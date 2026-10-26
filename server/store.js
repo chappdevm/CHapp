@@ -269,6 +269,13 @@ class ERPStore {
     }
   }
 
+  async ensureSynced() {
+    if (!this.supabase || !this.supabase.isReady()) return;
+    if (this._hasSyncedOnce) return;
+    await this.syncFromSupabaseIfAvailable();
+    this._hasSyncedOnce = true;
+  }
+
   async syncFromSupabaseIfAvailable() {
     if (!this.supabase || !this.supabase.isReady()) return;
     try {
@@ -667,7 +674,7 @@ class ERPStore {
       name,
       employee_name: String(payload.employee_name || this.getActiveAuthor()).trim(),
       department: String(payload.department || 'Operaciones & Proyectos').trim(),
-      product_id: product ? product.id : 4,
+      product_id: product ? product.id : (payload.product_id ? Number(payload.product_id) : null),
       product_name: product ? product.name : String(payload.product_name || 'Viáticos y Alojamiento Corporativo'),
       date: payload.date || todayStr(),
       payment_mode: payload.payment_mode || 'own_account',
@@ -877,7 +884,6 @@ class ERPStore {
 
     this.save();
     if (this.supabase) {
-      await this.supabase.saveExpense(exp);
       if (exp.move_id) {
         const move = this.data.accounting.moves.find((m) => Number(m.id) === Number(exp.move_id));
         if (move) await this.supabase.saveAccountMove(move);
@@ -886,6 +892,7 @@ class ERPStore {
         const pay = this.data.accounting.payments.find((p) => Number(p.id) === Number(exp.payment_id));
         if (pay) await this.supabase.savePayment(pay);
       }
+      await this.supabase.saveExpense(exp);
     }
     return exp;
   }
@@ -916,7 +923,7 @@ class ERPStore {
 
       return {
         id: line.id || idx + 1,
-        product_id: product ? product.id : Number(line.product_id || 1),
+        product_id: product ? product.id : (line.product_id ? Number(line.product_id) : null),
         product_name: product ? product.name : String(line.product_name || 'Servicio / Producto').trim(),
         description: String(line.description || (product ? product.name : 'Servicio')).trim(),
         quantity: qty,
@@ -1458,6 +1465,9 @@ class ERPStore {
         await this.supabase.savePayment(payment);
       } else if (action === 'cancel' || action === 'draft') {
         await this.supabase.deletePaymentsByMoveId(move.id);
+      }
+      if (linkedSale) {
+        await this.supabase.saveSaleOrder(linkedSale);
       }
     }
     return move;

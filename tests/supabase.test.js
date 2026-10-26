@@ -286,4 +286,123 @@ describe('Supabase Persistence Layer & PostgREST Architecture', () => {
     assert.equal(finalRes.ok, true);
     assert.equal(finalRes.data.length, 0);
   });
+
+  it('performs live relational roundtrip with foreign keys across all active tables (product -> partner -> sale + lines -> move -> expense)', async () => {
+    const persistence = new SupabasePersistence();
+    assert.equal(persistence.isReady(), true);
+
+    const relId = 777771;
+    const relMoveId = 777772;
+
+    try {
+      // 1. Create product & partner
+      await persistence.saveProduct({
+        id: relId,
+        name: 'Servicio Cloud Premium Test',
+        default_code: 'SRV-TEST',
+        type: 'service',
+        list_price: 250000,
+        standard_price: 100000,
+        tax_rate: 19
+      });
+
+      await persistence.savePartner({
+        id: relId,
+        name: 'Cliente Relacional Test SAS',
+        is_company: true,
+        email: 'relacional@example.com'
+      });
+
+      // 2. Create sale order with nested lines referencing partner and product
+      await persistence.saveSaleOrder({
+        id: relId,
+        name: 'S77771',
+        partner_id: relId,
+        partner_name: 'Cliente Relacional Test SAS',
+        date_order: '2026-10-26',
+        state: 'sale',
+        invoice_status: 'to invoice',
+        amount_untaxed: 250000,
+        amount_tax: 47500,
+        amount_total: 297500,
+        lines: [
+          {
+            product_id: relId,
+            product_name: 'Servicio Cloud Premium Test',
+            quantity: 1,
+            price_unit: 250000,
+            discount: 0,
+            tax_rate: 19,
+            subtotal: 250000,
+            tax_amount: 47500,
+            total: 297500
+          }
+        ]
+      });
+
+      // 3. Create account move referencing partner
+      await persistence.saveAccountMove({
+        id: relMoveId,
+        name: 'INV/2026/7772',
+        move_type: 'out_invoice',
+        journal_code: 'INV',
+        partner_id: relId,
+        partner_name: 'Cliente Relacional Test SAS',
+        invoice_date: '2026-10-26',
+        state: 'posted',
+        payment_state: 'not_paid',
+        amount_untaxed: 250000,
+        amount_tax: 47500,
+        amount_total: 297500,
+        amount_residual: 297500
+      });
+
+      // 4. Create hr_expense referencing partner, product, and account move
+      await persistence.saveExpense({
+        id: relId,
+        reference: 'EXP/2026/7771',
+        name: 'Gasto Viáticos Test',
+        employee_name: 'Consultor Test',
+        product_id: relId,
+        partner_id: relId,
+        date: '2026-10-26',
+        total_amount: 50000,
+        state: 'posted',
+        move_id: relMoveId
+      });
+
+      // 5. Verify recovery via loadAll
+      const loaded = await persistence.loadAll();
+      assert.ok(loaded);
+      const foundProduct = loaded.products.find((p) => Number(p.id) === relId);
+      assert.ok(foundProduct);
+      assert.equal(foundProduct.name, 'Servicio Cloud Premium Test');
+
+      const foundPartner = loaded.contacts.find((c) => Number(c.id) === relId);
+      assert.ok(foundPartner);
+      assert.equal(foundPartner.name, 'Cliente Relacional Test SAS');
+
+      const foundSale = loaded.sales.find((s) => Number(s.id) === relId);
+      assert.ok(foundSale);
+      assert.equal(foundSale.lines.length, 1);
+      assert.equal(foundSale.lines[0].product_name, 'Servicio Cloud Premium Test');
+
+      const foundMove = loaded.moves.find((m) => Number(m.id) === relMoveId);
+      assert.ok(foundMove);
+      assert.equal(foundMove.name, 'INV/2026/7772');
+
+      const foundExp = loaded.expenses.find((e) => Number(e.id) === relId);
+      assert.ok(foundExp);
+      assert.equal(foundExp.reference, 'EXP/2026/7771');
+      assert.equal(foundExp.move_id, relMoveId);
+    } finally {
+      // Cleanup in reverse dependency order
+      await callPostgrest(`/sale_order_line?order_id=eq.${relId}`, { method: 'DELETE' });
+      await callPostgrest(`/hr_expense?id=eq.${relId}`, { method: 'DELETE' });
+      await callPostgrest(`/sale_order?id=eq.${relId}`, { method: 'DELETE' });
+      await callPostgrest(`/account_move?id=eq.${relMoveId}`, { method: 'DELETE' });
+      await callPostgrest(`/res_partner?id=eq.${relId}`, { method: 'DELETE' });
+      await callPostgrest(`/product_template?id=eq.${relId}`, { method: 'DELETE' });
+    }
+  });
 });

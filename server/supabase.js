@@ -358,15 +358,39 @@ function serializeAccountMove(m) {
 
 function deserializeAccountMove(r) {
   const moveType = r.move_type || 'out_invoice';
-  const defaultAccountCode = moveType === 'out_invoice' ? '413501' : '519530';
-  const defaultAccountName =
-    moveType === 'out_invoice'
-      ? 'Ingresos por Servicios de Software y Consultoría'
-      : 'Gastos de Tecnología, Licencias y Suministros';
+  const isOutInvoice = moveType === 'out_invoice';
+  const isExpenseMove = r.journal_code === 'EXJ' || moveType === 'entry';
+  const defaultAccountCode = isOutInvoice ? '413501' : isExpenseMove ? '510506' : '519530';
+  const defaultAccountName = isOutInvoice
+    ? 'Ingresos por Servicios de Software y Consultoría'
+    : isExpenseMove
+    ? 'Gastos de Viaje, Viáticos y Representación'
+    : 'Gastos de Tecnología, Licencias y Suministros';
 
   const amountUntaxed = Number(r.amount_untaxed || 0);
   const amountTax = Number(r.amount_tax || 0);
   const amountTotal = Number(r.amount_total || 0);
+
+  let journalItems = [];
+  if (isOutInvoice) {
+    journalItems = [
+      { account_code: '130505', account_name: 'Clientes Nacionales (Cuentas por Cobrar)', label: r.partner_name || '', debit: amountTotal, credit: 0 },
+      { account_code: '413501', account_name: 'Ingresos por Servicios de Software y Consultoría', label: 'Ingresos por facturación', debit: 0, credit: amountUntaxed },
+      ...(amountTax > 0 ? [{ account_code: '240801', account_name: 'IVA Generado en Ventas (19%)', label: 'IVA Generado', debit: 0, credit: amountTax }] : [])
+    ];
+  } else if (isExpenseMove) {
+    journalItems = [
+      { account_code: '510506', account_name: 'Gastos de Viaje, Viáticos y Representación', label: r.ref || 'Gasto de empleado', debit: amountUntaxed, credit: 0 },
+      ...(amountTax > 0 ? [{ account_code: '240802', account_name: 'IVA Descontable en Compras y Gastos (19%)', label: 'IVA Descontable', debit: amountTax, credit: 0 }] : []),
+      { account_code: '233595', account_name: 'Costos y Gastos por Pagar / Reembolsos', label: r.partner_name || 'Empleado', debit: 0, credit: amountTotal }
+    ];
+  } else {
+    journalItems = [
+      { account_code: '519530', account_name: 'Gastos de Tecnología, Licencias y Suministros', label: 'Compras / Gastos', debit: amountUntaxed, credit: 0 },
+      ...(amountTax > 0 ? [{ account_code: '240802', account_name: 'IVA Descontable en Compras y Gastos (19%)', label: 'IVA Descontable', debit: amountTax, credit: 0 }] : []),
+      { account_code: '220505', account_name: 'Proveedores Nacionales (Cuentas por Pagar)', label: r.partner_name || '', debit: 0, credit: amountTotal }
+    ];
+  }
 
   return {
     id: Number(r.id),
@@ -407,18 +431,7 @@ function deserializeAccountMove(r) {
         total: amountTotal
       }
     ],
-    journal_items:
-      moveType === 'out_invoice'
-        ? [
-            { account_code: '130505', account_name: 'Clientes Nacionales (Cuentas por Cobrar)', label: r.partner_name || '', debit: amountTotal, credit: 0 },
-            { account_code: '413501', account_name: 'Ingresos por Servicios de Software y Consultoría', label: 'Ingresos por facturación', debit: 0, credit: amountUntaxed },
-            ...(amountTax > 0 ? [{ account_code: '240801', account_name: 'IVA Generado en Ventas (19%)', label: 'IVA Generado', debit: 0, credit: amountTax }] : [])
-          ]
-        : [
-            { account_code: '519530', account_name: 'Gastos de Tecnología, Licencias y Suministros', label: 'Compras / Gastos', debit: amountUntaxed, credit: 0 },
-            ...(amountTax > 0 ? [{ account_code: '240802', account_name: 'IVA Descontable en Compras y Gastos (19%)', label: 'IVA Descontable', debit: amountTax, credit: 0 }] : []),
-            { account_code: '220505', account_name: 'Proveedores Nacionales (Cuentas por Pagar)', label: r.partner_name || '', debit: 0, credit: amountTotal }
-          ],
+    journal_items: journalItems,
     chatter: []
   };
 }

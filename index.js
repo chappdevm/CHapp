@@ -55,6 +55,10 @@ function createHandler(store = new ERPStore()) {
 
     if (pathname.startsWith('/api/')) {
       try {
+        if (store.ensureSynced) {
+          await store.ensureSynced();
+        }
+
         if (method === 'GET' && pathname === '/api/bootstrap') {
           if (store.syncFromSupabaseIfAvailable) {
             await store.syncFromSupabaseIfAvailable();
