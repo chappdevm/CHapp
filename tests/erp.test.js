@@ -499,6 +499,23 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.ok(jsText.includes('class="o_group o_acc_add_grid"'), 'Accounts quick add should use o_acc_add_grid');
     assert.ok(cssText.includes('.o_prod_add_grid'), 'CSS must define .o_prod_add_grid');
     assert.ok(cssText.includes('.o_acc_add_grid'), 'CSS must define .o_acc_add_grid');
+
+    // 10. WCAG touch targets >= 44px on all mobile interactive elements
+    assert.ok(cssText.includes('.o_filter_pill {\n    min-height: 44px;'), 'Filter pills must have min-height 44px on mobile');
+    assert.ok(cssText.includes('.o_switch_btn {\n    min-height: 44px;'), 'Switch buttons must have min-height 44px on mobile');
+    assert.ok(cssText.includes('.o_arrow_button {\n    min-height: 44px;'), 'Statusbar arrow buttons must have min-height 44px on mobile');
+    assert.ok(cssText.includes('.btn-sm {\n    min-height: 44px;'), 'Small buttons must have min-height 44px on mobile');
+    assert.ok(cssText.includes('.o_nav_entry {\n    min-height: 44px;'), 'Navbar entries must have min-height 44px on mobile');
+
+    // 11. iOS Safari auto-zoom prevention (font-size: 16px on mobile inputs)
+    assert.ok(cssText.includes('.o_searchview input {\n    font-size: 16px;'), 'Search input must have font-size 16px on mobile');
+    assert.ok(cssText.includes('font-size: 16px;\n  }\n\n  .o_notebook_tab'), 'Form inputs must have font-size 16px on mobile');
+
+    // 12. Top navbar compaction on mobile (theme label hidden) & Command palette
+    assert.ok(cssText.includes('#btnThemeToggle .o_theme_label {\n    display: none;'), 'Theme label must be hidden on mobile');
+    assert.ok(cssText.includes('.o_cmd_entry'), 'Command palette must have dedicated responsive class');
+    assert.ok(jsText.includes('class="o_cmd_entry"'), 'JS command palette must use o_cmd_entry');
+    assert.ok(cssText.includes('.o_badge {\n  display: inline-flex;\n  align-items: center;\n  gap: 0.25rem;\n  padding: 0.15rem 0.55rem;\n  font-size: 0.74rem;\n  font-weight: 600;\n  border-radius: 999px;\n  white-space: nowrap;\n  flex-shrink: 0;\n}'), 'Badges must have flex-shrink: 0');
   });
 });
 

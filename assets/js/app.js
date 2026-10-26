@@ -180,8 +180,10 @@
   function applyTheme(theme) {
     const t = theme === 'light' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', t);
+    const icon = document.getElementById('themeIcon');
     const lbl = document.getElementById('themeIconLabel');
-    if (lbl) lbl.textContent = t === 'dark' ? '🌙 Oscuro' : '☀️ Claro';
+    if (icon) icon.textContent = t === 'dark' ? '🌙' : '☀️';
+    if (lbl) lbl.textContent = t === 'dark' ? 'Oscuro' : 'Claro';
   }
 
   function updateSystray() {
@@ -3120,8 +3122,8 @@
       .slice(0, 12)
       .map(
         (it, i) => `
-        <button type="button" class="o_nav_entry" data-cmd-idx="${i}" style="display: flex; justify-content: space-between; width: 100%; text-align: start; padding: 0.5rem 0.75rem; background: var(--o-gray-100); border: 1px solid var(--o-border-color);">
-          <span>${esc(it.label)}</span>
+        <button type="button" class="o_cmd_entry" data-cmd-idx="${i}">
+          <span class="o_cmd_label">${esc(it.label)}</span>
           <span class="o_badge o_badge_info">${esc(it.type)}</span>
         </button>
       `
