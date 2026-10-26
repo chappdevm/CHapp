@@ -3143,6 +3143,9 @@
 
     try {
       const res = await fetch('/api/bootstrap');
+      if (!res.ok) {
+        throw new Error(`Error HTTP ${res.status} (${res.statusText || 'Ruta no encontrada'})`);
+      }
       const json = await res.json();
       state.data = json.data;
       updateSystray();
