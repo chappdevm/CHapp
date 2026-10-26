@@ -56,94 +56,97 @@ function createHandler(store = new ERPStore()) {
     if (pathname.startsWith('/api/')) {
       try {
         if (method === 'GET' && pathname === '/api/bootstrap') {
+          if (store.syncFromSupabaseIfAvailable) {
+            await store.syncFromSupabaseIfAvailable();
+          }
           return sendJson(res, 200, { ok: true, data: store.getBootstrapState() });
         }
 
         if (method === 'POST' && pathname === '/api/reset') {
-          const data = store.reset();
+          const data = await store.reset();
           return sendJson(res, 200, { ok: true, data });
         }
 
         // Contacts
         if (method === 'POST' && pathname === '/api/contacts') {
           const body = await readJsonBody(req);
-          const contact = store.saveContact(body);
+          const contact = await store.saveContact(body);
           return sendJson(res, 200, { ok: true, contact, state: store.getBootstrapState() });
         }
 
         const contactDelMatch = pathname.match(/^\/api\/contacts\/(\d+)$/);
         if (method === 'DELETE' && contactDelMatch) {
-          const removed = store.deleteContact(Number(contactDelMatch[1]));
+          const removed = await store.deleteContact(Number(contactDelMatch[1]));
           return sendJson(res, 200, { ok: true, removed, state: store.getBootstrapState() });
         }
 
         // Products
         if (method === 'POST' && pathname === '/api/products') {
           const body = await readJsonBody(req);
-          const product = store.saveProduct(body);
+          const product = await store.saveProduct(body);
           return sendJson(res, 200, { ok: true, product, state: store.getBootstrapState() });
         }
 
         // Expenses
         if (method === 'POST' && pathname === '/api/expenses') {
           const body = await readJsonBody(req);
-          const expense = store.saveExpense(body);
+          const expense = await store.saveExpense(body);
           return sendJson(res, 200, { ok: true, expense, state: store.getBootstrapState() });
         }
 
         const expActionMatch = pathname.match(/^\/api\/expenses\/(\d+)\/action$/);
         if (method === 'POST' && expActionMatch) {
           const body = await readJsonBody(req);
-          const expense = store.transitionExpense(Number(expActionMatch[1]), body.action, body);
+          const expense = await store.transitionExpense(Number(expActionMatch[1]), body.action, body);
           return sendJson(res, 200, { ok: true, expense, state: store.getBootstrapState() });
         }
 
         // Sales
         if (method === 'POST' && pathname === '/api/sales') {
           const body = await readJsonBody(req);
-          const order = store.saveSaleOrder(body);
+          const order = await store.saveSaleOrder(body);
           return sendJson(res, 200, { ok: true, order, state: store.getBootstrapState() });
         }
 
         const saleActionMatch = pathname.match(/^\/api\/sales\/(\d+)\/action$/);
         if (method === 'POST' && saleActionMatch) {
           const body = await readJsonBody(req);
-          const result = store.transitionSaleOrder(Number(saleActionMatch[1]), body.action);
+          const result = await store.transitionSaleOrder(Number(saleActionMatch[1]), body.action);
           return sendJson(res, 200, { ok: true, ...result, state: store.getBootstrapState() });
         }
 
         // Accounting Moves
         if (method === 'POST' && pathname === '/api/accounting/moves') {
           const body = await readJsonBody(req);
-          const move = store.saveAccountMove(body);
+          const move = await store.saveAccountMove(body);
           return sendJson(res, 200, { ok: true, move, state: store.getBootstrapState() });
         }
 
         const moveActionMatch = pathname.match(/^\/api\/accounting\/moves\/(\d+)\/action$/);
         if (method === 'POST' && moveActionMatch) {
           const body = await readJsonBody(req);
-          const move = store.transitionAccountMove(Number(moveActionMatch[1]), body.action, body);
+          const move = await store.transitionAccountMove(Number(moveActionMatch[1]), body.action, body);
           return sendJson(res, 200, { ok: true, move, state: store.getBootstrapState() });
         }
 
         // Accounting Accounts
         if (method === 'POST' && pathname === '/api/accounting/accounts') {
           const body = await readJsonBody(req);
-          const account = store.saveAccount(body);
+          const account = await store.saveAccount(body);
           return sendJson(res, 200, { ok: true, account, state: store.getBootstrapState() });
         }
 
         // Settings
         if (method === 'POST' && pathname === '/api/settings') {
           const body = await readJsonBody(req);
-          const settings = store.saveSettings(body);
+          const settings = await store.saveSettings(body);
           return sendJson(res, 200, { ok: true, settings, state: store.getBootstrapState() });
         }
 
         // Chatter notes
         if (method === 'POST' && pathname === '/api/chatter') {
           const body = await readJsonBody(req);
-          const record = store.addChatterNote(body.model, body.id, body.text);
+          const record = await store.addChatterNote(body.model, body.id, body.text);
           return sendJson(res, 200, { ok: true, record, state: store.getBootstrapState() });
         }
 

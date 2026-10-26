@@ -1,0 +1,289 @@
+const { describe, it } = require('node:test');
+const assert = require('node:assert/strict');
+const {
+  isSupabaseConfigured,
+  getSupabaseConfig,
+  callPostgrest,
+  SupabasePersistence,
+  serializePartner,
+  deserializePartner,
+  serializeProduct,
+  deserializeProduct,
+  serializeExpense,
+  deserializeExpense,
+  serializeSaleOrder,
+  serializeSaleOrderLine,
+  deserializeSaleOrder,
+  serializeAccountMove,
+  deserializeAccountMove,
+  serializePayment,
+  deserializePayment,
+  serializeSettings,
+  deserializeSettings
+} = require('../server/supabase');
+
+describe('Supabase Persistence Layer & PostgREST Architecture', () => {
+  it('detects Supabase configuration correctly from environment', () => {
+    const config = getSupabaseConfig();
+    assert.ok(config.url.startsWith('https://'), 'Supabase URL must start with https://');
+    assert.ok(config.key.length > 20, 'Supabase key must be set');
+    assert.equal(isSupabaseConfigured(), true);
+  });
+
+  it('serializes and deserializes res_partner (Contactos) with full fidelity', () => {
+    const original = {
+      id: 42,
+      name: 'Constructora Bolívar S.A.S.',
+      is_company: true,
+      vat: '900.123.456-7',
+      function: 'Empresa',
+      street: 'Calle 100 # 15-20',
+      city: 'Medellín',
+      state_name: 'Antioquia',
+      country: 'Colombia',
+      email: 'contacto@bolivar.com',
+      phone: '6045551234',
+      mobile: '3105556789',
+      website: 'https://bolivar.com',
+      customer_rank: 1,
+      supplier_rank: 2,
+      category_ids: ['VIP', 'Construcción'],
+      payment_term: '60 Días',
+      notes: 'Cliente preferencial',
+      active: true
+    };
+
+    const serialized = serializePartner(original);
+    assert.equal(serialized.id, 42);
+    assert.equal(serialized.name, 'Constructora Bolívar S.A.S.');
+    assert.deepEqual(serialized.category_ids, ['VIP', 'Construcción']);
+
+    const deserialized = deserializePartner(serialized);
+    assert.equal(deserialized.id, 42);
+    assert.equal(deserialized.name, original.name);
+    assert.equal(deserialized.is_company, true);
+    assert.equal(deserialized.city, 'Medellín');
+    assert.deepEqual(deserialized.category_ids, ['VIP', 'Construcción']);
+    assert.equal(deserialized.payment_term, '60 Días');
+  });
+
+  it('serializes and deserializes product_template (Productos)', () => {
+    const original = {
+      id: 10,
+      name: 'Licencia Servidor Dedicado',
+      default_code: 'LIC-SRV-01',
+      type: 'service',
+      list_price: 2500000,
+      standard_price: 1200000,
+      tax_rate: 19,
+      category: 'Infraestructura',
+      can_be_sold: true,
+      can_be_expensed: false,
+      uom: 'Mes'
+    };
+
+    const serialized = serializeProduct(original);
+    assert.equal(serialized.list_price, 2500000);
+    assert.equal(serialized.tax_rate, 19);
+
+    const deserialized = deserializeProduct(serialized);
+    assert.equal(deserialized.name, original.name);
+    assert.equal(deserialized.list_price, 2500000);
+    assert.equal(deserialized.standard_price, 1200000);
+    assert.equal(deserialized.can_be_expensed, false);
+    assert.equal(deserialized.uom, 'Mes');
+  });
+
+  it('serializes and deserializes hr_expense (Gastos)', () => {
+    const original = {
+      id: 5,
+      reference: 'EXP/2026/0005',
+      name: 'Hospedaje Cali Conferencia',
+      employee_name: 'Laura Gómez',
+      department: 'Comercial',
+      product_id: 4,
+      date: '2026-10-20',
+      payment_mode: 'company_account',
+      quantity: 3,
+      price_unit: 150000,
+      tax_rate: 19,
+      untaxed_amount: 450000,
+      tax_amount: 85500,
+      total_amount: 535500,
+      partner_id: 1,
+      receipt_ref: 'FAC-9876',
+      notes: 'Hotel Dann Cali',
+      state: 'posted',
+      move_id: 12
+    };
+
+    const serialized = serializeExpense(original);
+    assert.equal(serialized.reference, 'EXP/2026/0005');
+    assert.equal(serialized.total_amount, 535500);
+
+    const deserialized = deserializeExpense(serialized);
+    assert.equal(deserialized.reference, original.reference);
+    assert.equal(deserialized.total_amount, 535500);
+    assert.equal(deserialized.employee_name, 'Laura Gómez');
+    assert.equal(deserialized.move_id, 12);
+  });
+
+  it('serializes and deserializes sale_order with nested sale_order_lines', () => {
+    const originalOrder = {
+      id: 7,
+      name: 'S00007',
+      partner_id: 2,
+      partner_name: 'Ecopetrol S.A.',
+      date_order: '2026-10-25',
+      validity_date: '2026-11-25',
+      salesperson: 'Laura Gómez',
+      payment_term: '30 Días',
+      state: 'sale',
+      invoice_status: 'to invoice',
+      amount_untaxed: 1000000,
+      amount_tax: 190000,
+      amount_total: 1190000,
+      notes: 'Entrega prioritaria',
+      lines: [
+        {
+          id: 1,
+          product_id: 1,
+          product_name: 'Consultoría ERP',
+          description: 'Implementación Fase 1',
+          quantity: 1,
+          price_unit: 1000000,
+          discount: 0,
+          tax_rate: 19,
+          subtotal: 1000000,
+          tax_amount: 190000,
+          total: 1190000
+        }
+      ]
+    };
+
+    const serializedOrder = serializeSaleOrder(originalOrder);
+    assert.equal(serializedOrder.name, 'S00007');
+    assert.equal(serializedOrder.amount_total, 1190000);
+
+    const serializedLine = serializeSaleOrderLine(originalOrder.lines[0], originalOrder.id);
+    assert.equal(serializedLine.order_id, 7);
+    assert.equal(serializedLine.total, 1190000);
+
+    const simulatedPostgrestJoin = {
+      ...serializedOrder,
+      sale_order_line: [serializedLine]
+    };
+
+    const deserializedOrder = deserializeSaleOrder(simulatedPostgrestJoin);
+    assert.equal(deserializedOrder.name, 'S00007');
+    assert.equal(deserializedOrder.amount_total, 1190000);
+    assert.equal(deserializedOrder.lines.length, 1);
+    assert.equal(deserializedOrder.lines[0].description, 'Implementación Fase 1');
+  });
+
+  it('serializes and deserializes account_move (Facturas y Asientos)', () => {
+    const original = {
+      id: 15,
+      name: 'INV/2026/0015',
+      move_type: 'out_invoice',
+      journal_code: 'INV',
+      partner_id: 2,
+      partner_name: 'Ecopetrol S.A.',
+      invoice_date: '2026-10-26',
+      invoice_date_due: '2026-11-25',
+      ref: 'S00007',
+      origin: 'S00007',
+      state: 'posted',
+      payment_state: 'partial',
+      amount_untaxed: 1000000,
+      amount_tax: 190000,
+      amount_total: 1190000,
+      amount_residual: 500000
+    };
+
+    const serialized = serializeAccountMove(original);
+    assert.equal(serialized.name, 'INV/2026/0015');
+    assert.equal(serialized.amount_residual, 500000);
+
+    const deserialized = deserializeAccountMove(serialized);
+    assert.equal(deserialized.name, 'INV/2026/0015');
+    assert.equal(deserialized.journal_code, 'INV');
+    assert.equal(deserialized.payment_state, 'partial');
+    assert.equal(deserialized.amount_residual, 500000);
+    assert.ok(deserialized.lines.length >= 1, 'Should reconstruct default invoice lines');
+  });
+
+  it('serializes and deserializes account_payment (Pagos) and res_config_settings (Ajustes)', () => {
+    const payment = {
+      id: 3,
+      name: 'PAY/2026/0003',
+      payment_type: 'inbound',
+      partner_id: 2,
+      partner_name: 'Ecopetrol S.A.',
+      amount: 690000,
+      date: '2026-10-26',
+      journal_code: 'BNK1',
+      journal_name: 'Banco Bancolombia Cta Cte',
+      ref: 'INV/2026/0015',
+      move_id: 15,
+      state: 'posted'
+    };
+
+    const serializedPay = serializePayment(payment);
+    assert.equal(serializedPay.name, 'PAY/2026/0003');
+    const deserializedPay = deserializePayment(serializedPay);
+    assert.equal(deserializedPay.amount, 690000);
+    assert.equal(deserializedPay.move_id, 15);
+
+    const settings = {
+      company_name: 'CHapp Colombia S.A.S.',
+      currency: 'COP',
+      currency_symbol: '$',
+      theme: 'dark',
+      active_user: { id: 1, name: 'Admin' }
+    };
+    const serializedSettings = serializeSettings(settings);
+    assert.equal(serializedSettings.company_name, 'CHapp Colombia S.A.S.');
+    const deserializedSettings = deserializeSettings(serializedSettings);
+    assert.equal(deserializedSettings.company_name, 'CHapp Colombia S.A.S.');
+    assert.equal(deserializedSettings.theme, 'dark');
+  });
+
+  it('performs live PostgREST roundtrip CRUD on Supabase (create -> read -> update -> delete)', async () => {
+    const persistence = new SupabasePersistence();
+    assert.equal(persistence.isReady(), true);
+
+    const testId = 888888;
+    const testContact = {
+      id: testId,
+      name: 'Contacto Test Automatizado PostgREST',
+      is_company: true,
+      city: 'Bucaramanga',
+      category_ids: ['Test', 'CI']
+    };
+
+    // 1. Create
+    await persistence.savePartner(testContact);
+
+    // 2. Read back
+    const readRes = await callPostgrest(`/res_partner?id=eq.${testId}`);
+    assert.equal(readRes.ok, true);
+    assert.equal(readRes.data.length, 1);
+    assert.equal(readRes.data[0].name, 'Contacto Test Automatizado PostgREST');
+    assert.deepEqual(readRes.data[0].category_ids, ['Test', 'CI']);
+
+    // 3. Update
+    testContact.city = 'Pasto';
+    await persistence.savePartner(testContact);
+
+    const updateRes = await callPostgrest(`/res_partner?id=eq.${testId}`);
+    assert.equal(updateRes.ok, true);
+    assert.equal(updateRes.data[0].city, 'Pasto');
+
+    // 4. Delete & verify
+    await persistence.deletePartner(testId);
+    const finalRes = await callPostgrest(`/res_partner?id=eq.${testId}`);
+    assert.equal(finalRes.ok, true);
+    assert.equal(finalRes.data.length, 0);
+  });
+});

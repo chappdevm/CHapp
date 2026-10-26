@@ -118,3 +118,45 @@ CREATE TABLE IF NOT EXISTS public.hr_expense (
   move_id BIGINT REFERENCES public.account_move(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS public.account_payment (
+  id BIGSERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  payment_type TEXT NOT NULL DEFAULT 'inbound', -- inbound, outbound
+  partner_id BIGINT REFERENCES public.res_partner(id),
+  partner_name TEXT,
+  amount NUMERIC(14,2) NOT NULL DEFAULT 0,
+  date DATE NOT NULL DEFAULT CURRENT_DATE,
+  journal_code TEXT NOT NULL DEFAULT 'BNK1',
+  journal_name TEXT DEFAULT 'Banco Bancolombia Cta Cte',
+  ref TEXT,
+  move_id BIGINT REFERENCES public.account_move(id),
+  state TEXT NOT NULL DEFAULT 'posted',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.res_config_settings (
+  id BIGSERIAL PRIMARY KEY,
+  company_name TEXT NOT NULL DEFAULT 'CHapp ERP S.A.S.',
+  company_vat TEXT,
+  company_email TEXT DEFAULT 'chappdevm@gmail.com',
+  company_phone TEXT,
+  company_city TEXT DEFAULT 'Bogotá D.C.',
+  company_country TEXT DEFAULT 'Colombia',
+  company_address TEXT,
+  currency TEXT NOT NULL DEFAULT 'COP',
+  currency_symbol TEXT NOT NULL DEFAULT '$',
+  theme TEXT NOT NULL DEFAULT 'dark',
+  quotation_validity_days INT NOT NULL DEFAULT 30,
+  enable_line_discounts BOOLEAN NOT NULL DEFAULT true,
+  default_sale_tax NUMERIC(5,2) NOT NULL DEFAULT 19,
+  default_purchase_tax NUMERIC(5,2) NOT NULL DEFAULT 19,
+  fiscal_regime TEXT DEFAULT 'Responsable de IVA - Régimen Ordinario',
+  expense_approval_required BOOLEAN NOT NULL DEFAULT true,
+  expense_default_journal TEXT DEFAULT 'EXJ',
+  default_bank_journal TEXT DEFAULT 'BNK1',
+  sale_terms TEXT DEFAULT 'Condiciones de pago y entrega según cotización.',
+  active_user JSONB,
+  users JSONB,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { SupabasePersistence, isSupabaseConfigured } = require('./supabase');
 
 const DEFAULT_DB_PATH = path.join(__dirname, '..', 'data', 'db.json');
 
@@ -241,8 +242,14 @@ function createInitialData() {
 }
 
 class ERPStore {
-  constructor(dbPath = DEFAULT_DB_PATH) {
+  constructor(dbPath = DEFAULT_DB_PATH, options = {}) {
     this.dbPath = dbPath;
+    this.options = options;
+    const isTestPath = typeof dbPath === 'string' && dbPath.includes('chapp_erp_test_');
+    const useSupabase = options.useSupabase !== undefined
+      ? Boolean(options.useSupabase)
+      : (process.env.NODE_ENV !== 'test' && !isTestPath && isSupabaseConfigured());
+    this.supabase = useSupabase ? new SupabasePersistence() : null;
     this.data = null;
     this.load();
   }
@@ -262,6 +269,59 @@ class ERPStore {
     }
   }
 
+  async syncFromSupabaseIfAvailable() {
+    if (!this.supabase || !this.supabase.isReady()) return;
+    try {
+      const remote = await this.supabase.loadAll(this.data);
+      if (remote) {
+        if (Array.isArray(remote.contacts)) this.data.contacts = remote.contacts;
+        if (Array.isArray(remote.products)) this.data.products = remote.products;
+        if (Array.isArray(remote.expenses)) this.data.expenses = remote.expenses;
+        if (Array.isArray(remote.sales)) this.data.sales = remote.sales;
+        if (Array.isArray(remote.moves)) this.data.accounting.moves = remote.moves;
+        if (Array.isArray(remote.payments)) this.data.accounting.payments = remote.payments;
+        if (remote.settings) this.data.settings = remote.settings;
+
+        this.updateSequencesFromData();
+        this.save();
+      }
+    } catch (err) {
+      console.warn('[Store] syncFromSupabase error:', err.message);
+    }
+  }
+
+  updateSequencesFromData() {
+    if (!this.data.meta) this.data.meta = { sequences: {} };
+    if (!this.data.meta.sequences) this.data.meta.sequences = {};
+    const seq = this.data.meta.sequences;
+
+    const maxContact = (this.data.contacts || []).reduce((m, c) => Math.max(m, Number(c.id) || 0), 0);
+    seq.contact = Math.max(seq.contact || 1, maxContact + 1);
+
+    const maxProduct = (this.data.products || []).reduce((m, p) => Math.max(m, Number(p.id) || 0), 0);
+    seq.product = Math.max(seq.product || 1, maxProduct + 1);
+
+    const maxExpense = (this.data.expenses || []).reduce((m, e) => Math.max(m, Number(e.id) || 0), 0);
+    seq.expense = Math.max(seq.expense || 1, maxExpense + 1);
+
+    const maxSale = (this.data.sales || []).reduce((m, s) => Math.max(m, Number(s.id) || 0), 0);
+    seq.sale = Math.max(seq.sale || 1, maxSale + 1);
+
+    const moves = (this.data.accounting && this.data.accounting.moves) || [];
+    const maxInv = moves.filter((m) => m.move_type === 'out_invoice').reduce((m, x) => Math.max(m, Number(x.id) || 0), 0);
+    seq.move_inv = Math.max(seq.move_inv || 1, maxInv + 1);
+
+    const maxBill = moves.filter((m) => m.move_type === 'in_invoice').reduce((m, x) => Math.max(m, Number(x.id) || 0), 0);
+    seq.move_bill = Math.max(seq.move_bill || 1, maxBill + 1);
+
+    const maxMisc = moves.filter((m) => m.move_type === 'entry').reduce((m, x) => Math.max(m, Number(x.id) || 0), 0);
+    seq.move_misc = Math.max(seq.move_misc || 1, maxMisc + 1);
+
+    const payments = (this.data.accounting && this.data.accounting.payments) || [];
+    const maxPay = payments.reduce((m, p) => Math.max(m, Number(p.id) || 0), 0);
+    seq.payment = Math.max(seq.payment || 1, maxPay + 1);
+  }
+
   save() {
     const dir = path.dirname(this.dbPath);
     if (!fs.existsSync(dir)) {
@@ -270,9 +330,12 @@ class ERPStore {
     fs.writeFileSync(this.dbPath, JSON.stringify(this.data, null, 2), 'utf8');
   }
 
-  reset() {
+  async reset() {
     this.data = createInitialData();
     this.save();
+    if (this.supabase) {
+      await this.supabase.resetData();
+    }
     return this.getBootstrapState();
   }
 
@@ -364,7 +427,7 @@ class ERPStore {
   }
 
   // ==================== CONTACTOS (res.partner) ====================
-  saveContact(payload) {
+  async saveContact(payload) {
     if (!payload || typeof payload !== 'object') {
       throw new Error('Datos de contacto inválidos.');
     }
@@ -411,6 +474,9 @@ class ERPStore {
       ];
       this.data.contacts[idx] = updated;
       this.save();
+      if (this.supabase) {
+        await this.supabase.savePartner(updated);
+      }
       return this.getEnrichedContacts().find((c) => Number(c.id) === Number(updated.id));
     }
 
@@ -444,10 +510,13 @@ class ERPStore {
     };
     this.data.contacts.unshift(newContact);
     this.save();
+    if (this.supabase) {
+      await this.supabase.savePartner(newContact);
+    }
     return this.getEnrichedContacts().find((c) => Number(c.id) === Number(id));
   }
 
-  deleteContact(id) {
+  async deleteContact(id) {
     const idx = this.data.contacts.findIndex((c) => Number(c.id) === Number(id));
     if (idx === -1) throw new Error('Contacto no encontrado.');
     const hasSales = this.data.sales.some((s) => Number(s.partner_id) === Number(id));
@@ -458,6 +527,9 @@ class ERPStore {
     }
     const removed = this.data.contacts.splice(idx, 1)[0];
     this.save();
+    if (this.supabase) {
+      await this.supabase.deletePartner(id);
+    }
     return removed;
   }
 
@@ -478,7 +550,7 @@ class ERPStore {
   }
 
   // ==================== PRODUCTOS (product.template) ====================
-  saveProduct(payload) {
+  async saveProduct(payload) {
     if (!payload || typeof payload !== 'object') throw new Error('Datos de producto inválidos.');
     const name = String(payload.name || '').trim();
     if (!name) throw new Error('El nombre del producto es obligatorio.');
@@ -503,6 +575,9 @@ class ERPStore {
         uom: String(payload.uom || this.data.products[idx].uom || 'Unidad').trim()
       };
       this.save();
+      if (this.supabase) {
+        await this.supabase.saveProduct(this.data.products[idx]);
+      }
       return this.data.products[idx];
     }
 
@@ -522,11 +597,14 @@ class ERPStore {
     };
     this.data.products.push(prod);
     this.save();
+    if (this.supabase) {
+      await this.supabase.saveProduct(prod);
+    }
     return prod;
   }
 
   // ==================== GASTOS (hr.expense) ====================
-  saveExpense(payload) {
+  async saveExpense(payload) {
     if (!payload || typeof payload !== 'object') throw new Error('Datos de gasto inválidos.');
     const name = String(payload.name || '').trim();
     if (!name) throw new Error('La descripción del gasto es obligatoria.');
@@ -575,6 +653,9 @@ class ERPStore {
       ];
       this.data.expenses[idx] = updated;
       this.save();
+      if (this.supabase) {
+        await this.supabase.saveExpense(updated);
+      }
       return updated;
     }
 
@@ -612,10 +693,13 @@ class ERPStore {
     };
     this.data.expenses.unshift(newExpense);
     this.save();
+    if (this.supabase) {
+      await this.supabase.saveExpense(newExpense);
+    }
     return newExpense;
   }
 
-  transitionExpense(id, action, extra = {}) {
+  async transitionExpense(id, action, extra = {}) {
     const exp = this.data.expenses.find((e) => Number(e.id) === Number(id));
     if (!exp) throw new Error('Gasto no encontrado.');
 
@@ -734,7 +818,7 @@ class ERPStore {
         throw new Error('El gasto debe estar Publicado para registrar su reembolso.');
       }
       if (!exp.move_id) {
-        this.transitionExpense(id, 'post');
+        await this.transitionExpense(id, 'post');
       }
       const paySeq = this.nextSeq('payment');
       const payId = this.data.accounting.payments.reduce((m, p) => Math.max(m, Number(p.id)), 0) + 1;
@@ -792,6 +876,17 @@ class ERPStore {
     }
 
     this.save();
+    if (this.supabase) {
+      await this.supabase.saveExpense(exp);
+      if (exp.move_id) {
+        const move = this.data.accounting.moves.find((m) => Number(m.id) === Number(exp.move_id));
+        if (move) await this.supabase.saveAccountMove(move);
+      }
+      if (exp.payment_id) {
+        const pay = this.data.accounting.payments.find((p) => Number(p.id) === Number(exp.payment_id));
+        if (pay) await this.supabase.savePayment(pay);
+      }
+    }
     return exp;
   }
 
@@ -836,7 +931,7 @@ class ERPStore {
     });
   }
 
-  saveSaleOrder(payload) {
+  async saveSaleOrder(payload) {
     if (!payload || typeof payload !== 'object') throw new Error('Datos de pedido inválidos.');
     const partner = this.data.contacts.find((c) => Number(c.id) === Number(payload.partner_id));
     if (!partner && !payload.partner_name) {
@@ -873,6 +968,9 @@ class ERPStore {
       ];
       this.data.sales[idx] = updated;
       this.save();
+      if (this.supabase) {
+        await this.supabase.saveSaleOrder(updated);
+      }
       return updated;
     }
 
@@ -903,12 +1001,16 @@ class ERPStore {
     };
     this.data.sales.unshift(newOrder);
     this.save();
+    if (this.supabase) {
+      await this.supabase.saveSaleOrder(newOrder);
+    }
     return newOrder;
   }
 
-  transitionSaleOrder(id, action) {
+  async transitionSaleOrder(id, action) {
     const order = this.data.sales.find((s) => Number(s.id) === Number(id));
     if (!order) throw new Error('Pedido de venta no encontrado.');
+    let invoice = null;
 
     if (action === 'send') {
       if (order.state !== 'draft') throw new Error('Solo las cotizaciones en borrador se marcan como enviadas.');
@@ -1013,7 +1115,7 @@ class ERPStore {
         });
       }
 
-      const invoice = {
+      invoice = {
         id: moveId,
         name: invName,
         move_type: 'out_invoice',
@@ -1048,8 +1150,6 @@ class ERPStore {
         date: this.formatNowShort(),
         text: `Factura de cliente ${invName} creada en Contabilidad.`
       });
-      this.save();
-      return { order, invoice };
     } else if (action === 'cancel') {
       const hasPostedInvoices = (order.invoice_ids || []).some((mid) => {
         const m = this.data.accounting.moves.find((x) => Number(x.id) === Number(mid));
@@ -1080,11 +1180,17 @@ class ERPStore {
     }
 
     this.save();
-    return { order };
+    if (this.supabase) {
+      await this.supabase.saveSaleOrder(order);
+      if (action === 'create_invoice' && invoice) {
+        await this.supabase.saveAccountMove(invoice);
+      }
+    }
+    return { order, ...(invoice ? { invoice } : {}) };
   }
 
   // ==================== CONTABILIDAD (account.move & account.payment) ====================
-  saveAccountMove(payload) {
+  async saveAccountMove(payload) {
     if (!payload || typeof payload !== 'object') throw new Error('Datos de documento contable inválidos.');
     const existingIdx = payload.id ? this.data.accounting.moves.findIndex((m) => Number(m.id) === Number(payload.id)) : -1;
     const existing = existingIdx !== -1 ? this.data.accounting.moves[existingIdx] : null;
@@ -1191,6 +1297,9 @@ class ERPStore {
         return this.transitionAccountMove(updatedMove.id, 'post');
       }
       this.save();
+      if (this.supabase) {
+        await this.supabase.saveAccountMove(updatedMove);
+      }
       return updatedMove;
     }
 
@@ -1227,12 +1336,17 @@ class ERPStore {
       return this.transitionAccountMove(newMove.id, 'post');
     }
     this.save();
+    if (this.supabase) {
+      await this.supabase.saveAccountMove(newMove);
+    }
     return newMove;
   }
 
-  transitionAccountMove(id, action, extra = {}) {
+  async transitionAccountMove(id, action, extra = {}) {
     const move = this.data.accounting.moves.find((m) => Number(m.id) === Number(id));
     if (!move) throw new Error('Documento contable no encontrado.');
+
+    let payment = null;
 
     const reverseLinkedPayments = () => {
       const linked = this.data.accounting.payments.filter((p) => Number(p.move_id) === Number(move.id));
@@ -1280,7 +1394,7 @@ class ERPStore {
       const journalName = journalCode === 'CSH1' ? 'Caja General Efectivo' : 'Banco Bancolombia Cta Cte';
       const paymentType = move.move_type === 'out_invoice' ? 'inbound' : 'outbound';
 
-      const payment = {
+      payment = {
         id: payId,
         name: payName,
         payment_type: paymentType,
@@ -1338,6 +1452,14 @@ class ERPStore {
     }
 
     this.save();
+    if (this.supabase) {
+      await this.supabase.saveAccountMove(move);
+      if (action === 'register_payment' && payment) {
+        await this.supabase.savePayment(payment);
+      } else if (action === 'cancel' || action === 'draft') {
+        await this.supabase.deletePaymentsByMoveId(move.id);
+      }
+    }
     return move;
   }
 
@@ -1363,7 +1485,7 @@ class ERPStore {
   }
 
   // ==================== AJUSTES (res.config.settings) ====================
-  saveSettings(payload) {
+  async saveSettings(payload) {
     if (!payload || typeof payload !== 'object') throw new Error('Parámetros de configuración inválidos.');
     const currencySymbols = { COP: '$', USD: 'US$', EUR: '€' };
     const nextCurrency = payload.currency || this.data.settings.currency;
@@ -1382,6 +1504,9 @@ class ERPStore {
       currency_symbol: currencySymbols[nextCurrency] || '$'
     };
     this.save();
+    if (this.supabase) {
+      await this.supabase.saveSettings(this.data.settings);
+    }
     return this.data.settings;
   }
 

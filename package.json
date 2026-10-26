@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node index.js",
-    "test": "node --test tests/erp.test.js"
+    "test": "node --test tests/erp.test.js tests/supabase.test.js"
   },
   "engines": {
     "node": ">=18.0.0"

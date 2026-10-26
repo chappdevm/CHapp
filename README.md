@@ -36,3 +36,26 @@ start.bat
 # Ejecutar la suite de pruebas automatizadas:
 npm test
 ```
+
+---
+
+## 🗄️ Persistencia en Supabase (PostgreSQL / PostgREST)
+
+CHapp ERP cuenta con persistencia directa en **Supabase** mediante la API REST nativa de PostgREST, garantizando que los datos no se borren en plataformas con contenedores efímeros o suspensiones por inactividad (como **Vercel** o **Render**).
+
+### Variables de Entorno
+
+Configure las siguientes variables en su entorno de producción (Vercel / Render) o en un archivo `.env` local:
+
+```env
+SUPABASE_URL=https://<tu-proyecto>.supabase.co
+SUPABASE_ANON_KEY=<tu-anon-key>
+SUPABASE_SERVICE_ROLE_KEY=<tu-service-role-key>
+```
+
+### Características de la Integración
+
+- **PostgREST Nativo:** Comunicación HTTP sin clientes pesados, permitiendo arranques en frío ultrarrápidos en serverless.
+- **Fallback Transparente:** Si las variables no están presentes o se trabaja sin conexión, CHapp ERP continúa operando fluidamente utilizando almacenamiento local en `data/db.json` (o `/tmp` en serverless).
+- **Esquema Relacional (`supabase_schema.sql`):** Estructura relacional con las tablas `res_partner`, `product_template`, `hr_expense`, `sale_order`, `sale_order_line`, `account_move`, `account_payment` y `res_config_settings`.
+
