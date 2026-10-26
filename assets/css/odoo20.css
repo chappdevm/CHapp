@@ -1,0 +1,1495 @@
+/* ==========================================================================
+   CHapp ERP — Odoo 20 Enterprise Design System & Stylesheet
+   Extracted & adapted from C:\Program Files\Odoo 20\server\odoo\addons\web_enterprise
+   ========================================================================== */
+
+:root,
+[data-theme="dark"] {
+  --o-white: #000000;
+  --o-black: #ffffff;
+  --o-gray-100: #1F1F23;
+  --o-gray-200: #2C2E35;
+  --o-gray-300: #3E3F47;
+  --o-gray-400: #56575E;
+  --o-gray-500: #6E6F77;
+  --o-gray-600: #88898F;
+  --o-gray-700: #B3B4B8;
+  --o-gray-800: #D1D1D3;
+  --o-gray-900: #EBEBEB;
+
+  --o-brand-odoo: #92427d;
+  --o-brand-primary: #92427d;
+  --o-brand-primary-hover: #a14d8b;
+  --o-action: #1CBCB1;
+  --o-action-subtle: rgba(28, 188, 177, 0.14);
+
+  --o-success: #22b053;
+  --o-success-bg: #0d3715;
+  --o-success-text: #b0e8b5;
+
+  --o-info: #71ADEA;
+  --o-info-bg: #043e50;
+  --o-info-text: #a0e3fe;
+
+  --o-warning: #e39c50;
+  --o-warning-bg: #542d06;
+  --o-warning-text: #fecca6;
+
+  --o-danger: #cb2f2f;
+  --o-danger-bg: #58271f;
+  --o-danger-text: #fec9bf;
+
+  --o-webclient-bg: #1F1F23;
+  --o-view-bg: #2C2E35;
+  --o-sheet-bg: #26282F;
+  --o-navbar-bg: #1F1F23;
+  --o-border-color: #3E3F47;
+  --o-text-main: #EBEBEB;
+  --o-text-muted: #9FA1A9;
+
+  /* Odoo 20 Home Menu Dark Variables (from home_menu.variables.dark.scss & home_menu_background.dark.scss) */
+  --AppSwitcherBg-base: #1F1F23;
+  --AppSwitcherBg-contrastRadial: rgba(22, 22, 25, 0.93);
+  --AppSwitcherBg-dots: rgba(255, 255, 255, 0.16);
+  --AppSwitcherIcon-background: #2C2E35;
+  --AppSwitcherIcon-inset-shadow: inset 0 0 0 1px #3E3F47, 0 8px 18px -6px rgba(0, 0, 0, 0.45);
+  --AppSwitcherIcon-inset-shadow-hover: inset 0 0 0 1px #6E6F77, 0 12px 24px -6px rgba(0, 0, 0, 0.65);
+  --homeMenuCaption-color: #FFFFFF;
+  --homeMenuCaption-shadow: 0 1px 2px rgba(0, 0, 0, 0.75), 0 2px 5px rgba(0, 0, 0, 0.05), 0 0 5px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] {
+  --o-white: #ffffff;
+  --o-black: #111827;
+  --o-gray-100: #f8f9fa;
+  --o-gray-200: #e7ebed;
+  --o-gray-300: #dee2e6;
+  --o-gray-400: #ced4da;
+  --o-gray-500: #adb5bd;
+  --o-gray-600: #6c757d;
+  --o-gray-700: #495057;
+  --o-gray-800: #343a40;
+  --o-gray-900: #212529;
+
+  --o-brand-odoo: #714B67;
+  --o-brand-primary: #714B67;
+  --o-brand-primary-hover: #5d3d55;
+  --o-action: #017e84;
+  --o-action-subtle: rgba(1, 126, 132, 0.1);
+
+  --o-success: #00a945;
+  --o-success-bg: #dcfce7;
+  --o-success-text: #166534;
+
+  --o-info: #0284c7;
+  --o-info-bg: #e0f2fe;
+  --o-info-text: #075985;
+
+  --o-warning: #d97706;
+  --o-warning-bg: #fef3c7;
+  --o-warning-text: #92400e;
+
+  --o-danger: #dc2626;
+  --o-danger-bg: #fee2e2;
+  --o-danger-text: #991b1b;
+
+  --o-webclient-bg: #f8f9fa;
+  --o-view-bg: #ffffff;
+  --o-sheet-bg: #ffffff;
+  --o-navbar-bg: #ffffff;
+  --o-border-color: #dee2e6;
+  --o-text-main: #212529;
+  --o-text-muted: #6c757d;
+
+  --AppSwitcherBg-base: #f0f2f5;
+  --AppSwitcherBg-contrastRadial: rgba(231, 235, 237, 0.92);
+  --AppSwitcherBg-dots: rgba(0, 0, 0, 0.14);
+  --AppSwitcherIcon-background: #ffffff;
+  --AppSwitcherIcon-inset-shadow: rgba(0, 0, 0, 0.075) 0px 0px 0px 1px, rgba(42, 51, 70, 0.06) 0px 4px 10px -2px;
+  --AppSwitcherIcon-inset-shadow-hover: rgba(9, 30, 66, 0.22) 0px 6px 14px -2px, rgba(9, 30, 66, 0.12) 0px 0px 0px 1px;
+  --homeMenuCaption-color: #212529;
+  --homeMenuCaption-shadow: none;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Ubuntu, sans-serif;
+  font-size: 14px;
+  color: var(--o-text-main);
+  background-color: var(--o-webclient-bg);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* ==========================================================================
+   1. ODOO 20 HOME MENU BACKGROUND & APP SWITCHER
+   Exact replica of C:\Program Files\Odoo 20\server\odoo\addons\web_enterprise
+   ========================================================================== */
+
+.o_web_client {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.o_home_menu_background {
+  background-color: var(--AppSwitcherBg-base);
+  background-image:
+    linear-gradient(45deg, var(--AppSwitcherBg-base) 0%, transparent 50%),
+    linear-gradient(135deg, var(--AppSwitcherBg-base) 0%, transparent 30%, transparent 60%, var(--AppSwitcherBg-base) 95%),
+    linear-gradient(180deg, var(--AppSwitcherBg-base) 0%, transparent 100%),
+    radial-gradient(circle at 50% 50%, var(--AppSwitcherBg-contrastRadial) 20%, transparent 400%),
+    radial-gradient(var(--AppSwitcherBg-dots) 1px, var(--AppSwitcherBg-base) 1px);
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, repeat;
+  background-size: auto, auto, 100% 40%, auto, 12px 12px;
+}
+
+.o_home_menu_background .o_main_navbar {
+  background: transparent !important;
+  border-bottom-color: transparent !important;
+}
+
+.o_home_menu {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.5rem 1rem 3rem;
+}
+
+.o_home_menu_container {
+  width: 100%;
+  max-width: 850px;
+  margin-top: 0.75rem;
+}
+
+/* Hidden-by-default search bar that appears when typing or clicking search on Home Menu */
+.o_home_menu_search_bar {
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto 1.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: rgba(44, 46, 53, 0.85);
+  border: 1px solid var(--o-border-color);
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.85rem;
+  backdrop-filter: blur(8px);
+  transition: opacity 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  opacity: 0;
+  pointer-events: none;
+  height: 0;
+  padding-block: 0;
+  margin-bottom: 0;
+  overflow: hidden;
+  border-width: 0;
+}
+
+.o_home_menu_search_bar.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  height: 40px;
+  padding-block: 0.45rem;
+  margin-bottom: 1.75rem;
+  border-width: 1px;
+}
+
+.o_home_menu_search_bar:focus-within {
+  border-color: var(--o-action);
+  box-shadow: 0 0 0 2px var(--o-action-subtle);
+}
+
+.o_home_menu_search_bar input {
+  background: transparent;
+  border: none;
+  outline: none;
+  width: 100%;
+  color: var(--o-text-main);
+  font-size: 0.92rem;
+}
+
+/* App grid matching Odoo 20 col-3 col-md-2 layout */
+.o_apps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(110px, 1fr));
+  gap: 1.25rem 0.75rem;
+  justify-items: center;
+  user-select: none;
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 768px) {
+  .o_apps {
+    grid-template-columns: repeat(3, minmax(96px, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .o_apps {
+    grid-template-columns: repeat(2, minmax(96px, 1fr));
+  }
+}
+
+.o_app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  max-width: 132px;
+  padding: 0.5rem;
+  border-radius: 0.75rem;
+  text-decoration: none;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  transition: background-color 0.12s ease;
+}
+
+.o_app .o_app_icon {
+  width: 70px;
+  height: 70px;
+  aspect-ratio: 1;
+  padding: 10px;
+  background-color: var(--AppSwitcherIcon-background);
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--AppSwitcherIcon-inset-shadow);
+  transform-origin: center bottom;
+  transition: box-shadow 0.1s ease-in, transform 0.1s ease-in;
+}
+
+.o_app .o_app_icon img {
+  width: 50px;
+  height: 50px;
+  object-fit: contain;
+  display: block;
+  pointer-events: none;
+}
+
+.o_app:hover .o_app_icon {
+  box-shadow: var(--AppSwitcherIcon-inset-shadow-hover);
+  transform: translateY(-2px);
+}
+
+.o_app:active .o_app_icon {
+  transform: translateY(-2px) scale(0.98);
+  transition: none;
+}
+
+.o_app.o_focused {
+  background: rgba(28, 188, 177, 0.14);
+  outline: 1px solid var(--o-action);
+}
+
+.o_app .o_caption {
+  margin-top: 0.5rem;
+  width: 100%;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--homeMenuCaption-color);
+  text-shadow: var(--homeMenuCaption-shadow);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.01em;
+}
+
+/* Subtle footer tip on Home Menu */
+.o_home_menu_footer_tip {
+  margin-top: auto;
+  padding-top: 2.5rem;
+  font-size: 0.78rem;
+  color: var(--o-gray-600);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  opacity: 0.75;
+}
+
+.o_kbd {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: var(--o-gray-200);
+  border: 1px solid var(--o-border-color);
+  border-radius: 4px;
+  color: var(--o-gray-800);
+}
+
+/* ==========================================================================
+   2. TOP NAVBAR & SYSTRAY (Odoo 20 Webclient Header)
+   ========================================================================== */
+
+.o_main_navbar {
+  height: 46px;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.75rem;
+  background-color: var(--o-navbar-bg);
+  border-bottom: 1px solid var(--o-border-color);
+  z-index: 20;
+  user-select: none;
+}
+
+.o_navbar_left {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.o_navbar_apps_toggle {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--o-gray-800);
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.o_navbar_apps_toggle:hover {
+  background-color: var(--o-gray-200);
+  color: var(--o-black);
+}
+
+.o_menu_brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--o-text-main);
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.o_menu_brand img {
+  width: 22px;
+  height: 22px;
+}
+
+.o_menu_sections {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-left: 0.5rem;
+}
+
+.o_nav_entry {
+  padding: 0.35rem 0.7rem;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--o-gray-800);
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.o_nav_entry:hover {
+  background-color: var(--o-gray-200);
+  color: var(--o-black);
+}
+
+.o_nav_entry.is-active {
+  background-color: var(--o-gray-200);
+  color: var(--o-action);
+  font-weight: 600;
+}
+
+.o_menu_systray {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.o_systray_item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--o-gray-800);
+  font-size: 0.82rem;
+  cursor: pointer;
+  position: relative;
+  transition: background-color 0.12s ease;
+}
+
+.o_systray_item:hover {
+  background-color: var(--o-gray-200);
+  color: var(--o-black);
+}
+
+.o_systray_badge {
+  background-color: var(--o-action);
+  color: #0b1919;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.05rem 0.36rem;
+  border-radius: 999px;
+  line-height: 1.2;
+}
+
+.o_user_avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--o-brand-primary), var(--o-action));
+  color: #ffffff;
+  font-size: 0.74rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ==========================================================================
+   3. CONTROL PANEL (Action Buttons, Breadcrumbs, Search, View Switcher)
+   ========================================================================== */
+
+.o_control_panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 1.25rem;
+  background-color: var(--o-webclient-bg);
+  border-bottom: 1px solid var(--o-border-color);
+  z-index: 15;
+}
+
+.o_cp_left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.o_cp_breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--o-text-main);
+}
+
+.o_cp_breadcrumbs .o_breadcrumb_link {
+  color: var(--o-action);
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.o_cp_breadcrumbs .o_breadcrumb_link:hover {
+  text-decoration: underline;
+}
+
+.o_cp_center {
+  flex: 1;
+  max-width: 480px;
+  min-width: 220px;
+}
+
+.o_searchview {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  background-color: var(--o-view-bg);
+  border: 1px solid var(--o-border-color);
+  border-radius: 6px;
+  padding: 0.32rem 0.65rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.o_searchview:focus-within {
+  border-color: var(--o-action);
+  box-shadow: 0 0 0 2px var(--o-action-subtle);
+}
+
+.o_searchview input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 0.86rem;
+  color: var(--o-text-main);
+}
+
+.o_search_facet {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: var(--o-action-subtle);
+  color: var(--o-action);
+  border: 1px solid rgba(28, 188, 177, 0.35);
+  border-radius: 4px;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.o_search_facet button {
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.o_cp_right {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.o_cp_filter_pills {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.o_filter_pill {
+  padding: 0.28rem 0.6rem;
+  font-size: 0.78rem;
+  border-radius: 6px;
+  border: 1px solid var(--o-border-color);
+  background: var(--o-view-bg);
+  color: var(--o-gray-800);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.o_filter_pill:hover {
+  border-color: var(--o-gray-500);
+}
+
+.o_filter_pill.is-active {
+  background: var(--o-action-subtle);
+  border-color: var(--o-action);
+  color: var(--o-action);
+  font-weight: 600;
+}
+
+.o_cp_pager {
+  font-size: 0.8rem;
+  color: var(--o-text-muted);
+  white-space: nowrap;
+}
+
+.o_cp_switch_buttons {
+  display: inline-flex;
+  background: var(--o-view-bg);
+  border: 1px solid var(--o-border-color);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.o_switch_btn {
+  padding: 0.34rem 0.6rem;
+  border: none;
+  background: transparent;
+  color: var(--o-gray-700);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.o_switch_btn:hover {
+  background: var(--o-gray-300);
+  color: var(--o-text-main);
+}
+
+.o_switch_btn.is-active {
+  background: var(--o-action-subtle);
+  color: var(--o-action);
+}
+
+/* ==========================================================================
+   4. BUTTONS & BADGES (Odoo 20 primary_variables.dark.scss)
+   ========================================================================== */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.38rem 0.85rem;
+  font-size: 0.86rem;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.btn-primary {
+  background-color: var(--o-brand-primary);
+  border-color: var(--o-brand-primary);
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  background-color: var(--o-brand-primary-hover);
+  border-color: var(--o-brand-primary-hover);
+}
+
+.btn-secondary {
+  background-color: var(--o-view-bg);
+  border-color: var(--o-border-color);
+  color: var(--o-text-main);
+}
+
+.btn-secondary:hover {
+  background-color: var(--o-gray-300);
+}
+
+.btn-action {
+  background-color: var(--o-action);
+  border-color: var(--o-action);
+  color: #091e1d;
+  font-weight: 600;
+}
+
+.btn-action:hover {
+  filter: brightness(1.08);
+}
+
+.btn-danger {
+  background-color: transparent;
+  border-color: var(--o-danger);
+  color: #ff6b6b;
+}
+
+.btn-danger:hover {
+  background-color: var(--o-danger);
+  color: #ffffff;
+}
+
+.btn-sm {
+  padding: 0.24rem 0.6rem;
+  font-size: 0.78rem;
+}
+
+.o_badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.o_badge_success {
+  background-color: var(--o-success-bg);
+  color: var(--o-success-text);
+  border: 1px solid rgba(117, 199, 127, 0.35);
+}
+
+.o_badge_info {
+  background-color: var(--o-info-bg);
+  color: var(--o-info-text);
+  border: 1px solid rgba(55, 194, 239, 0.35);
+}
+
+.o_badge_warning {
+  background-color: var(--o-warning-bg);
+  color: var(--o-warning-text);
+  border: 1px solid rgba(238, 155, 86, 0.35);
+}
+
+.o_badge_danger {
+  background-color: var(--o-danger-bg);
+  color: var(--o-danger-text);
+  border: 1px solid rgba(248, 144, 126, 0.35);
+}
+
+.o_badge_muted {
+  background-color: var(--o-gray-200);
+  color: var(--o-gray-700);
+  border: 1px solid var(--o-border-color);
+}
+
+/* Odoo Tag Palette (1-11) */
+.o_tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: 999px;
+  background: #172d53;
+  color: #c3d9fe;
+  border: 1px solid rgba(134, 177, 253, 0.35);
+}
+
+/* ==========================================================================
+   5. MAIN CONTENT AREA, SUMMARY HEADER BAR & KANBAN VIEW
+   ========================================================================== */
+
+.o_content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem 1.25rem 2.5rem;
+}
+
+/* Odoo Expense / Sales Top KPI Banner */
+.o_dashboard_banner {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.o_stat_card {
+  background: var(--o-view-bg);
+  border: 1px solid var(--o-border-color);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  cursor: pointer;
+  transition: border-color 0.14s ease, transform 0.12s ease;
+}
+
+.o_stat_card:hover {
+  border-color: var(--o-action);
+  transform: translateY(-1px);
+}
+
+.o_stat_card .o_stat_label {
+  font-size: 0.76rem;
+  color: var(--o-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+
+.o_stat_card .o_stat_value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--o-text-main);
+}
+
+.o_stat_card .o_stat_sub {
+  font-size: 0.76rem;
+  color: var(--o-action);
+}
+
+/* Kanban Grid */
+.o_kanban_view {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 0.85rem;
+}
+
+.o_kanban_record {
+  background-color: var(--o-view-bg);
+  border: 1px solid var(--o-border-color);
+  border-radius: 8px;
+  padding: 0.95rem 1rem;
+  display: flex;
+  gap: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.14s ease, box-shadow 0.14s ease;
+  position: relative;
+}
+
+.o_kanban_record:hover {
+  border-color: var(--o-gray-500);
+  box-shadow: 0 6px 16px -6px rgba(0, 0, 0, 0.35);
+}
+
+.o_kanban_avatar {
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1rem;
+  color: #ffffff;
+  background: linear-gradient(135deg, #92427d, #1CBCB1);
+}
+
+.o_kanban_details {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.o_kanban_title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--o-text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.o_kanban_subtitle {
+  font-size: 0.8rem;
+  color: var(--o-text-muted);
+}
+
+.o_kanban_footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.35rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 0.78rem;
+}
+
+/* ==========================================================================
+   6. RESPONSIVE DATA TABLES (Following modern-web-guidance `responsive-table`)
+   - Semantic <table>, <thead>, <tbody>, <th>
+   - Sticky column headers (inset-block-start: 0) & sticky row headers (inset-inline-start: 0)
+   - @container query stacked layout on narrow containers with CSS variable label injection
+   ========================================================================== */
+
+.table-wrapper {
+  overflow: auto;
+  max-inline-size: 100%;
+  max-block-size: min(680px, 76vh);
+  container-type: inline-size;
+  background-color: var(--o-view-bg);
+  border: 1px solid var(--o-border-color);
+  border-radius: 8px;
+}
+
+.table-wrapper:focus-visible {
+  outline: 2px solid var(--o-action);
+}
+
+.o_list_table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  text-align: start;
+}
+
+.o_list_table caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+/* Sticky column headers (desktop) */
+.o_list_table thead {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  background-color: var(--o-gray-100);
+}
+
+.o_list_table thead th {
+  padding: 0.65rem 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--o-text-muted);
+  border-bottom: 1px solid var(--o-border-color);
+  background-color: var(--o-gray-100);
+  white-space: nowrap;
+}
+
+.o_list_table tbody tr {
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+}
+
+.o_list_table tbody tr:hover td,
+.o_list_table tbody tr:hover th {
+  background-color: rgba(28, 188, 177, 0.07);
+}
+
+/* Sticky row headers (desktop) */
+.o_list_table tbody th {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  background-color: var(--o-view-bg);
+  padding: 0.65rem 0.85rem;
+  font-weight: 600;
+  color: var(--o-text-main);
+  border-bottom: 1px solid var(--o-border-color);
+  white-space: nowrap;
+}
+
+.o_list_table tbody td {
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid var(--o-border-color);
+  color: var(--o-gray-800);
+  vertical-align: middle;
+}
+
+.o_list_table tfoot td {
+  padding: 0.7rem 0.85rem;
+  font-weight: 700;
+  background-color: var(--o-gray-100);
+  color: var(--o-text-main);
+}
+
+.text-end {
+  text-align: end !important;
+}
+
+@container (width < 600px) {
+  .o_list_table,
+  .o_list_table thead,
+  .o_list_table tbody,
+  .o_list_table tr,
+  .o_list_table th,
+  .o_list_table td {
+    display: block;
+  }
+
+  .o_list_table thead {
+    /* MANDATORY: Hide column header from layout and screen readers */
+    display: none;
+  }
+
+  .o_list_table tbody tr {
+    margin-block-end: 1rem;
+    border: 1px solid var(--o-border-color);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .o_list_table tbody th {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 2;
+    background-color: var(--o-gray-100);
+  }
+
+  .o_list_table tbody td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    text-align: end;
+  }
+
+  .o_list_table tbody td:nth-child(2)::before { content: var(--label-2, "") ": "; font-weight: 600; color: var(--o-text-muted); }
+  .o_list_table tbody td:nth-child(3)::before { content: var(--label-3, "") ": "; font-weight: 600; color: var(--o-text-muted); }
+  .o_list_table tbody td:nth-child(4)::before { content: var(--label-4, "") ": "; font-weight: 600; color: var(--o-text-muted); }
+  .o_list_table tbody td:nth-child(5)::before { content: var(--label-5, "") ": "; font-weight: 600; color: var(--o-text-muted); }
+  .o_list_table tbody td:nth-child(6)::before { content: var(--label-6, "") ": "; font-weight: 600; color: var(--o-text-muted); }
+  .o_list_table tbody td:nth-child(7)::before { content: var(--label-7, "") ": "; font-weight: 600; color: var(--o-text-muted); }
+  .o_list_table tbody td:nth-child(8)::before { content: var(--label-8, "") ": "; font-weight: 600; color: var(--o-text-muted); }
+  .o_list_table tbody td:nth-child(9)::before { content: var(--label-9, "") ": "; font-weight: 600; color: var(--o-text-muted); }
+
+  .o_list_table tfoot,
+  .o_list_table tfoot tr,
+  .o_list_table tfoot td {
+    display: block;
+    text-align: end;
+  }
+}
+
+/* ==========================================================================
+   7. ODOO 20 FORM VIEW (Statusbar Header + Sheet + Smart Buttons + Chatter)
+   ========================================================================== */
+
+.o_form_view {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .o_form_view {
+    grid-template-columns: 1fr;
+  }
+}
+
+.o_form_sheet_bg {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.o_form_statusbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background-color: var(--o-view-bg);
+  border: 1px solid var(--o-border-color);
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+}
+
+.o_statusbar_buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.o_statusbar_status {
+  display: inline-flex;
+  align-items: center;
+  background: var(--o-gray-100);
+  border: 1px solid var(--o-border-color);
+  border-radius: 999px;
+  padding: 0.15rem;
+  gap: 0.15rem;
+}
+
+.o_arrow_button {
+  padding: 0.22rem 0.7rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  border-radius: 999px;
+  color: var(--o-text-muted);
+}
+
+.o_arrow_button.is-current {
+  background-color: var(--o-action);
+  color: #081c1b;
+}
+
+.o_form_sheet {
+  background-color: var(--o-sheet-bg);
+  border: 1px solid var(--o-border-color);
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+}
+
+.o_button_box {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--o-border-color);
+}
+
+.o_stat_button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.85rem;
+  background-color: var(--o-view-bg);
+  border: 1px solid var(--o-border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: start;
+  transition: border-color 0.12s ease;
+}
+
+.o_stat_button:hover {
+  border-color: var(--o-action);
+}
+
+.o_stat_button .o_stat_info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.o_stat_button .o_stat_value {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--o-action);
+}
+
+.o_stat_button .o_stat_text {
+  font-size: 0.74rem;
+  color: var(--o-text-muted);
+}
+
+.o_form_title_group {
+  margin-bottom: 1.25rem;
+}
+
+.o_form_title_group label {
+  display: block;
+  font-size: 0.76rem;
+  color: var(--o-text-muted);
+  text-transform: uppercase;
+  margin-bottom: 0.25rem;
+}
+
+.o_input_title {
+  width: 100%;
+  font-size: 1.4rem;
+  font-weight: 700;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid var(--o-border-color);
+  padding: 0.25rem 0;
+  color: var(--o-text-main);
+  outline: none;
+}
+
+.o_input_title:focus {
+  border-bottom-color: var(--o-action);
+}
+
+.o_group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+@media (max-width: 720px) {
+  .o_group {
+    grid-template-columns: 1fr;
+  }
+}
+
+.o_field_row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.o_field_row label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--o-text-muted);
+}
+
+.o_input,
+.o_select,
+.o_textarea {
+  width: 100%;
+  padding: 0.42rem 0.65rem;
+  background-color: var(--o-gray-100);
+  border: 1px solid var(--o-border-color);
+  border-radius: 6px;
+  color: var(--o-text-main);
+  outline: none;
+  transition: border-color 0.12s ease;
+}
+
+.o_input:focus,
+.o_select:focus,
+.o_textarea:focus {
+  border-color: var(--o-action);
+}
+
+/* Notebook Tabs inside Form Sheet */
+.o_notebook_headers {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--o-border-color);
+  margin: 1rem 0;
+}
+
+.o_notebook_tab {
+  padding: 0.5rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--o-text-muted);
+  cursor: pointer;
+}
+
+.o_notebook_tab.is-active {
+  color: var(--o-action);
+  border-bottom-color: var(--o-action);
+}
+
+/* Totals Box at bottom right of Sale Order / Invoice */
+.o_totals_box {
+  margin-left: auto;
+  width: 100%;
+  max-width: 320px;
+  margin-top: 1rem;
+  background: var(--o-gray-100);
+  border: 1px solid var(--o-border-color);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.o_totals_row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.88rem;
+  color: var(--o-gray-800);
+}
+
+.o_totals_row.is-grand {
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--o-border-color);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--o-action);
+}
+
+/* Odoo Chatter Sidebar */
+.o_chatter {
+  background-color: var(--o-view-bg);
+  border: 1px solid var(--o-border-color);
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.o_chatter_header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 0.88rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--o-border-color);
+}
+
+.o_chatter_composer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.o_chatter_messages {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.o_chatter_msg {
+  padding: 0.55rem 0.7rem;
+  background: var(--o-gray-100);
+  border-left: 3px solid var(--o-action);
+  border-radius: 4px;
+  font-size: 0.82rem;
+}
+
+.o_chatter_msg_meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.73rem;
+  color: var(--o-text-muted);
+  margin-bottom: 0.2rem;
+}
+
+/* ==========================================================================
+   8. ACCOUNTING JOURNAL DASHBOARD & SETTINGS LAYOUT
+   ========================================================================== */
+
+.o_journal_dashboard {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.o_journal_card {
+  background: var(--o-view-bg);
+  border: 1px solid var(--o-border-color);
+  border-left: 4px solid var(--o-action);
+  border-radius: 8px;
+  padding: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.o_journal_card.is-sale { border-left-color: #92427d; }
+.o_journal_card.is-purchase { border-left-color: #e39c50; }
+.o_journal_card.is-bank { border-left-color: #1CBCB1; }
+.o_journal_card.is-cash { border-left-color: #22b053; }
+
+.o_settings_layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 840px) {
+  .o_settings_layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.o_settings_sidebar {
+  background: var(--o-view-bg);
+  border: 1px solid var(--o-border-color);
+  border-radius: 8px;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.o_settings_tab {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--o-gray-800);
+  font-weight: 500;
+  cursor: pointer;
+  text-align: start;
+}
+
+.o_settings_tab img {
+  width: 20px;
+  height: 20px;
+}
+
+.o_settings_tab.is-active {
+  background: var(--o-action-subtle);
+  color: var(--o-action);
+  font-weight: 600;
+}
+
+.o_settings_block {
+  background: var(--o-view-bg);
+  border: 1px solid var(--o-border-color);
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.o_settings_block h3 {
+  font-size: 1rem;
+  margin-bottom: 0.85rem;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid var(--o-border-color);
+  color: var(--o-text-main);
+}
+
+/* ==========================================================================
+   9. MODAL DIALOGS (Following modern-web-guidance `light-dismiss-a-dialog`)
+   ========================================================================== */
+
+dialog.o_dialog {
+  margin: auto;
+  width: min(560px, 92vw);
+  background: var(--o-sheet-bg);
+  color: var(--o-text-main);
+  border: 1px solid var(--o-border-color);
+  border-radius: 10px;
+  padding: 0;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+}
+
+dialog.o_dialog::backdrop {
+  background-color: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.o_dialog_content {
+  padding: 1.25rem 1.4rem;
+}
+
+.o_dialog_header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 0.75rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--o-border-color);
+}
+
+.o_dialog_footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding-top: 1rem;
+  margin-top: 1rem;
+  border-top: 1px solid var(--o-border-color);
+}
+
+/* Toast Notification */
+.o_toast_container {
+  position: fixed;
+  bottom: 1.25rem;
+  right: 1.25rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.o_toast {
+  background: var(--o-gray-200);
+  border: 1px solid var(--o-action);
+  border-left: 4px solid var(--o-action);
+  color: var(--o-text-main);
+  padding: 0.65rem 1rem;
+  border-radius: 6px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.45);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.o_toast.is-error {
+  border-color: var(--o-danger);
+  border-left-color: var(--o-danger);
+}

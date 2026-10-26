@@ -1,0 +1,214 @@
+{
+  "meta": {
+    "version": "20.0.1.0",
+    "based_on": "Odoo 20 Enterprise",
+    "sequences": {
+      "contact": 1,
+      "product": 1,
+      "expense": 1,
+      "sale": 1,
+      "move_inv": 1,
+      "move_bill": 1,
+      "move_misc": 1,
+      "payment": 1,
+      "account": 12,
+      "tax": 5
+    }
+  },
+  "settings": {
+    "company_name": "CHapp ERP S.A.S.",
+    "company_vat": "",
+    "company_email": "chappdevm@gmail.com",
+    "company_phone": "",
+    "company_city": "Bogotá D.C.",
+    "company_country": "Colombia",
+    "company_address": "",
+    "currency": "COP",
+    "currency_symbol": "$",
+    "theme": "dark",
+    "quotation_validity_days": 30,
+    "enable_line_discounts": true,
+    "default_sale_tax": 19,
+    "default_purchase_tax": 19,
+    "fiscal_regime": "Responsable de IVA - Régimen Ordinario",
+    "expense_approval_required": true,
+    "expense_default_journal": "EXJ",
+    "default_bank_journal": "BNK1",
+    "sale_terms": "Condiciones de pago y entrega según cotización.",
+    "active_user": {
+      "id": 1,
+      "name": "Administrador CHapp",
+      "email": "chappdevm@gmail.com",
+      "role": "Administrador General"
+    },
+    "users": [
+      {
+        "id": 1,
+        "name": "Administrador CHapp",
+        "email": "chappdevm@gmail.com",
+        "role": "Administrador General",
+        "active": true
+      }
+    ]
+  },
+  "contacts": [],
+  "products": [],
+  "expenses": [],
+  "sales": [],
+  "accounting": {
+    "journals": [
+      {
+        "id": 1,
+        "code": "INV",
+        "name": "Facturas de Clientes",
+        "type": "sale",
+        "default_account": "413501"
+      },
+      {
+        "id": 2,
+        "code": "BILL",
+        "name": "Facturas de Proveedores",
+        "type": "purchase",
+        "default_account": "519530"
+      },
+      {
+        "id": 3,
+        "code": "BNK1",
+        "name": "Banco Bancolombia Cta Cte",
+        "type": "bank",
+        "default_account": "111005",
+        "balance": 0
+      },
+      {
+        "id": 4,
+        "code": "CSH1",
+        "name": "Caja General Efectivo",
+        "type": "cash",
+        "default_account": "110505",
+        "balance": 0
+      },
+      {
+        "id": 5,
+        "code": "EXJ",
+        "name": "Gastos de Empleados",
+        "type": "purchase",
+        "default_account": "510506"
+      }
+    ],
+    "accounts": [
+      {
+        "id": 1,
+        "code": "110505",
+        "name": "Caja General",
+        "type": "Activo Corriente / Liquidez",
+        "reconcile": false
+      },
+      {
+        "id": 2,
+        "code": "111005",
+        "name": "Bancos Nacionales - Moneda Funcional",
+        "type": "Activo Corriente / Banco",
+        "reconcile": false
+      },
+      {
+        "id": 3,
+        "code": "130505",
+        "name": "Clientes Nacionales (Cuentas por Cobrar)",
+        "type": "Por Cobrar",
+        "reconcile": true
+      },
+      {
+        "id": 4,
+        "code": "220505",
+        "name": "Proveedores Nacionales (Cuentas por Pagar)",
+        "type": "Por Pagar",
+        "reconcile": true
+      },
+      {
+        "id": 5,
+        "code": "233595",
+        "name": "Costos y Gastos por Pagar / Reembolsos",
+        "type": "Pasivo Corriente",
+        "reconcile": true
+      },
+      {
+        "id": 6,
+        "code": "240801",
+        "name": "IVA Generado en Ventas (19%)",
+        "type": "Impuestos Pasivo",
+        "reconcile": false
+      },
+      {
+        "id": 7,
+        "code": "240802",
+        "name": "IVA Descontable en Compras y Gastos (19%)",
+        "type": "Impuestos Activo",
+        "reconcile": false
+      },
+      {
+        "id": 8,
+        "code": "310505",
+        "name": "Capital Suscrito y Pagado",
+        "type": "Patrimonio",
+        "reconcile": false
+      },
+      {
+        "id": 9,
+        "code": "413501",
+        "name": "Ingresos por Servicios de Software y Consultoría",
+        "type": "Ingresos Operacionales",
+        "reconcile": false
+      },
+      {
+        "id": 10,
+        "code": "510506",
+        "name": "Gastos de Viaje, Viáticos y Representación",
+        "type": "Gastos de Administración",
+        "reconcile": false
+      },
+      {
+        "id": 11,
+        "code": "519530",
+        "name": "Gastos de Tecnología, Licencias y Suministros",
+        "type": "Gastos Operacionales",
+        "reconcile": false
+      }
+    ],
+    "taxes": [
+      {
+        "id": 1,
+        "name": "IVA 19% Ventas",
+        "amount": 19,
+        "type_tax_use": "sale",
+        "account_code": "240801",
+        "active": true
+      },
+      {
+        "id": 2,
+        "name": "IVA 19% Compras",
+        "amount": 19,
+        "type_tax_use": "purchase",
+        "account_code": "240802",
+        "active": true
+      },
+      {
+        "id": 3,
+        "name": "IVA 5% Servicios Especiales",
+        "amount": 5,
+        "type_tax_use": "sale",
+        "account_code": "240801",
+        "active": true
+      },
+      {
+        "id": 4,
+        "name": "Exento / Excluido 0%",
+        "amount": 0,
+        "type_tax_use": "all",
+        "account_code": "240801",
+        "active": true
+      }
+    ],
+    "moves": [],
+    "payments": []
+  }
+}

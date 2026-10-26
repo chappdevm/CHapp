@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CHapp ERP — Odoo 20</title>
+  <link rel="icon" type="image/png" href="/assets/icons/settings.png" />
+  <link rel="stylesheet" href="/assets/css/odoo20.css" />
+</head>
+<body>
+  <div id="webclient" class="o_web_client o_home_menu_background">
+    <!-- Top Navbar (Odoo 20 Webclient Header) -->
+    <header class="o_main_navbar" role="navigation" aria-label="Barra principal de navegación">
+      <div class="o_navbar_left">
+        <button
+          type="button"
+          id="btnHomeMenuToggle"
+          class="o_navbar_apps_toggle"
+          title="Menú Principal de Aplicaciones (Alt+H / Esc)"
+          aria-label="Alternar Menú Principal de Aplicaciones"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <rect x="3" y="3" width="4" height="4" rx="1"></rect>
+            <rect x="10" y="3" width="4" height="4" rx="1"></rect>
+            <rect x="17" y="3" width="4" height="4" rx="1"></rect>
+            <rect x="3" y="10" width="4" height="4" rx="1"></rect>
+            <rect x="10" y="10" width="4" height="4" rx="1"></rect>
+            <rect x="17" y="10" width="4" height="4" rx="1"></rect>
+            <rect x="3" y="17" width="4" height="4" rx="1"></rect>
+            <rect x="10" y="17" width="4" height="4" rx="1"></rect>
+            <rect x="17" y="17" width="4" height="4" rx="1"></rect>
+          </svg>
+        </button>
+
+        <a href="#home" id="navbarBrand" class="o_menu_brand" style="display: none;">
+          <img id="navbarBrandIcon" src="/assets/icons/contacts.png" alt="" />
+          <span id="navbarBrandText">Contactos</span>
+        </a>
+
+        <nav id="navbarSubmenus" class="o_menu_sections" aria-label="Submenús del módulo"></nav>
+      </div>
+
+      <div class="o_menu_systray">
+        <button
+          type="button"
+          id="btnCommandPalette"
+          class="o_systray_item"
+          title="Paleta de Comandos (Ctrl+K)"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <span>Buscar</span>
+          <span class="o_kbd">Ctrl+K</span>
+        </button>
+
+        <button
+          type="button"
+          id="btnPendingActivities"
+          class="o_systray_item"
+          title="Actividades y documentos pendientes"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          <span id="systrayActivityCount" class="o_systray_badge">0</span>
+        </button>
+
+        <button
+          type="button"
+          id="btnThemeToggle"
+          class="o_systray_item"
+          title="Cambiar tema Oscuro / Claro"
+          aria-label="Cambiar tema Oscuro o Claro"
+        >
+          <span id="themeIconLabel">Oscuro</span>
+        </button>
+
+        <div class="o_systray_item" id="systrayCompany" title="Compañía activa">
+          <span id="systrayCompanyName">CHapp ERP S.A.S.</span>
+        </div>
+
+        <button type="button" id="btnUserSettings" class="o_systray_item" title="Usuario activo">
+          <span class="o_user_avatar" id="systrayUserAvatar">AD</span>
+          <span id="systrayUserName">Administrador</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- 1. ODOO 20 HOME MENU (Panel Principal) -->
+    <main id="homeMenuView" class="o_home_menu" role="main" aria-label="Panel principal de módulos Odoo 20">
+      <div id="homeSearchBarWrapper" class="o_home_menu_search_bar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input
+          type="text"
+          id="homeSearchInput"
+          placeholder="Buscar módulo (Contactos, Gastos, Ventas, Contabilidad, Ajustes)..."
+          autocomplete="off"
+          aria-label="Buscar módulo en el menú principal"
+        />
+      </div>
+
+      <div class="o_home_menu_container">
+        <div id="homeAppsGrid" role="listbox" aria-label="Módulos del ERP" class="o_apps"></div>
+      </div>
+
+      <div class="o_home_menu_footer_tip">
+        <span><strong style="color: var(--o-action);">TIP</strong> — Escribe directamente para filtrar módulos o presiona <span class="o_kbd">Ctrl</span> + <span class="o_kbd">K</span> en cualquier vista</span>
+      </div>
+    </main>
+
+    <!-- 2. MODULE WORKSPACE (Control Panel + Dynamic View Container) -->
+    <section id="moduleWorkspace" style="display: none; flex-direction: column; flex: 1; overflow: hidden;" aria-label="Área de trabajo del módulo">
+      <div id="controlPanel" class="o_control_panel">
+        <div class="o_cp_left">
+          <div id="cpActionButtons" style="display: flex; gap: 0.45rem;"></div>
+          <nav id="cpBreadcrumbs" class="o_cp_breadcrumbs" aria-label="Ruta de navegación"></nav>
+        </div>
+
+        <div class="o_cp_center" id="cpSearchContainer">
+          <div class="o_searchview">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <div id="cpSearchFacets" style="display: flex; gap: 0.25rem;"></div>
+            <input
+              type="text"
+              id="cpSearchInput"
+              placeholder="Buscar registros..."
+              autocomplete="off"
+              aria-label="Buscar registros en la vista actual"
+            />
+          </div>
+        </div>
+
+        <div class="o_cp_right">
+          <div id="cpFilterPills" class="o_cp_filter_pills"></div>
+          <span id="cpPager" class="o_cp_pager"></span>
+          <div id="cpViewSwitcher" class="o_cp_switch_buttons" role="group" aria-label="Cambiar tipo de vista"></div>
+        </div>
+      </div>
+
+      <div id="moduleContent" class="o_content"></div>
+    </section>
+  </div>
+
+  <!-- Native Modal Dialog: Register Payment (modern-web-guidance: light-dismiss-a-dialog) -->
+  <dialog id="paymentDialog" class="o_dialog" closedby="any" aria-labelledby="paymentDialogTitle">
+    <div class="o_dialog_content">
+      <div class="o_dialog_header">
+        <h2 id="paymentDialogTitle" style="font-size: 1.05rem;">Registrar Pago</h2>
+        <button type="button" class="btn btn-sm btn-secondary" id="btnClosePaymentDialog">✕</button>
+      </div>
+      <form id="paymentDialogForm">
+        <input type="hidden" id="payMoveId" />
+        <div class="o_group" style="grid-template-columns: 1fr 1fr; margin-bottom: 0.5rem;">
+          <div class="o_field_row">
+            <label for="payJournal">Diario de Pago</label>
+            <select id="payJournal" class="o_select" required>
+              <option value="BNK1">Banco Bancolombia Cta Cte (BNK1)</option>
+              <option value="CSH1">Caja General Efectivo (CSH1)</option>
+            </select>
+          </div>
+          <div class="o_field_row">
+            <label for="payAmount">Importe a Pagar</label>
+            <input type="number" id="payAmount" class="o_input" min="1" step="any" required />
+          </div>
+          <div class="o_field_row">
+            <label for="payDate">Fecha de Pago</label>
+            <input type="date" id="payDate" class="o_input" required />
+          </div>
+          <div class="o_field_row">
+            <label for="payRef">Circular / Referencia (Memo)</label>
+            <input type="text" id="payRef" class="o_input" placeholder="Referencia del pago" />
+          </div>
+        </div>
+        <div class="o_dialog_footer">
+          <button type="button" class="btn btn-secondary" id="btnCancelPaymentDialog">Cancelar</button>
+          <button type="submit" class="btn btn-action">Crear Pago</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- Native Modal Dialog: Command Palette (Ctrl+K) -->
+  <dialog id="commandPaletteDialog" class="o_dialog" closedby="any" aria-labelledby="commandPaletteTitle">
+    <div class="o_dialog_content">
+      <div class="o_dialog_header">
+        <h2 id="commandPaletteTitle" style="font-size: 1rem;">Paleta de Comandos Odoo 20</h2>
+        <button type="button" class="btn btn-sm btn-secondary" id="btnCloseCommandPalette">Esc</button>
+      </div>
+      <div class="o_searchview" style="margin-bottom: 0.85rem;">
+        <input
+          type="text"
+          id="commandPaletteInput"
+          placeholder="Escribe un módulo, cliente, pedido (S00001), factura (INV/...) o comando..."
+          autocomplete="off"
+        />
+      </div>
+      <div id="commandPaletteResults" style="max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.35rem;"></div>
+    </div>
+  </dialog>
+
+  <div id="toastContainer" class="o_toast_container" aria-live="polite"></div>
+
+  <script src="/assets/js/app.js"></script>
+</body>
+</html>
