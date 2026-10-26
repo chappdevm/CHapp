@@ -451,4 +451,54 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.ok(jsText.includes("--label-9: 'Estado'"), 'Should include --label-9: Estado');
     assert.ok(jsText.includes("e.altKey && e.key.toLowerCase() === 'h'"), 'Should include Alt+H shortcut');
   });
+
+  it('validates comprehensive responsiveness, tap target sizes (>= 44px), and multi-screen layouts (<600px, 600-1024px, >1200px)', () => {
+    const cssText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'css', 'odoo20.css'), 'utf8');
+    const htmlText = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    const jsText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
+
+    // 1. Viewport meta & Dynamic viewport units (100dvh)
+    assert.ok(htmlText.includes('<meta name="viewport" content="width=device-width, initial-scale=1.0"'), 'HTML must have responsive viewport meta');
+    assert.ok(cssText.includes('100dvh'), 'CSS must use dynamic viewport units (100dvh) for mobile browser bars');
+    assert.ok(cssText.includes('overflow-x: hidden'), 'CSS must prevent horizontal root scroll');
+
+    // 2. Mobile Tap Targets (>= 44px)
+    assert.ok(cssText.includes('min-height: 44px'), 'CSS must enforce >= 44px touch targets on mobile');
+    assert.ok(cssText.includes('touch-action: manipulation'), 'CSS must optimize touch manipulation');
+
+    // 3. Mobile Navbar (<768px / <600px): apps toggle, brand, submenus as scrollable pill strip, compact systray
+    assert.ok(cssText.includes('.o_navbar_left {\n    display: contents;'), 'Navbar left should use display: contents on mobile to wrap submenus');
+    assert.ok(cssText.includes('.o_menu_sections {\n    order: 4;'), 'Submenus must order into second responsive row on mobile');
+    assert.ok(cssText.includes('#btnCommandPalette span:not(.o_systray_badge) {\n    display: none;'), 'Systray text must hide on mobile to fit icons');
+    assert.ok(cssText.includes('#systrayCompany {\n    display: none;'), 'Company name must hide on mobile navbar');
+
+    // 4. Control Panel responsive collapse on mobile (<600px)
+    assert.ok(cssText.includes('.o_cp_center {\n    width: 100%;\n    max-width: 100%;'), 'Search container must take 100% width on mobile');
+    assert.ok(cssText.includes('.o_cp_filter_pills {\n    display: flex;\n    overflow-x: auto;'), 'Filter pills must scroll horizontally on small screens');
+
+    // 5. Responsive Data Tables: Container query + card layout
+    assert.ok(cssText.includes('@container (width < 600px)'), 'CSS must include @container (width < 600px) for tables');
+    assert.ok(cssText.includes('.table-wrapper {\n    max-block-size: min(560px, 72vh);\n  }'), 'Table wrapper must adapt to viewport on mobile');
+
+    // 6. Responsive Forms, Totals box, and Smart Buttons on mobile (<600px)
+    assert.ok(cssText.includes('.o_form_statusbar {\n    padding: 0.6rem 0.75rem;\n    flex-direction: column;\n    align-items: stretch;'), 'Form statusbar must stack on mobile');
+    assert.ok(cssText.includes('.o_button_box {\n    display: grid;\n    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));'), 'Smart buttons must auto-fit on mobile');
+    assert.ok(cssText.includes('.o_totals_box {\n    max-width: 100%;\n    margin-left: 0;'), 'Totals box must span 100% on mobile');
+
+    // 7. Modals / Dialogs: light-dismiss + responsive dialog group
+    assert.ok(htmlText.includes('class="o_group o_dialog_group"'), 'Payment dialog should use o_dialog_group');
+    assert.ok(cssText.includes('.o_dialog_group {\n  grid-template-columns: 1fr 1fr;\n}'), 'Dialog group should be 2-column on desktop');
+    assert.ok(cssText.includes('.o_dialog_group {\n    grid-template-columns: 1fr;\n  }'), 'Dialog group should be 1-column on mobile');
+    assert.ok(cssText.includes('width: min(560px, calc(100vw - 1.5rem))'), 'Dialog must fit cleanly inside mobile viewports');
+
+    // 8. Settings layout: horizontal swipeable tabs on screens < 840px
+    assert.ok(cssText.includes('.o_settings_sidebar {\n    flex-direction: row;\n    overflow-x: auto;'), 'Settings sidebar must become horizontal scrollable bar on mobile');
+
+    // 9. Quick add grids in Products & Accounts
+    assert.ok(jsText.includes('class="o_group o_prod_add_grid"'), 'Product quick add should use o_prod_add_grid');
+    assert.ok(jsText.includes('class="o_group o_acc_add_grid"'), 'Accounts quick add should use o_acc_add_grid');
+    assert.ok(cssText.includes('.o_prod_add_grid'), 'CSS must define .o_prod_add_grid');
+    assert.ok(cssText.includes('.o_acc_add_grid'), 'CSS must define .o_acc_add_grid');
+  });
 });
+

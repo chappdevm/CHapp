@@ -2009,7 +2009,7 @@
     container.innerHTML = `
       <div class="o_form_sheet" style="margin-bottom: 1rem;">
         <h3 style="margin-bottom: 0.75rem;">➕ Crear / Actualizar Producto o Servicio</h3>
-        <div class="o_group" style="grid-template-columns: 2fr 1fr 1fr 1fr auto; align-items: end; margin-bottom: 0;">
+        <div class="o_group o_prod_add_grid" style="align-items: end; margin-bottom: 0;">
           <div class="o_field_row">
             <label for="newProdName">Nombre del Producto / Servicio</label>
             <input type="text" id="newProdName" class="o_input" placeholder="Ej. Licencia Adicional Usuario ERP" />
@@ -2295,7 +2295,7 @@
       container.innerHTML = `
         <div class="o_form_sheet" style="margin-bottom: 1rem;">
           <h3 style="margin-bottom: 0.75rem;">➕ Agregar Cuenta al Plan Único de Cuentas (PUC)</h3>
-          <div class="o_group" style="grid-template-columns: 1fr 2fr 1.5fr auto; align-items: end; margin-bottom: 0;">
+          <div class="o_group o_acc_add_grid" style="align-items: end; margin-bottom: 0;">
             <div class="o_field_row">
               <label for="newAccCode">Código PUC</label>
               <input type="text" id="newAccCode" class="o_input" placeholder="Ej. 513515" />
