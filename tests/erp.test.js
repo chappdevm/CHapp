@@ -583,7 +583,39 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.ok(!jsText.includes('id="prodCanBeSold"'), 'Must remove prodCanBeSold checkbox from form');
     assert.ok(!jsText.includes('id="prodCanBeExpensed"'), 'Must remove prodCanBeExpensed checkbox from form');
 
-    // 4. Verify ZERO emojis and symbols inside <button> tags across index.html and app.js
+    // 4. Verify table column alignment and exact 6-column matching
+    const cssContent = fs.readFileSync(path.join(__dirname, '..', 'assets', 'css', 'odoo20.css'), 'utf8');
+    assert.ok(cssContent.includes('.o_list_table thead th {\n  padding: 0.65rem 0.85rem;') && cssContent.includes('text-align: start;'), 'Table header th must have text-align: start');
+    assert.ok(cssContent.includes('.o_list_table thead th:first-child {\n  position: sticky;\n  inset-inline-start: 0;\n  z-index: 3;\n}'), 'First column header must have sticky inset-inline-start: 0');
+    assert.ok(cssContent.includes('.o_list_table tbody th {\n  position: sticky;\n  inset-inline-start: 0;\n  z-index: 1;\n  background-color: var(--o-view-bg);\n  padding: 0.65rem 0.85rem;\n  font-weight: 600;\n  color: var(--o-text-main);\n  border-bottom: 1px solid var(--o-border-color);\n  white-space: nowrap;\n  text-align: start;\n}'), 'Table body th must have text-align: start');
+    assert.ok(cssContent.includes('.o_list_table tbody td {\n  padding: 0.65rem 0.85rem;\n  border-bottom: 1px solid var(--o-border-color);\n  color: var(--o-gray-800);\n  vertical-align: middle;\n  text-align: start;\n}'), 'Table body td must have text-align: start');
+    assert.ok(jsText.includes('<th>Producto</th>'), 'Products table must have Producto header');
+    assert.ok(jsText.includes('<th>Referencia SKU</th>'), 'Products table must have Referencia SKU header');
+    assert.ok(jsText.includes('<th>Categoría</th>'), 'Products table must have Categoría header');
+    assert.ok(jsText.includes('<th>Unidad de Medida</th>'), 'Products table must have Unidad de Medida header');
+    assert.ok(jsText.includes('<th class="text-end">Precio de Venta</th>'), 'Products table must have Precio de Venta header');
+    assert.ok(jsText.includes('<th>Impuesto</th>'), 'Products table must have Impuesto header');
+
+    // 5. Verify select menus across entire app have empty/placeholder options when unselected
+    assert.ok(htmlText.includes('<option value="" disabled selected>— Seleccione un diario de pago —</option>'), 'Payment journal must have empty placeholder option');
+    assert.ok(jsText.includes('<option value="" ${!existing.payment_term ? \'selected disabled\' : \'\'}>— Seleccione un plazo de pago —</option>'), 'Contact payment term select must have empty placeholder');
+    assert.ok(jsText.includes('<option value="" ${!existing.product_id ? \'selected disabled\' : \'\'}>— Seleccione Categoría de Gasto —</option>'), 'Expense product select must have empty placeholder');
+    assert.ok(jsText.includes('<option value="" ${!existing.partner_id ? \'selected disabled\' : \'\'}>— Seleccionar Proveedor —</option>'), 'Expense partner select must have empty placeholder');
+    assert.ok(jsText.includes('<option value="" ${existing.tax_rate === \'\' || existing.tax_rate === undefined || existing.tax_rate === null ? \'selected disabled\' : \'\'}>— Seleccione IVA —</option>'), 'Expense tax select must have empty placeholder');
+    assert.ok(jsText.includes('<option value="" ${!existing.payment_mode ? \'selected disabled\' : \'\'}>— Seleccione Forma de Pago —</option>'), 'Expense payment mode select must have empty placeholder');
+    assert.ok(jsText.includes('<option value="" ${!draft.partner_id ? \'selected disabled\' : \'\'}>— Seleccione un cliente —</option>'), 'Sale partner select must have empty placeholder');
+    assert.ok(jsText.includes('<option value="" ${!draft.payment_term ? \'selected disabled\' : \'\'}>— Seleccione plazo de pago —</option>'), 'Sale payment term select must have empty placeholder');
+    assert.ok(jsText.includes('<option value="" ${!l.product_id ? \'selected disabled\' : \'\'}>— Seleccione producto —</option>'), 'Sale line product select must have empty placeholder');
+    assert.ok(jsText.includes('<option value="" ${!existing.uom ? \'selected disabled\' : \'\'}>— Seleccione Unidad de Medida —</option>'), 'Product UoM select must have empty placeholder');
+    assert.ok(jsText.includes('<option value="" ${existing.tax_rate === \'\' || existing.tax_rate === undefined || existing.tax_rate === null ? \'selected disabled\' : \'\'}>— Seleccione IVA —</option>'), 'Product tax select must have empty placeholder');
+    assert.ok(jsText.includes('<option value="" disabled selected>— Seleccione Naturaleza / Tipo —</option>'), 'PUC account type select must have empty placeholder');
+    assert.ok(jsText.includes('<option value="" ${!draft.partner_id ? \'selected disabled\' : \'\'}>— Seleccione Tercero / Contacto —</option>'), 'Accounting move partner select must have empty placeholder');
+    assert.ok(jsText.includes('<option value="" ${!s.currency ? \'selected disabled\' : \'\'}>— Seleccione Moneda —</option>'), 'Settings currency select must have empty placeholder');
+    assert.ok(jsText.includes('<option value="" ${!s.theme ? \'selected disabled\' : \'\'}>— Seleccione Tema —</option>'), 'Settings theme select must have empty placeholder');
+    assert.ok(jsText.includes('<option value="" ${s.default_sale_tax === \'\' || s.default_sale_tax === undefined || s.default_sale_tax === null ? \'selected disabled\' : \'\'}>— Seleccione IVA por Defecto —</option>'), 'Settings default sale tax select must have empty placeholder');
+    assert.ok(jsText.includes('<option value="" ${!s.active_user || !s.active_user.id ? \'selected disabled\' : \'\'}>— Seleccione Usuario Activo —</option>'), 'Settings active user select must have empty placeholder');
+
+    // 6. Verify ZERO emojis and symbols inside <button> tags across index.html and app.js
     const emojiRegex = /[\p{Extended_Pictographic}\u2600-\u27BF\u2300-\u23FF\u2B50\u203C\u2049\u2139\u2194-\u21AA\u2702-\u27B0✕✓💾✉➕🔍]/u;
     const btnRegex = /<button[\s\S]*?<\/button>/gi;
 

@@ -1307,6 +1307,13 @@ button, input, select, textarea {
   border-bottom: 1px solid var(--o-border-color);
   background-color: var(--o-gray-100);
   white-space: nowrap;
+  text-align: start;
+}
+
+.o_list_table thead th:first-child {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 3;
 }
 
 .o_list_table tbody tr {
@@ -1330,6 +1337,7 @@ button, input, select, textarea {
   color: var(--o-text-main);
   border-bottom: 1px solid var(--o-border-color);
   white-space: nowrap;
+  text-align: start;
 }
 
 .o_list_table tbody td {
@@ -1337,6 +1345,7 @@ button, input, select, textarea {
   border-bottom: 1px solid var(--o-border-color);
   color: var(--o-gray-800);
   vertical-align: middle;
+  text-align: start;
 }
 
 .o_list_table tfoot td {

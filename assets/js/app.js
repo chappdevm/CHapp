@@ -752,7 +752,7 @@
           customer_rank: 1,
           supplier_rank: 0,
           category_ids: ['Cliente'],
-          payment_term: '30 Días',
+          payment_term: '',
           notes: '',
           sales_count: 0,
           sales_total: 0,
@@ -869,6 +869,7 @@
               <div class="o_field_row">
                 <label for="fContactPaymentTerm">Plazo de Pago Predeterminado</label>
                 <select id="fContactPaymentTerm" class="o_select">
+                  <option value="" ${!existing.payment_term ? 'selected disabled' : ''}>— Seleccione un plazo de pago —</option>
                   ${['Contado', '15 Días', '30 Días', '45 Días', '60 Días']
                     .map((t) => `<option value="${t}" ${existing.payment_term === t ? 'selected' : ''}>${t}</option>`)
                     .join('')}
@@ -1201,17 +1202,17 @@
           name: '',
           employee_name: (state.data.settings.active_user && state.data.settings.active_user.name) || 'Andrés Salazar',
           department: 'Operaciones & Proyectos',
-          product_id: 4,
-          product_name: 'Viáticos y Alojamiento Corporativo',
+          product_id: '',
+          product_name: '',
           date: new Date().toISOString().slice(0, 10),
-          payment_mode: 'own_account',
+          payment_mode: '',
           quantity: 1,
-          price_unit: 250000,
-          tax_rate: 19,
-          untaxed_amount: 250000,
-          tax_amount: 47500,
-          total_amount: 297500,
-          partner_id: 6,
+          price_unit: 0,
+          tax_rate: '',
+          untaxed_amount: 0,
+          tax_amount: 0,
+          total_amount: 0,
+          partner_id: '',
           analytic_account: 'General',
           receipt_ref: '',
           notes: '',
@@ -1308,6 +1309,7 @@
               <div class="o_field_row">
                 <label for="fExpProduct">Categoría de Gasto</label>
                 <select id="fExpProduct" class="o_select">
+                  <option value="" ${!existing.product_id ? 'selected disabled' : ''}>— Seleccione Categoría de Gasto —</option>
                   ${(state.data.products || [])
                     .map(
                       (p) =>
@@ -1319,7 +1321,7 @@
               <div class="o_field_row">
                 <label for="fExpPartner">Proveedor / Comercio</label>
                 <select id="fExpPartner" class="o_select">
-                  <option value="">— Seleccionar Proveedor —</option>
+                  <option value="" ${!existing.partner_id ? 'selected disabled' : ''}>— Seleccionar Proveedor —</option>
                   ${(state.data.contacts || [])
                     .map(
                       (c) => `<option value="${c.id}" ${Number(existing.partner_id) === Number(c.id) ? 'selected' : ''}>${esc(c.name)}</option>`
@@ -1346,14 +1348,16 @@
               <div class="o_field_row">
                 <label for="fExpTax">Impuesto IVA (%)</label>
                 <select id="fExpTax" class="o_select">
+                  <option value="" ${existing.tax_rate === '' || existing.tax_rate === undefined || existing.tax_rate === null ? 'selected disabled' : ''}>— Seleccione IVA —</option>
                   ${[0, 5, 19]
-                    .map((t) => `<option value="${t}" ${Number(existing.tax_rate) === t ? 'selected' : ''}>IVA ${t}%</option>`)
+                    .map((t) => `<option value="${t}" ${existing.tax_rate !== '' && Number(existing.tax_rate) === t ? 'selected' : ''}>IVA ${t}%</option>`)
                     .join('')}
                 </select>
               </div>
               <div class="o_field_row">
                 <label for="fExpPayMode">Pagado Por</label>
                 <select id="fExpPayMode" class="o_select">
+                  <option value="" ${!existing.payment_mode ? 'selected disabled' : ''}>— Seleccione Forma de Pago —</option>
                   <option value="own_account" ${existing.payment_mode === 'own_account' ? 'selected' : ''}>Empleado (a reembolsar)</option>
                   <option value="company_account" ${existing.payment_mode === 'company_account' ? 'selected' : ''}>Compañía (Tarjeta / Caja)</option>
                 </select>
@@ -1402,21 +1406,43 @@
       document.getElementById(id).addEventListener('input', recalc);
     });
 
+    document.getElementById('fExpProduct').addEventListener('change', (e) => {
+      const pid = Number(e.target.value);
+      const prod = (state.data.products || []).find((p) => Number(p.id) === pid);
+      if (prod) {
+        document.getElementById('fExpPrice').value = String(prod.list_price || 0);
+        if (prod.tax_rate !== undefined) {
+          document.getElementById('fExpTax').value = String(prod.tax_rate);
+        }
+        recalc();
+      }
+    });
+
     document.getElementById('btnSaveExpense').addEventListener('click', async () => {
       try {
+        const prodVal = document.getElementById('fExpProduct').value;
+        if (!prodVal) {
+          showToast('Debe seleccionar una categoría de gasto.', true);
+          return;
+        }
+        const payMode = document.getElementById('fExpPayMode').value;
+        if (!payMode) {
+          showToast('Debe seleccionar una forma de pago.', true);
+          return;
+        }
         const payload = {
           id: isNew ? undefined : existing.id,
           name: document.getElementById('fExpName').value,
           employee_name: document.getElementById('fExpEmployee').value,
           department: document.getElementById('fExpDept').value,
-          product_id: Number(document.getElementById('fExpProduct').value),
+          product_id: Number(prodVal),
           partner_id: Number(document.getElementById('fExpPartner').value) || null,
           date: document.getElementById('fExpDate').value,
           receipt_ref: document.getElementById('fExpReceipt').value,
           quantity: Number(document.getElementById('fExpQty').value),
           price_unit: Number(document.getElementById('fExpPrice').value),
-          tax_rate: Number(document.getElementById('fExpTax').value),
-          payment_mode: document.getElementById('fExpPayMode').value,
+          tax_rate: Number(document.getElementById('fExpTax').value || 0),
+          payment_mode: payMode,
           notes: document.getElementById('fExpNotes').value
         };
         const res = await apiCall('/api/expenses', 'POST', payload);
@@ -1651,26 +1677,26 @@
     const existing = isNew
       ? {
           name: 'Nueva Cotización',
-          partner_id: (state.formDraft && state.formDraft.partner_id) || ((state.data.contacts || [])[0] && state.data.contacts[0].id) || 1,
+          partner_id: (state.formDraft && state.formDraft.partner_id) || '',
           date_order: new Date().toISOString().slice(0, 10),
           validity_date: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
           salesperson: (state.data.settings.active_user && state.data.settings.active_user.name) || 'Laura Gómez',
-          payment_term: '30 Días',
+          payment_term: (state.formDraft && state.formDraft.payment_term) || '',
           state: 'draft',
           invoice_status: 'no',
-          lines: [
+          lines: state.formDraft && state.formDraft.lines ? state.formDraft.lines : [
             {
               id: 1,
-              product_id: defaultProd.id,
-              product_name: defaultProd.name,
-              description: defaultProd.name,
+              product_id: '',
+              product_name: '',
+              description: '',
               quantity: 1,
-              price_unit: defaultProd.list_price,
+              price_unit: 0,
               discount: 0,
-              tax_rate: defaultProd.tax_rate,
-              subtotal: defaultProd.list_price,
-              tax_amount: Math.round(defaultProd.list_price * (defaultProd.tax_rate / 100)),
-              total: Math.round(defaultProd.list_price * (1 + defaultProd.tax_rate / 100))
+              tax_rate: 19,
+              subtotal: 0,
+              tax_amount: 0,
+              total: 0
             }
           ],
           notes: state.data.settings.sale_terms || '',
@@ -1687,8 +1713,8 @@
     if (!state.formDraft || state.formDraft.recordId !== state.activeRecordId) {
       state.formDraft = {
         recordId: state.activeRecordId,
-        partner_id: (state.formDraft && state.formDraft.partner_id) || existing.partner_id,
-        payment_term: existing.payment_term || '30 Días',
+        partner_id: (state.formDraft && state.formDraft.partner_id) || existing.partner_id || '',
+        payment_term: existing.payment_term || '',
         date_order: existing.date_order,
         validity_date: existing.validity_date,
         salesperson: existing.salesperson,
@@ -1780,6 +1806,7 @@
               <div class="o_field_row">
                 <label for="fSalePartner">Cliente *</label>
                 <select id="fSalePartner" class="o_select">
+                  <option value="" ${!draft.partner_id ? 'selected disabled' : ''}>— Seleccione un cliente —</option>
                   ${(state.data.contacts || [])
                     .map(
                       (c) => `<option value="${c.id}" ${Number(draft.partner_id) === Number(c.id) ? 'selected' : ''}>${esc(c.name)} (${esc(c.vat || 'Sin NIT')})</option>`
@@ -1790,6 +1817,7 @@
               <div class="o_field_row">
                 <label for="fSalePaymentTerm">Plazos de Pago</label>
                 <select id="fSalePaymentTerm" class="o_select">
+                  <option value="" ${!draft.payment_term ? 'selected disabled' : ''}>— Seleccione plazo de pago —</option>
                   ${['Contado', '15 Días', '30 Días', '45 Días', '60 Días']
                     .map((t) => `<option value="${t}" ${draft.payment_term === t ? 'selected' : ''}>${t}</option>`)
                     .join('')}
@@ -1835,6 +1863,7 @@
                       <tr data-line-idx="${idx}">
                         <th>
                           <select class="o_select line-product" data-idx="${idx}">
+                            <option value="" ${!l.product_id ? 'selected disabled' : ''}>— Seleccione producto —</option>
                             ${(state.data.products || [])
                               .map(
                                 (p) => `<option value="${p.id}" ${Number(l.product_id) === Number(p.id) ? 'selected' : ''}>${esc(p.name)}</option>`
@@ -1848,8 +1877,9 @@
                         <td><input type="number" class="o_input line-disc" data-idx="${idx}" min="0" max="100" step="any" value="${Number(l.discount || 0)}" /></td>
                         <td>
                           <select class="o_select line-tax" data-idx="${idx}">
+                            <option value="" ${l.tax_rate === undefined || l.tax_rate === null || l.tax_rate === '' ? 'selected disabled' : ''}>— IVA —</option>
                             ${[0, 5, 19]
-                              .map((t) => `<option value="${t}" ${Number(l.tax_rate) === t ? 'selected' : ''}>${t}%</option>`)
+                              .map((t) => `<option value="${t}" ${l.tax_rate !== '' && Number(l.tax_rate) === t ? 'selected' : ''}>${t}%</option>`)
                               .join('')}
                           </select>
                         </td>
@@ -1959,19 +1989,23 @@
       syncSaleDraft();
       state.formDraft.lines.push({
         id: Date.now(),
-        product_id: defaultProd.id,
-        product_name: defaultProd.name,
-        description: defaultProd.name,
+        product_id: '',
+        product_name: '',
+        description: '',
         quantity: 1,
-        price_unit: defaultProd.list_price,
+        price_unit: 0,
         discount: 0,
-        tax_rate: defaultProd.tax_rate
+        tax_rate: 19
       });
       renderSaleOrderForm(container);
     });
 
     const saveOrderNow = async () => {
       syncSaleDraft();
+      if (!state.formDraft.partner_id) {
+        showToast('Debe seleccionar un cliente para la cotización.', true);
+        throw new Error('Debe seleccionar un cliente para la cotización.');
+      }
       const payload = {
         id: isNew ? undefined : existing.id,
         partner_id: Number(state.formDraft.partner_id),
@@ -2147,10 +2181,10 @@
           default_code: '',
           category: 'General',
           type: 'consu',
-          uom: 'Metro Cuadrado',
+          uom: '',
           list_price: 0,
           standard_price: 0,
-          tax_rate: 19,
+          tax_rate: '',
           can_be_sold: true,
           can_be_expensed: false
         }
@@ -2211,7 +2245,8 @@
                   <div class="o_field_row">
                     <label for="prodUom">Unidad de Medida</label>
                     <select id="prodUom" class="o_select">
-                      <option value="Metro Cuadrado" ${existing.uom === 'Metro Liso' ? '' : 'selected'}>Metro Cuadrado (m²)</option>
+                      <option value="" ${!existing.uom ? 'selected disabled' : ''}>— Seleccione Unidad de Medida —</option>
+                      <option value="Metro Cuadrado" ${existing.uom === 'Metro Cuadrado' ? 'selected' : ''}>Metro Cuadrado (m²)</option>
                       <option value="Metro Liso" ${existing.uom === 'Metro Liso' ? 'selected' : ''}>Metro Liso</option>
                     </select>
                   </div>
@@ -2222,9 +2257,10 @@
                   <div class="o_field_row">
                     <label for="prodTax">Impuesto IVA (%)</label>
                     <select id="prodTax" class="o_select">
-                      <option value="19" ${Number(existing.tax_rate) === 19 ? 'selected' : ''}>IVA 19%</option>
-                      <option value="5" ${Number(existing.tax_rate) === 5 ? 'selected' : ''}>IVA 5%</option>
-                      <option value="0" ${Number(existing.tax_rate) === 0 ? 'selected' : ''}>Exento 0%</option>
+                      <option value="" ${existing.tax_rate === '' || existing.tax_rate === undefined || existing.tax_rate === null ? 'selected disabled' : ''}>— Seleccione IVA —</option>
+                      <option value="19" ${existing.tax_rate !== '' && Number(existing.tax_rate) === 19 ? 'selected' : ''}>IVA 19%</option>
+                      <option value="5" ${existing.tax_rate !== '' && Number(existing.tax_rate) === 5 ? 'selected' : ''}>IVA 5%</option>
+                      <option value="0" ${existing.tax_rate !== '' && Number(existing.tax_rate) === 0 ? 'selected' : ''}>Exento 0%</option>
                     </select>
                   </div>
                 </div>
@@ -2244,9 +2280,18 @@
         }
         const default_code = (document.getElementById('prodSku').value || '').trim();
         const category = (document.getElementById('prodCategory').value || 'General').trim();
-        const uom = document.getElementById('prodUom').value;
+        const uom = (document.getElementById('prodUom').value || '').trim();
+        if (!uom) {
+          showToast('Debe seleccionar una unidad de medida.', true);
+          return;
+        }
         const list_price = Number(document.getElementById('prodPrice').value || 0);
-        const tax_rate = Number(document.getElementById('prodTax').value || 19);
+        const taxVal = document.getElementById('prodTax').value;
+        if (taxVal === '') {
+          showToast('Debe seleccionar la tarifa de IVA.', true);
+          return;
+        }
+        const tax_rate = Number(taxVal);
 
         const payload = {
           name,
@@ -2506,6 +2551,7 @@
             <div class="o_field_row">
               <label for="newAccType">Naturaleza / Tipo</label>
               <select id="newAccType" class="o_select">
+                <option value="" disabled selected>— Seleccione Naturaleza / Tipo —</option>
                 <option value="Activo Corriente">Activo Corriente</option>
                 <option value="Por Cobrar">Por Cobrar</option>
                 <option value="Por Pagar">Por Pagar</option>
@@ -2551,6 +2597,10 @@
           const code = document.getElementById('newAccCode').value;
           const name = document.getElementById('newAccName').value;
           const type = document.getElementById('newAccType').value;
+          if (!type) {
+            showToast('Debe seleccionar la naturaleza o tipo de cuenta.', true);
+            return;
+          }
           await apiCall('/api/accounting/accounts', 'POST', { code, name, type, reconcile: type.includes('Cobrar') || type.includes('Pagar') });
           showToast('Cuenta contable creada.');
           renderModuleWorkspace();
@@ -2649,7 +2699,7 @@
       ? {
           name: 'Borrador',
           move_type: moveType,
-          partner_id: ((state.data.contacts || [])[0] && state.data.contacts[0].id) || 1,
+          partner_id: '',
           invoice_date: new Date().toISOString().slice(0, 10),
           invoice_date_due: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
           ref: '',
@@ -2686,7 +2736,7 @@
     if (!state.formDraft || state.formDraft.moveRecordId !== state.activeRecordId) {
       state.formDraft = {
         moveRecordId: state.activeRecordId,
-        partner_id: existing.partner_id,
+        partner_id: existing.partner_id || '',
         ref: existing.ref || '',
         invoice_date: existing.invoice_date,
         invoice_date_due: existing.invoice_date_due,
@@ -2752,6 +2802,7 @@
               <div class="o_field_row">
                 <label for="fMovePartner">Cliente / Proveedor</label>
                 <select id="fMovePartner" class="o_select" ${!isEditable ? 'disabled' : ''}>
+                  <option value="" ${!draft.partner_id ? 'selected disabled' : ''}>— Seleccione Tercero / Contacto —</option>
                   ${(state.data.contacts || [])
                     .map(
                       (c) => `<option value="${c.id}" ${Number(draft.partner_id) === Number(c.id) ? 'selected' : ''}>${esc(c.name)}</option>`
@@ -2953,6 +3004,10 @@
 
     const saveMoveFromForm = async (autoPost) => {
       syncMoveDraft();
+      if (!state.formDraft.partner_id) {
+        showToast('Debe seleccionar un cliente o proveedor.', true);
+        throw new Error('Debe seleccionar un cliente o proveedor.');
+      }
       const payload = {
         id: isNew ? undefined : existing.id,
         move_type: existing.move_type,
@@ -2995,6 +3050,7 @@
       openPayModalBtn.addEventListener('click', () => {
         const dialog = document.getElementById('paymentDialog');
         document.getElementById('payMoveId').value = String(existing.id);
+        document.getElementById('payJournal').value = '';
         document.getElementById('payAmount').value = String(existing.amount_residual);
         document.getElementById('payDate').value = new Date().toISOString().slice(0, 10);
         document.getElementById('payRef').value = existing.name;
@@ -3064,6 +3120,7 @@
               <div class="o_field_row">
                 <label for="setCurrency">Moneda Funcional</label>
                 <select id="setCurrency" class="o_select">
+                  <option value="" ${!s.currency ? 'selected disabled' : ''}>— Seleccione Moneda —</option>
                   <option value="COP" ${s.currency === 'COP' ? 'selected' : ''}>COP — Peso Colombiano ($)</option>
                   <option value="USD" ${s.currency === 'USD' ? 'selected' : ''}>USD — Dólar Estadounidense (US$)</option>
                   <option value="EUR" ${s.currency === 'EUR' ? 'selected' : ''}>EUR — Euro (€)</option>
@@ -3072,6 +3129,7 @@
               <div class="o_field_row">
                 <label for="setTheme">Tema Visual Odoo 20</label>
                 <select id="setTheme" class="o_select">
+                  <option value="" ${!s.theme ? 'selected disabled' : ''}>— Seleccione Tema —</option>
                   <option value="dark" ${s.theme === 'dark' ? 'selected' : ''}>Modo Oscuro Odoo 20 (Predeterminado)</option>
                   <option value="light" ${s.theme === 'light' ? 'selected' : ''}>Modo Claro</option>
                 </select>
@@ -3089,7 +3147,8 @@
               <div class="o_field_row">
                 <label for="setDefaultSaleTax">IVA de Ventas por Defecto (%)</label>
                 <select id="setDefaultSaleTax" class="o_select">
-                  ${[19, 5, 0].map((t) => `<option value="${t}" ${Number(s.default_sale_tax) === t ? 'selected' : ''}>${t}%</option>`).join('')}
+                  <option value="" ${s.default_sale_tax === '' || s.default_sale_tax === undefined || s.default_sale_tax === null ? 'selected disabled' : ''}>— Seleccione IVA por Defecto —</option>
+                  ${[19, 5, 0].map((t) => `<option value="${t}" ${s.default_sale_tax !== '' && Number(s.default_sale_tax) === t ? 'selected' : ''}>${t}%</option>`).join('')}
                 </select>
               </div>
               <div class="o_field_row">
@@ -3109,6 +3168,7 @@
               <div class="o_field_row">
                 <label for="setActiveUser">Usuario Activo de Sesión</label>
                 <select id="setActiveUser" class="o_select">
+                  <option value="" ${!s.active_user || !s.active_user.id ? 'selected disabled' : ''}>— Seleccione Usuario Activo —</option>
                   ${(s.users || [])
                     .map(
                       (u) =>
@@ -3399,6 +3459,10 @@
       try {
         const moveId = Number(document.getElementById('payMoveId').value);
         const journal_code = document.getElementById('payJournal').value;
+        if (!journal_code) {
+          showToast('Debe seleccionar un diario de pago.', true);
+          return;
+        }
         const amount = Number(document.getElementById('payAmount').value);
         const date = document.getElementById('payDate').value;
         const ref = document.getElementById('payRef').value;
