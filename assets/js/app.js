@@ -197,7 +197,7 @@
     applyTheme(settings.theme || 'dark');
 
     const compEl = document.getElementById('systrayCompanyName');
-    if (compEl) compEl.textContent = settings.company_name || 'CHapp ERP S.A.S.';
+    if (compEl) compEl.textContent = settings.company_name || 'GH Aluminios';
 
     const user = settings.active_user || { name: 'Administrador CHapp' };
     const userEl = document.getElementById('systrayUserName');

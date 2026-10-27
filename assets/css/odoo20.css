@@ -8,29 +8,30 @@
 [data-theme="dark"] {
   --o-white: #000000;
   --o-black: #ffffff;
-  --o-gray-100: #1F1F23;
-  --o-gray-200: #2C2E35;
-  --o-gray-300: #3E3F47;
-  --o-gray-400: #56575E;
-  --o-gray-500: #6E6F77;
-  --o-gray-600: #88898F;
-  --o-gray-700: #B3B4B8;
-  --o-gray-800: #D1D1D3;
-  --o-gray-900: #EBEBEB;
+  --o-gray-100: #051a2c;
+  --o-gray-200: #072640;
+  --o-gray-300: #0a3556;
+  --o-gray-400: #104874;
+  --o-gray-500: #256a9a;
+  --o-gray-600: #5593c2;
+  --o-gray-700: #93bee0;
+  --o-gray-800: #cbe0f1;
+  --o-gray-900: #F2F2F2;
 
-  --o-brand-odoo: #92427d;
-  --o-brand-primary: #92427d;
-  --o-brand-primary-hover: #a14d8b;
-  --o-action: #1CBCB1;
-  --o-action-subtle: rgba(28, 188, 177, 0.14);
+  --o-brand-odoo: #074073;
+  --o-brand-primary: #074073;
+  --o-brand-primary-hover: #0c5292;
+  --o-action: #14B5D9;
+  --o-action-subtle: rgba(20, 181, 217, 0.16);
+  --o-highlight: #41F2F2;
 
   --o-success: #22b053;
   --o-success-bg: #0d3715;
   --o-success-text: #b0e8b5;
 
-  --o-info: #71ADEA;
-  --o-info-bg: #043e50;
-  --o-info-text: #a0e3fe;
+  --o-info: #14B5D9;
+  --o-info-bg: #03253d;
+  --o-info-text: #41F2F2;
 
   --o-warning: #e39c50;
   --o-warning-bg: #542d06;
@@ -40,51 +41,52 @@
   --o-danger-bg: #58271f;
   --o-danger-text: #fec9bf;
 
-  --o-webclient-bg: #1F1F23;
-  --o-view-bg: #2C2E35;
-  --o-sheet-bg: #26282F;
-  --o-navbar-bg: #1F1F23;
-  --o-border-color: #3E3F47;
-  --o-text-main: #EBEBEB;
-  --o-text-muted: #9FA1A9;
+  --o-webclient-bg: #031626;
+  --o-view-bg: #05213b;
+  --o-sheet-bg: #072c4d;
+  --o-navbar-bg: #031626;
+  --o-border-color: #0d4370;
+  --o-text-main: #F2F2F2;
+  --o-text-muted: #95b8d4;
 
   /* Odoo 20 Home Menu Dark Variables */
-  --AppSwitcherBg-base: #1F1F23;
-  --AppSwitcherBg-contrastRadial: rgba(22, 22, 25, 0.93);
-  --AppSwitcherBg-dots: rgba(255, 255, 255, 0.16);
-  --AppSwitcherIcon-background: #2C2E35;
-  --AppSwitcherIcon-inset-shadow: inset 0 0 0 1px #3E3F47, 0 8px 18px -6px rgba(0, 0, 0, 0.45);
-  --AppSwitcherIcon-inset-shadow-hover: inset 0 0 0 1px #6E6F77, 0 12px 24px -6px rgba(0, 0, 0, 0.65);
-  --homeMenuCaption-color: #FFFFFF;
+  --AppSwitcherBg-base: #031626;
+  --AppSwitcherBg-contrastRadial: rgba(3, 22, 38, 0.94);
+  --AppSwitcherBg-dots: rgba(65, 242, 242, 0.18);
+  --AppSwitcherIcon-background: #074073;
+  --AppSwitcherIcon-inset-shadow: inset 0 0 0 1px #0e4e8a, 0 8px 18px -6px rgba(0, 0, 0, 0.55);
+  --AppSwitcherIcon-inset-shadow-hover: inset 0 0 0 1px #41F2F2, 0 12px 24px -6px rgba(20, 181, 217, 0.45);
+  --homeMenuCaption-color: #F2F2F2;
   --homeMenuCaption-shadow: 0 1px 2px rgba(0, 0, 0, 0.75), 0 2px 5px rgba(0, 0, 0, 0.05), 0 0 5px rgba(0, 0, 0, 0.05);
 }
 
 [data-theme="light"] {
   --o-white: #ffffff;
-  --o-black: #111827;
-  --o-gray-100: #f8f9fa;
-  --o-gray-200: #e7ebed;
-  --o-gray-300: #dee2e6;
-  --o-gray-400: #ced4da;
-  --o-gray-500: #adb5bd;
-  --o-gray-600: #6c757d;
-  --o-gray-700: #495057;
-  --o-gray-800: #343a40;
-  --o-gray-900: #212529;
+  --o-black: #031626;
+  --o-gray-100: #F2F2F2;
+  --o-gray-200: #e2eaf0;
+  --o-gray-300: #c9dbe7;
+  --o-gray-400: #9fc1da;
+  --o-gray-500: #6b96bb;
+  --o-gray-600: #426f95;
+  --o-gray-700: #234d73;
+  --o-gray-800: #074073;
+  --o-gray-900: #031626;
 
-  --o-brand-odoo: #714B67;
-  --o-brand-primary: #714B67;
-  --o-brand-primary-hover: #5d3d55;
-  --o-action: #017e84;
-  --o-action-subtle: rgba(1, 126, 132, 0.1);
+  --o-brand-odoo: #074073;
+  --o-brand-primary: #074073;
+  --o-brand-primary-hover: #052e54;
+  --o-action: #0b8fae;
+  --o-action-subtle: rgba(20, 181, 217, 0.12);
+  --o-highlight: #14B5D9;
 
   --o-success: #00a945;
   --o-success-bg: #dcfce7;
   --o-success-text: #166534;
 
-  --o-info: #0284c7;
-  --o-info-bg: #e0f2fe;
-  --o-info-text: #075985;
+  --o-info: #074073;
+  --o-info-bg: #e1f5fb;
+  --o-info-text: #053b6b;
 
   --o-warning: #d97706;
   --o-warning-bg: #fef3c7;
@@ -94,21 +96,21 @@
   --o-danger-bg: #fee2e2;
   --o-danger-text: #991b1b;
 
-  --o-webclient-bg: #f8f9fa;
+  --o-webclient-bg: #F2F2F2;
   --o-view-bg: #ffffff;
   --o-sheet-bg: #ffffff;
   --o-navbar-bg: #ffffff;
-  --o-border-color: #dee2e6;
-  --o-text-main: #212529;
-  --o-text-muted: #6c757d;
+  --o-border-color: #c9dbe7;
+  --o-text-main: #031626;
+  --o-text-muted: #426f95;
 
-  --AppSwitcherBg-base: #f0f2f5;
-  --AppSwitcherBg-contrastRadial: rgba(231, 235, 237, 0.92);
-  --AppSwitcherBg-dots: rgba(0, 0, 0, 0.14);
+  --AppSwitcherBg-base: #F2F2F2;
+  --AppSwitcherBg-contrastRadial: rgba(226, 234, 240, 0.92);
+  --AppSwitcherBg-dots: rgba(7, 64, 115, 0.14);
   --AppSwitcherIcon-background: #ffffff;
-  --AppSwitcherIcon-inset-shadow: rgba(0, 0, 0, 0.075) 0px 0px 0px 1px, rgba(42, 51, 70, 0.06) 0px 4px 10px -2px;
-  --AppSwitcherIcon-inset-shadow-hover: rgba(9, 30, 66, 0.22) 0px 6px 14px -2px, rgba(9, 30, 66, 0.12) 0px 0px 0px 1px;
-  --homeMenuCaption-color: #212529;
+  --AppSwitcherIcon-inset-shadow: rgba(7, 64, 115, 0.09) 0px 0px 0px 1px, rgba(3, 22, 38, 0.08) 0px 4px 10px -2px;
+  --AppSwitcherIcon-inset-shadow-hover: rgba(7, 64, 115, 0.25) 0px 6px 14px -2px, rgba(20, 181, 217, 0.3) 0px 0px 0px 1px;
+  --homeMenuCaption-color: #031626;
   --homeMenuCaption-shadow: none;
 }
 
@@ -184,6 +186,36 @@ button, input, select, textarea {
   align-items: center;
   padding: clamp(1rem, 3vh, 2rem) 1rem 3rem;
   width: 100%;
+}
+
+.o_home_menu_brand_header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  margin-bottom: 1.25rem;
+  user-select: none;
+}
+
+.o_home_menu_logo {
+  width: 76px;
+  height: 76px;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 18px rgba(20, 181, 217, 0.35));
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.o_home_menu_logo:hover {
+  transform: scale(1.06);
+}
+
+.o_home_menu_brand_title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--o-text-main);
+  text-shadow: var(--homeMenuCaption-shadow);
 }
 
 .o_home_menu_container {
@@ -322,7 +354,7 @@ button, input, select, textarea {
 }
 
 .o_app.o_focused {
-  background: rgba(28, 188, 177, 0.14);
+  background: var(--o-action-subtle);
   outline: 1px solid var(--o-action);
 }
 
@@ -743,7 +775,7 @@ button, input, select, textarea {
   gap: 0.3rem;
   background: var(--o-action-subtle);
   color: var(--o-action);
-  border: 1px solid rgba(28, 188, 177, 0.35);
+  border: 1px solid rgba(20, 181, 217, 0.35);
   border-radius: 4px;
   padding: 0.15rem 0.45rem;
   font-size: 0.75rem;
@@ -1006,12 +1038,15 @@ button, input, select, textarea {
 .btn-action {
   background-color: var(--o-action);
   border-color: var(--o-action);
-  color: #091e1d;
+  color: #031626;
   font-weight: 600;
 }
 
 .btn-action:hover {
-  filter: brightness(1.08);
+  background-color: var(--o-highlight);
+  border-color: var(--o-highlight);
+  color: #031626;
+  box-shadow: 0 0 10px rgba(65, 242, 242, 0.4);
 }
 
 .btn-danger {
@@ -1210,7 +1245,7 @@ button, input, select, textarea {
   font-weight: 700;
   font-size: 1rem;
   color: #ffffff;
-  background: linear-gradient(135deg, #92427d, #1CBCB1);
+  background: linear-gradient(135deg, var(--o-brand-primary), var(--o-action));
   flex-shrink: 0;
 }
 
@@ -1323,7 +1358,7 @@ button, input, select, textarea {
 
 .o_list_table tbody tr:hover td,
 .o_list_table tbody tr:hover th {
-  background-color: rgba(28, 188, 177, 0.07);
+  background-color: rgba(20, 181, 217, 0.08);
 }
 
 /* Sticky row headers (desktop) */
@@ -1929,9 +1964,9 @@ button, input, select, textarea {
   gap: 1rem;
 }
 
-.o_journal_card.is-sale { border-left-color: #92427d; }
+.o_journal_card.is-sale { border-left-color: #074073; }
 .o_journal_card.is-purchase { border-left-color: #e39c50; }
-.o_journal_card.is-bank { border-left-color: #1CBCB1; }
+.o_journal_card.is-bank { border-left-color: #14B5D9; }
 .o_journal_card.is-cash { border-left-color: #22b053; }
 
 @media (max-width: 1024px) {
