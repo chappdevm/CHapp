@@ -1430,6 +1430,11 @@
           showToast('Debe seleccionar una forma de pago.', true);
           return;
         }
+        const expTaxVal = document.getElementById('fExpTax').value;
+        if (expTaxVal === '') {
+          showToast('Debe seleccionar la tarifa de IVA.', true);
+          return;
+        }
         const payload = {
           id: isNew ? undefined : existing.id,
           name: document.getElementById('fExpName').value,
@@ -1693,7 +1698,7 @@
               quantity: 1,
               price_unit: 0,
               discount: 0,
-              tax_rate: 19,
+              tax_rate: '',
               subtotal: 0,
               tax_amount: 0,
               total: 0
@@ -1945,7 +1950,8 @@
         line.quantity = Number(tr.querySelector('.line-qty').value || 1);
         line.price_unit = Number(tr.querySelector('.line-price').value || 0);
         line.discount = Number(tr.querySelector('.line-disc').value || 0);
-        line.tax_rate = Number(tr.querySelector('.line-tax').value || 0);
+        const lineTaxVal = tr.querySelector('.line-tax').value;
+        line.tax_rate = lineTaxVal === '' ? '' : Number(lineTaxVal);
       });
     };
 
@@ -1960,7 +1966,7 @@
           state.formDraft.lines[idx].product_name = prod.name;
           state.formDraft.lines[idx].description = prod.name;
           state.formDraft.lines[idx].price_unit = prod.list_price;
-          state.formDraft.lines[idx].tax_rate = prod.tax_rate;
+          state.formDraft.lines[idx].tax_rate = prod.tax_rate !== undefined && prod.tax_rate !== null && prod.tax_rate !== '' ? prod.tax_rate : '';
           renderSaleOrderForm(container);
         }
       });
@@ -1995,7 +2001,7 @@
         quantity: 1,
         price_unit: 0,
         discount: 0,
-        tax_rate: 19
+        tax_rate: ''
       });
       renderSaleOrderForm(container);
     });
@@ -2005,6 +2011,11 @@
       if (!state.formDraft.partner_id) {
         showToast('Debe seleccionar un cliente para la cotización.', true);
         throw new Error('Debe seleccionar un cliente para la cotización.');
+      }
+      const hasEmptyProduct = (state.formDraft.lines || []).some((l) => !l.product_id);
+      if (hasEmptyProduct) {
+        showToast('Debe seleccionar un producto en cada línea del pedido.', true);
+        throw new Error('Debe seleccionar un producto en cada línea del pedido.');
       }
       const payload = {
         id: isNew ? undefined : existing.id,

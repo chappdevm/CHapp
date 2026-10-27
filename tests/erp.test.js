@@ -606,6 +606,7 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.ok(jsText.includes('<option value="" ${!draft.partner_id ? \'selected disabled\' : \'\'}>— Seleccione un cliente —</option>'), 'Sale partner select must have empty placeholder');
     assert.ok(jsText.includes('<option value="" ${!draft.payment_term ? \'selected disabled\' : \'\'}>— Seleccione plazo de pago —</option>'), 'Sale payment term select must have empty placeholder');
     assert.ok(jsText.includes('<option value="" ${!l.product_id ? \'selected disabled\' : \'\'}>— Seleccione producto —</option>'), 'Sale line product select must have empty placeholder');
+    assert.ok(jsText.includes('<option value="" ${l.tax_rate === undefined || l.tax_rate === null || l.tax_rate === \'\' ? \'selected disabled\' : \'\'}>— IVA —</option>'), 'Sale line tax select must have empty placeholder');
     assert.ok(jsText.includes('<option value="" ${!existing.uom ? \'selected disabled\' : \'\'}>— Seleccione Unidad de Medida —</option>'), 'Product UoM select must have empty placeholder');
     assert.ok(jsText.includes('<option value="" ${existing.tax_rate === \'\' || existing.tax_rate === undefined || existing.tax_rate === null ? \'selected disabled\' : \'\'}>— Seleccione IVA —</option>'), 'Product tax select must have empty placeholder');
     assert.ok(jsText.includes('<option value="" disabled selected>— Seleccione Naturaleza / Tipo —</option>'), 'PUC account type select must have empty placeholder');
@@ -614,6 +615,8 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.ok(jsText.includes('<option value="" ${!s.theme ? \'selected disabled\' : \'\'}>— Seleccione Tema —</option>'), 'Settings theme select must have empty placeholder');
     assert.ok(jsText.includes('<option value="" ${s.default_sale_tax === \'\' || s.default_sale_tax === undefined || s.default_sale_tax === null ? \'selected disabled\' : \'\'}>— Seleccione IVA por Defecto —</option>'), 'Settings default sale tax select must have empty placeholder');
     assert.ok(jsText.includes('<option value="" ${!s.active_user || !s.active_user.id ? \'selected disabled\' : \'\'}>— Seleccione Usuario Activo —</option>'), 'Settings active user select must have empty placeholder');
+    assert.ok(jsText.includes('Debe seleccionar la tarifa de IVA.'), 'Expense form must require selecting tax rate');
+    assert.ok(jsText.includes('Debe seleccionar un producto en cada línea del pedido.'), 'Sale order form must validate products on order lines');
 
     // 6. Verify ZERO emojis and symbols inside <button> tags across index.html and app.js
     const emojiRegex = /[\p{Extended_Pictographic}\u2600-\u27BF\u2300-\u23FF\u2B50\u203C\u2049\u2139\u2194-\u21AA\u2702-\u27B0✕✓💾✉➕🔍]/u;
