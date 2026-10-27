@@ -1067,13 +1067,26 @@
           notes: document.getElementById('fContactNotes').value
         };
         const res = await apiCall('/api/contacts', 'POST', payload);
-        state.activeRecordId = res.contact.id;
+        if (isNew) {
+          state.activeRecordId = null;
+          state.viewType = 'kanban';
+        } else {
+          state.activeRecordId = res.contact.id;
+        }
         showToast('Contacto guardado correctamente.');
         renderModuleWorkspace();
       } catch (err) {
         showToast(err.message, true);
       }
     });
+
+    const contactFormEl = document.getElementById('contactForm');
+    if (contactFormEl) {
+      contactFormEl.addEventListener('submit', (e) => {
+        e.preventDefault();
+        document.getElementById('btnSaveContact')?.click();
+      });
+    }
 
     const delBtn = document.getElementById('btnDeleteContact');
     if (delBtn) {

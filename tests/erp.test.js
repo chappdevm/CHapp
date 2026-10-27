@@ -601,6 +601,9 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.ok(!jsText.includes('id="fContactWebsite"'), 'Contact form must not include Sitio Web field');
     assert.ok(!jsText.includes('id="fCustomerRank"'), 'Contact form must not include numeric Clasificación Cliente field');
     assert.ok(!jsText.includes('id="fSupplierRank"'), 'Contact form must not include numeric Clasificación Proveedor field');
+    assert.ok(htmlText.includes('<title>GH Aluminios ERP</title>'), 'Browser tab title must be GH Aluminios ERP without Odoo 20');
+    assert.ok(!htmlText.includes('ERP — Odoo 20'), 'HTML title must not contain Odoo 20');
+    assert.ok(jsText.includes("state.activeRecordId = null;\n          state.viewType = 'kanban';"), 'Creating new contact must redirect back to kanban view');
 
     // 4. Verify table column alignment and exact 6-column matching
     const cssContent = fs.readFileSync(path.join(__dirname, '..', 'assets', 'css', 'odoo20.css'), 'utf8').replace(/\r\n/g, '\n');
