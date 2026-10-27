@@ -392,10 +392,11 @@
     // Action buttons
     const isProductSubmenu = state.currentApp === 'sales' && state.submenu === 'products';
     const newRecordLabel = isProductSubmenu ? 'Nuevo Producto' : 'Nuevo';
+    const productAttr = isProductSubmenu ? ' data-id="btnNewProductList"' : '';
     if (state.viewType === 'form') {
       actionBtns.innerHTML = `
         <button type="button" class="btn btn-secondary" id="btnCpBackToList">Volver</button>
-        <button type="button" class="btn btn-primary" id="btnCpNewRecord" data-id="btnNewProductList">${newRecordLabel}</button>
+        <button type="button" class="btn btn-primary" id="btnCpNewRecord"${productAttr}>${newRecordLabel}</button>
       `;
     } else if (state.currentApp === 'accounting' && state.submenu === 'dashboard') {
       actionBtns.innerHTML = `
@@ -407,7 +408,7 @@
         <button type="button" class="btn btn-primary" id="btnGoToInvoicesForPay">Registrar Pago en Factura</button>
       `;
     } else {
-      actionBtns.innerHTML = `<button type="button" class="btn btn-primary" id="btnCpNewRecord" data-id="btnNewProductList">${newRecordLabel}</button>`;
+      actionBtns.innerHTML = `<button type="button" class="btn btn-primary" id="btnCpNewRecord"${productAttr}>${newRecordLabel}</button>`;
     }
 
     // Breadcrumbs

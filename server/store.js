@@ -579,7 +579,7 @@ class ERPStore {
         category: String(payload.category ?? this.data.products[idx].category).trim(),
         can_be_sold: payload.can_be_sold !== undefined ? Boolean(payload.can_be_sold) : this.data.products[idx].can_be_sold,
         can_be_expensed: payload.can_be_expensed !== undefined ? Boolean(payload.can_be_expensed) : this.data.products[idx].can_be_expensed,
-        uom: String(payload.uom || this.data.products[idx].uom || 'Unidad').trim()
+        uom: String(payload.uom || this.data.products[idx].uom || 'Metro Cuadrado').trim()
       };
       this.save();
       if (this.supabase) {
@@ -600,7 +600,7 @@ class ERPStore {
       category: String(payload.category || 'General').trim(),
       can_be_sold: payload.can_be_sold !== undefined ? Boolean(payload.can_be_sold) : true,
       can_be_expensed: payload.can_be_expensed !== undefined ? Boolean(payload.can_be_expensed) : true,
-      uom: String(payload.uom || 'Unidad').trim()
+      uom: String(payload.uom || 'Metro Cuadrado').trim()
     };
     this.data.products.push(prod);
     this.save();
@@ -927,7 +927,7 @@ class ERPStore {
         product_name: product ? product.name : String(line.product_name || 'Servicio / Producto').trim(),
         description: String(line.description || (product ? product.name : 'Servicio')).trim(),
         quantity: qty,
-        uom: String(line.uom || (product ? product.uom : 'Unidad')),
+        uom: String(line.uom || (product ? product.uom : 'Metro Cuadrado')),
         price_unit: price,
         discount,
         tax_rate: taxRate,

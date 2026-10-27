@@ -534,6 +534,7 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.ok(createRes.json.product.id > 0);
     assert.equal(createRes.json.product.name, 'Consultoría Cloud ERP Dedicada');
     assert.equal(createRes.json.product.list_price, 2500000);
+    assert.equal(createRes.json.product.uom, 'Metro Cuadrado', 'Product UoM must default to Metro Cuadrado');
 
     const prodId = createRes.json.product.id;
     const initialCount = createRes.json.state.products.length;
@@ -547,7 +548,8 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
       standard_price: 1100000.25,
       category: 'Infraestructura Cloud',
       tax_rate: 19,
-      type: 'service'
+      type: 'service',
+      uom: 'Metro Liso'
     });
     assert.equal(updateRes.status, 200);
     assert.ok(updateRes.json.ok);
@@ -555,6 +557,7 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.equal(updateRes.json.product.name, 'Consultoría Cloud ERP Dedicada (Actualizada)');
     assert.equal(updateRes.json.product.list_price, 2800000.5);
     assert.equal(updateRes.json.product.standard_price, 1100000.25);
+    assert.equal(updateRes.json.product.uom, 'Metro Liso', 'Product UoM must update to Metro Liso');
     assert.equal(updateRes.json.state.products.length, initialCount, 'Updating product in-place must not duplicate record');
 
     // 3. Verify frontend code contracts for Products list view vs detailed form card view
@@ -572,11 +575,13 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.ok(jsText.includes("const newRecordLabel = isProductSubmenu ? 'Nuevo Producto' : 'Nuevo'"), 'Control panel must use Nuevo Producto label');
     assert.ok(!jsText.includes('id="btnNewProductList">Nuevo Producto</button>'), 'Must remove duplicate creation button from product view body');
     assert.ok(!jsText.includes('<span class="o_stat_label">Almacenables / Consumibles</span>'), 'Must remove Almacenables card from banner');
+    assert.ok(!jsText.includes('<span class="o_stat_label">Servicios</span>'), 'Must remove Servicios card from product banner');
     assert.ok(jsText.includes('<option value="Metro Cuadrado"'), 'Must support Metro Cuadrado in UoM');
     assert.ok(jsText.includes('<option value="Metro Liso"'), 'Must support Metro Liso in UoM');
     assert.ok(!jsText.includes('id="prodType"'), 'Must remove prodType input from form');
     assert.ok(!jsText.includes('id="prodCost"'), 'Must remove prodCost input from form');
     assert.ok(!jsText.includes('id="prodCanBeSold"'), 'Must remove prodCanBeSold checkbox from form');
+    assert.ok(!jsText.includes('id="prodCanBeExpensed"'), 'Must remove prodCanBeExpensed checkbox from form');
 
     // 4. Verify ZERO emojis and symbols inside <button> tags across index.html and app.js
     const emojiRegex = /[\p{Extended_Pictographic}\u2600-\u27BF\u2300-\u23FF\u2B50\u203C\u2049\u2139\u2194-\u21AA\u2702-\u27B0✕✓💾✉➕🔍]/u;
