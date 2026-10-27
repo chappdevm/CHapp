@@ -289,6 +289,17 @@ button, input, select, textarea {
 }
 
 @media (max-width: 600px) {
+  .o_home_menu_brand_header {
+    margin-bottom: 0.75rem;
+    gap: 0.4rem;
+  }
+  .o_home_menu_logo {
+    width: 58px;
+    height: 58px;
+  }
+  .o_home_menu_brand_title {
+    font-size: 1.25rem;
+  }
   .o_apps {
     grid-template-columns: repeat(2, minmax(105px, 1fr));
     gap: 1rem 0.75rem;
