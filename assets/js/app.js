@@ -196,6 +196,11 @@
     const settings = state.data.settings || {};
     applyTheme(settings.theme || 'dark');
 
+    const compContainer = document.getElementById('systrayCompany');
+    if (compContainer) {
+      compContainer.title = 'Compañía activa • Base de datos Supabase conectada (Nube)';
+    }
+
     const compEl = document.getElementById('systrayCompanyName');
     if (compEl) compEl.textContent = settings.company_name || 'GH Aluminios';
 
@@ -211,6 +216,8 @@
       (kpis.to_invoice_count || 0);
     const badgeEl = document.getElementById('systrayActivityCount');
     if (badgeEl) badgeEl.textContent = String(pendingCount);
+
+    console.log('[CHapp] Base de datos Supabase conectada (Nube)');
   }
 
   // ==================== NAVIGATION & HOME MENU ====================

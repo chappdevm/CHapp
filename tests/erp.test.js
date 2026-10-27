@@ -1,3 +1,4 @@
+process.env.NODE_ENV = 'test';
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -54,6 +55,16 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
   });
 
   it('bootstraps clean Odoo 20 state with all 5 modules initialized', async () => {
+    const statusRes = await req('/api/status');
+    assert.equal(statusRes.status, 200);
+    assert.equal(statusRes.json.ok, true);
+    assert.ok(statusRes.json.supabase);
+    assert.equal(typeof statusRes.json.supabase.url, 'string');
+
+    const healthRes = await req('/api/health');
+    assert.equal(healthRes.status, 200);
+    assert.equal(healthRes.json.ok, true);
+
     const { status, json } = await req('/api/bootstrap');
     assert.equal(status, 200);
     assert.equal(json.ok, true);

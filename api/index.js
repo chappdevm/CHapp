@@ -3,7 +3,7 @@ const os = require('os');
 const fs = require('fs');
 const { createHandler } = require('../index');
 const { ERPStore } = require('../server/store');
-const { isSupabaseConfigured } = require('../server/supabase');
+const { isSupabaseConfigured, getSupabaseConfig } = require('../server/supabase');
 
 // On Vercel / serverless, filesystem is read-only except /tmp
 const tmpDbPath = path.join(os.tmpdir(), 'chapp_erp_db.json');
@@ -27,7 +27,9 @@ module.exports = async (req, res) => {
   if (store.ensureSynced) {
     try {
       await store.ensureSynced(0);
-    } catch (_) {}
+    } catch (err) {
+      console.warn('[Vercel sync error]:', err?.message);
+    }
   }
   return handler(req, res);
 };

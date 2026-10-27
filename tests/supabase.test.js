@@ -1,3 +1,4 @@
+process.env.NODE_ENV = 'test';
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const {
@@ -455,7 +456,7 @@ describe('Supabase Persistence Layer & PostgREST Architecture', () => {
 
   it('protects against destructive empty array [] wipes when anon key or error occurs', async () => {
     const oldServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = '';
 
     try {
       const persistence = new SupabasePersistence();
@@ -482,7 +483,7 @@ describe('Supabase Persistence Layer & PostgREST Architecture', () => {
 
   it('propagates write errors from Supabase instead of failing silently and provides RLS hints', async () => {
     const oldServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = '';
 
     try {
       const persistence = new SupabasePersistence();

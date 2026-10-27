@@ -2,7 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { ERPStore } = require('./server/store');
-const { isSupabaseConfigured } = require('./server/supabase');
+const { isSupabaseConfigured, getSupabaseConfig } = require('./server/supabase');
 
 const PORT = process.env.PORT || 3000;
 const ROOT_DIR = __dirname;
@@ -69,6 +69,8 @@ function createHandler(store = new ERPStore(undefined, { useSupabase: isSupabase
       const matchHeader = req.headers && (req.headers['x-matched-path'] || req.headers['x-forwarded-uri'] || req.headers['x-invoke-path'] || req.headers['x-original-url']);
       if (matchHeader) {
         pathname = decodeURI(new URL(matchHeader, 'http://localhost').pathname);
+      } else {
+        pathname = '/api/status';
       }
     }
     const method = req.method.toUpperCase();
@@ -77,6 +79,26 @@ function createHandler(store = new ERPStore(undefined, { useSupabase: isSupabase
       try {
         if (store.ensureSynced) {
           await store.ensureSynced(0);
+        }
+
+        if (method === 'GET' && (pathname === '/api/status' || pathname === '/api/health')) {
+          const supaConfig = getSupabaseConfig();
+          return sendJson(res, 200, {
+            ok: true,
+            env: process.env.NODE_ENV || 'production',
+            supabase: {
+              enabled: Boolean(store.supabase && store.supabase.isReady()),
+              url: supaConfig.url,
+              isServiceRole: Boolean(supaConfig.isServiceRole),
+              syncedOnce: Boolean(store._hasSyncedOnce),
+              counts: {
+                contacts: (store.data?.contacts || []).length,
+                products: (store.data?.products || []).length,
+                sales: (store.data?.sales || []).length,
+                expenses: (store.data?.expenses || []).length
+              }
+            }
+          });
         }
 
         if (method === 'GET' && pathname === '/api/bootstrap') {
