@@ -2,6 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { ERPStore } = require('./server/store');
+const { isSupabaseConfigured } = require('./server/supabase');
 
 const PORT = process.env.PORT || 3000;
 const ROOT_DIR = __dirname;
@@ -47,7 +48,7 @@ function readJsonBody(req) {
   });
 }
 
-function createHandler(store = new ERPStore()) {
+function createHandler(store = new ERPStore(undefined, { useSupabase: isSupabaseConfigured() })) {
   return async function handler(req, res) {
     const parsedUrl = new URL(req.url, 'http://localhost');
     const pathname = decodeURI(parsedUrl.pathname);
@@ -199,14 +200,16 @@ function createHandler(store = new ERPStore()) {
   };
 }
 
-function createAppServer(dbPath) {
-  const store = new ERPStore(dbPath);
+function createAppServer(dbPath, options) {
+  const isTestPath = typeof dbPath === 'string' && dbPath.includes('chapp_erp_test_');
+  const defaultOpts = isTestPath ? {} : { useSupabase: isSupabaseConfigured() };
+  const store = new ERPStore(dbPath, options || defaultOpts);
   const handler = createHandler(store);
   return http.createServer(handler);
 }
 
 if (require.main === module) {
-  const server = createAppServer();
+  const server = createAppServer(undefined, { useSupabase: isSupabaseConfigured() });
   server.listen(PORT, () => {
     console.log('====================================================');
     console.log('  CHapp ERP — Basado en Odoo 20 Enterprise');

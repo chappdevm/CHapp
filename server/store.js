@@ -259,12 +259,15 @@ class ERPStore {
       if (fs.existsSync(this.dbPath)) {
         const raw = fs.readFileSync(this.dbPath, 'utf8');
         this.data = JSON.parse(raw);
+        this.updateSequencesFromData();
       } else {
         this.data = createInitialData();
+        this.updateSequencesFromData();
         this.save();
       }
     } catch (err) {
       this.data = createInitialData();
+      this.updateSequencesFromData();
       this.save();
     }
   }
@@ -281,13 +284,41 @@ class ERPStore {
     try {
       const remote = await this.supabase.loadAll(this.data);
       if (remote) {
-        if (Array.isArray(remote.contacts)) this.data.contacts = remote.contacts;
-        if (Array.isArray(remote.products)) this.data.products = remote.products;
-        if (Array.isArray(remote.expenses)) this.data.expenses = remote.expenses;
-        if (Array.isArray(remote.sales)) this.data.sales = remote.sales;
-        if (Array.isArray(remote.moves)) this.data.accounting.moves = remote.moves;
-        if (Array.isArray(remote.payments)) this.data.accounting.payments = remote.payments;
-        if (remote.settings) this.data.settings = remote.settings;
+        const isServiceRole = Boolean(this.supabase.config && this.supabase.config.isServiceRole);
+
+        // Helper to decide if local data should be preserved rather than wiped
+        const shouldPreserveLocal = (remoteArr, localArr) => {
+          if (!Array.isArray(remoteArr)) return true;
+          // If remote is empty, but local has items, and it's not a verified service_role: protect against RLS wipe
+          if (remoteArr.length === 0 && !isServiceRole && Array.isArray(localArr) && localArr.length > 0) {
+            return true;
+          }
+          return false;
+        };
+
+        if (Array.isArray(remote.contacts) && !shouldPreserveLocal(remote.contacts, this.data.contacts)) {
+          this.data.contacts = remote.contacts;
+        }
+        if (Array.isArray(remote.products) && !shouldPreserveLocal(remote.products, this.data.products)) {
+          this.data.products = remote.products;
+        }
+        if (Array.isArray(remote.expenses) && !shouldPreserveLocal(remote.expenses, this.data.expenses)) {
+          this.data.expenses = remote.expenses;
+        }
+        if (Array.isArray(remote.sales) && !shouldPreserveLocal(remote.sales, this.data.sales)) {
+          this.data.sales = remote.sales;
+        }
+        if (this.data.accounting) {
+          if (Array.isArray(remote.moves) && !shouldPreserveLocal(remote.moves, this.data.accounting.moves)) {
+            this.data.accounting.moves = remote.moves;
+          }
+          if (Array.isArray(remote.payments) && !shouldPreserveLocal(remote.payments, this.data.accounting.payments)) {
+            this.data.accounting.payments = remote.payments;
+          }
+        }
+        if (remote.settings) {
+          this.data.settings = remote.settings;
+        }
 
         this.updateSequencesFromData();
         this.save();
@@ -298,34 +329,66 @@ class ERPStore {
   }
 
   updateSequencesFromData() {
+    if (!this.data) return;
     if (!this.data.meta) this.data.meta = { sequences: {} };
     if (!this.data.meta.sequences) this.data.meta.sequences = {};
     const seq = this.data.meta.sequences;
 
+    // Contacts
     const maxContact = (this.data.contacts || []).reduce((m, c) => Math.max(m, Number(c.id) || 0), 0);
     seq.contact = Math.max(seq.contact || 1, maxContact + 1);
 
+    // Products
     const maxProduct = (this.data.products || []).reduce((m, p) => Math.max(m, Number(p.id) || 0), 0);
     seq.product = Math.max(seq.product || 1, maxProduct + 1);
 
-    const maxExpense = (this.data.expenses || []).reduce((m, e) => Math.max(m, Number(e.id) || 0), 0);
+    // Expenses: check ID and reference numbers (e.g. EXP/2026/0005)
+    let maxExpense = (this.data.expenses || []).reduce((m, e) => Math.max(m, Number(e.id) || 0), 0);
+    (this.data.expenses || []).forEach((e) => {
+      const match = e.reference && String(e.reference).match(/(\d+)$/);
+      if (match) maxExpense = Math.max(maxExpense, parseInt(match[1], 10));
+    });
     seq.expense = Math.max(seq.expense || 1, maxExpense + 1);
 
-    const maxSale = (this.data.sales || []).reduce((m, s) => Math.max(m, Number(s.id) || 0), 0);
+    // Sales: check ID and order names (e.g. S00007)
+    let maxSale = (this.data.sales || []).reduce((m, s) => Math.max(m, Number(s.id) || 0), 0);
+    (this.data.sales || []).forEach((s) => {
+      const match = s.name && String(s.name).match(/(\d+)$/);
+      if (match) maxSale = Math.max(maxSale, parseInt(match[1], 10));
+    });
     seq.sale = Math.max(seq.sale || 1, maxSale + 1);
 
+    // Accounting moves & prefixes
     const moves = (this.data.accounting && this.data.accounting.moves) || [];
-    const maxInv = moves.filter((m) => m.move_type === 'out_invoice').reduce((m, x) => Math.max(m, Number(x.id) || 0), 0);
+    let maxInv = moves.filter((m) => m.move_type === 'out_invoice').reduce((m, x) => Math.max(m, Number(x.id) || 0), 0);
+    let maxBill = moves.filter((m) => m.move_type === 'in_invoice').reduce((m, x) => Math.max(m, Number(x.id) || 0), 0);
+    let maxMisc = moves.filter((m) => m.move_type === 'entry').reduce((m, x) => Math.max(m, Number(x.id) || 0), 0);
+
+    moves.forEach((m) => {
+      const match = m.name && String(m.name).match(/(\d+)$/);
+      const num = match ? parseInt(match[1], 10) : 0;
+      const id = Number(m.id) || 0;
+      const val = Math.max(num, id);
+      if (m.move_type === 'out_invoice' || (m.name && m.name.startsWith('INV/'))) {
+        maxInv = Math.max(maxInv, val);
+      } else if (m.move_type === 'in_invoice' || (m.name && m.name.startsWith('BILL/'))) {
+        maxBill = Math.max(maxBill, val);
+      } else {
+        maxMisc = Math.max(maxMisc, val);
+      }
+    });
+
     seq.move_inv = Math.max(seq.move_inv || 1, maxInv + 1);
-
-    const maxBill = moves.filter((m) => m.move_type === 'in_invoice').reduce((m, x) => Math.max(m, Number(x.id) || 0), 0);
     seq.move_bill = Math.max(seq.move_bill || 1, maxBill + 1);
-
-    const maxMisc = moves.filter((m) => m.move_type === 'entry').reduce((m, x) => Math.max(m, Number(x.id) || 0), 0);
     seq.move_misc = Math.max(seq.move_misc || 1, maxMisc + 1);
 
+    // Payments: check ID and payment names (e.g. PAY/2026/0003)
     const payments = (this.data.accounting && this.data.accounting.payments) || [];
-    const maxPay = payments.reduce((m, p) => Math.max(m, Number(p.id) || 0), 0);
+    let maxPay = payments.reduce((m, p) => Math.max(m, Number(p.id) || 0), 0);
+    payments.forEach((p) => {
+      const match = p.name && String(p.name).match(/(\d+)$/);
+      if (match) maxPay = Math.max(maxPay, parseInt(match[1], 10));
+    });
     seq.payment = Math.max(seq.payment || 1, maxPay + 1);
   }
 

@@ -46,18 +46,68 @@ const tableAvailability = {
   res_config_settings: null // tested on first call
 };
 
+function cleanEnvVal(val) {
+  if (!val) return '';
+  let str = String(val).trim();
+  if ((str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"))) {
+    str = str.slice(1, -1).trim();
+  }
+  return str;
+}
+
+function isServiceRoleKey(key) {
+  if (!key) return false;
+  const cleaned = cleanEnvVal(key);
+  if (cleaned.startsWith('sb_secret_')) return true;
+  try {
+    const parts = cleaned.split('.');
+    if (parts.length === 3) {
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+      if (payload && payload.role === 'service_role') return true;
+    }
+  } catch (_) {}
+  return false;
+}
+
 function getSupabaseConfig() {
-  const rawUrl = process.env.SUPABASE_URL || '';
+  const rawUrl = cleanEnvVal(
+    process.env.SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    process.env.VITE_SUPABASE_URL ||
+    ''
+  );
   const url = rawUrl.replace(/\/+$/, '');
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-  const anonKey = process.env.SUPABASE_ANON_KEY || '';
+
+  let serviceKey = cleanEnvVal(
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SERVICE_KEY ||
+    process.env.SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SECRET_KEY ||
+    ''
+  );
+
+  let anonKey = cleanEnvVal(
+    process.env.SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_KEY ||
+    process.env.VITE_SUPABASE_ANON_KEY ||
+    ''
+  );
+
+  // If serviceKey was not set via explicit service alias, but anonKey / generic SUPABASE_KEY is a service_role key:
+  if (!serviceKey && isServiceRoleKey(anonKey)) {
+    serviceKey = anonKey;
+  }
+
+  // Prioritize serviceKey over anonKey
   const key = serviceKey || anonKey;
+  const isServiceRole = Boolean(serviceKey);
   const isEnabled = Boolean(url && key);
 
   return {
     url,
     key,
-    isServiceRole: Boolean(serviceKey),
+    isServiceRole,
     enabled: isEnabled
   };
 }
@@ -110,11 +160,21 @@ async function callPostgrest(endpoint, options = {}) {
       return { status: res.status, ok: false, error: errText, data: null };
     }
 
-    if (res.status === 204) {
-      return { status: 204, ok: true, data: null };
+    if (res.status === 204 || res.headers.get('content-length') === '0') {
+      return { status: res.status, ok: true, data: null };
     }
 
-    const data = await res.json();
+    const text = await res.text();
+    if (!text || !text.trim()) {
+      return { status: res.status, ok: true, data: null };
+    }
+
+    let data = null;
+    try {
+      data = JSON.parse(text);
+    } catch (_) {
+      data = text;
+    }
     return { status: res.status, ok: true, data };
   } catch (err) {
     clearTimeout(timeoutId);
@@ -570,29 +630,32 @@ class SupabasePersistence {
         this.tableSupport.res_config_settings = false;
       }
 
-      const contacts = partnersRes.ok && Array.isArray(partnersRes.data)
-        ? partnersRes.data.map(deserializePartner)
-        : existingData ? existingData.contacts : [];
+      const hasQueryErrors = !partnersRes.ok || !productsRes.ok || !expensesRes.ok || !salesRes.ok || !movesRes.ok;
+      if (hasQueryErrors) {
+        console.warn('[Supabase] Una o más tablas retornaron error en loadAll. Preservando datos locales para evitar pérdida.');
+      }
 
-      const products = productsRes.ok && Array.isArray(productsRes.data)
-        ? productsRes.data.map(deserializeProduct)
-        : existingData ? existingData.products : [];
+      const isService = this.config.isServiceRole;
 
-      const expenses = expensesRes.ok && Array.isArray(expensesRes.data)
-        ? expensesRes.data.map(deserializeExpense)
-        : existingData ? existingData.expenses : [];
+      // Safe extractor: if query failed, or if anon/unauthorized key returned [] while local data exists, preserve local data!
+      const extractSafe = (res, deserializer, localList) => {
+        if (!res.ok || !Array.isArray(res.data)) {
+          return Array.isArray(localList) ? localList : [];
+        }
+        // If anon key returned empty list [] but local data exists, protect against RLS SELECT wipeout
+        if (res.data.length === 0 && !isService && Array.isArray(localList) && localList.length > 0) {
+          console.warn('[Supabase] Lectura remota vacía [] con clave anon/no-servicio. Conservando datos locales para evitar borrado por RLS.');
+          return localList;
+        }
+        return res.data.map(deserializer);
+      };
 
-      const sales = salesRes.ok && Array.isArray(salesRes.data)
-        ? salesRes.data.map(deserializeSaleOrder)
-        : existingData ? existingData.sales : [];
-
-      const moves = movesRes.ok && Array.isArray(movesRes.data)
-        ? movesRes.data.map(deserializeAccountMove)
-        : existingData && existingData.accounting ? existingData.accounting.moves : [];
-
-      const payments = paymentsRes.ok && Array.isArray(paymentsRes.data)
-        ? paymentsRes.data.map(deserializePayment)
-        : existingData && existingData.accounting ? existingData.accounting.payments : [];
+      const contacts = extractSafe(partnersRes, deserializePartner, existingData ? existingData.contacts : []);
+      const products = extractSafe(productsRes, deserializeProduct, existingData ? existingData.products : []);
+      const expenses = extractSafe(expensesRes, deserializeExpense, existingData ? existingData.expenses : []);
+      const sales = extractSafe(salesRes, deserializeSaleOrder, existingData ? existingData.sales : []);
+      const moves = extractSafe(movesRes, deserializeAccountMove, existingData && existingData.accounting ? existingData.accounting.moves : []);
+      const payments = extractSafe(paymentsRes, deserializePayment, existingData && existingData.accounting ? existingData.accounting.payments : []);
 
       let settings = existingData ? existingData.settings : null;
       if (settingsRes.ok && Array.isArray(settingsRes.data) && settingsRes.data[0]) {
@@ -631,160 +694,190 @@ class SupabasePersistence {
 
   async savePartner(partner) {
     if (!this.isReady()) return;
-    try {
-      const payload = serializePartner(partner);
-      await callPostgrest('/res_partner', {
-        method: 'POST',
-        headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
-        body: payload
-      });
-    } catch (err) {
-      console.warn('[Supabase] Error guardando contacto:', err.message);
+    const payload = serializePartner(partner);
+    const res = await callPostgrest('/res_partner', {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+      body: payload
+    });
+    if (!res.ok) {
+      const errMsg = `[Supabase] Error guardando contacto (HTTP ${res.status}): ${res.error}`;
+      console.error(errMsg);
+      throw new Error(errMsg);
     }
+    return res.data;
   }
 
   async deletePartner(id) {
     if (!this.isReady()) return;
-    try {
-      await callPostgrest(`/res_partner?id=eq.${id}`, { method: 'DELETE' });
-    } catch (err) {
-      console.warn('[Supabase] Error eliminando contacto:', err.message);
+    const res = await callPostgrest(`/res_partner?id=eq.${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const errMsg = `[Supabase] Error eliminando contacto ${id} (HTTP ${res.status}): ${res.error}`;
+      console.error(errMsg);
+      throw new Error(errMsg);
     }
+    return res.data;
   }
 
   async saveProduct(product) {
     if (!this.isReady()) return;
-    try {
-      const payload = serializeProduct(product);
-      await callPostgrest('/product_template', {
-        method: 'POST',
-        headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
-        body: payload
-      });
-    } catch (err) {
-      console.warn('[Supabase] Error guardando producto:', err.message);
+    const payload = serializeProduct(product);
+    const res = await callPostgrest('/product_template', {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+      body: payload
+    });
+    if (!res.ok) {
+      const errMsg = `[Supabase] Error guardando producto (HTTP ${res.status}): ${res.error}`;
+      console.error(errMsg);
+      throw new Error(errMsg);
     }
+    return res.data;
   }
 
   async saveExpense(expense) {
     if (!this.isReady()) return;
-    try {
-      const payload = serializeExpense(expense);
-      await callPostgrest('/hr_expense', {
-        method: 'POST',
-        headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
-        body: payload
-      });
-    } catch (err) {
-      console.warn('[Supabase] Error guardando gasto:', err.message);
+    const payload = serializeExpense(expense);
+    const res = await callPostgrest('/hr_expense', {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+      body: payload
+    });
+    if (!res.ok) {
+      const errMsg = `[Supabase] Error guardando gasto (HTTP ${res.status}): ${res.error}`;
+      console.error(errMsg);
+      throw new Error(errMsg);
     }
+    return res.data;
   }
 
   async saveSaleOrder(order) {
     if (!this.isReady()) return;
-    try {
-      const payload = serializeSaleOrder(order);
-      await callPostgrest('/sale_order', {
-        method: 'POST',
-        headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
-        body: payload
-      });
-
-      // Synchronize sale order lines
-      await callPostgrest(`/sale_order_line?order_id=eq.${order.id}`, { method: 'DELETE' });
-
-      if (Array.isArray(order.lines) && order.lines.length > 0) {
-        const linePayloads = order.lines.map((l) => serializeSaleOrderLine(l, order.id));
-        await callPostgrest('/sale_order_line', {
-          method: 'POST',
-          body: linePayloads
-        });
-      }
-    } catch (err) {
-      console.warn('[Supabase] Error guardando pedido de venta:', err.message);
+    const payload = serializeSaleOrder(order);
+    const orderRes = await callPostgrest('/sale_order', {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+      body: payload
+    });
+    if (!orderRes.ok) {
+      const errMsg = `[Supabase] Error guardando pedido de venta (HTTP ${orderRes.status}): ${orderRes.error}`;
+      console.error(errMsg);
+      throw new Error(errMsg);
     }
+
+    // Synchronize sale order lines
+    const delRes = await callPostgrest(`/sale_order_line?order_id=eq.${order.id}`, { method: 'DELETE' });
+    if (!delRes.ok && delRes.status !== 404) {
+      const errMsg = `[Supabase] Error limpiando líneas del pedido ${order.id} (HTTP ${delRes.status}): ${delRes.error}`;
+      console.error(errMsg);
+      throw new Error(errMsg);
+    }
+
+    if (Array.isArray(order.lines) && order.lines.length > 0) {
+      const linePayloads = order.lines.map((l) => serializeSaleOrderLine(l, order.id));
+      const lineRes = await callPostgrest('/sale_order_line', {
+        method: 'POST',
+        body: linePayloads
+      });
+      if (!lineRes.ok) {
+        const errMsg = `[Supabase] Error guardando líneas del pedido (HTTP ${lineRes.status}): ${lineRes.error}`;
+        console.error(errMsg);
+        throw new Error(errMsg);
+      }
+    }
+    return orderRes.data;
   }
 
   async saveAccountMove(move) {
     if (!this.isReady()) return;
-    try {
-      const payload = serializeAccountMove(move);
-      await callPostgrest('/account_move', {
-        method: 'POST',
-        headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
-        body: payload
-      });
-    } catch (err) {
-      console.warn('[Supabase] Error guardando documento contable:', err.message);
+    const payload = serializeAccountMove(move);
+    const res = await callPostgrest('/account_move', {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+      body: payload
+    });
+    if (!res.ok) {
+      const errMsg = `[Supabase] Error guardando documento contable (HTTP ${res.status}): ${res.error}`;
+      console.error(errMsg);
+      throw new Error(errMsg);
     }
+    return res.data;
   }
 
   async savePayment(payment) {
     if (!this.isReady() || this.tableSupport.account_payment === false) return;
-    try {
-      const payload = serializePayment(payment);
-      const res = await callPostgrest('/account_payment', {
-        method: 'POST',
-        headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
-        body: payload
-      });
-      if (res.status === 404) {
-        this.tableSupport.account_payment = false;
-      }
-    } catch (err) {
-      console.warn('[Supabase] Error guardando pago:', err.message);
+    const payload = serializePayment(payment);
+    const res = await callPostgrest('/account_payment', {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+      body: payload
+    });
+    if (res.status === 404) {
+      this.tableSupport.account_payment = false;
+      return null;
     }
+    if (!res.ok) {
+      const errMsg = `[Supabase] Error guardando pago (HTTP ${res.status}): ${res.error}`;
+      console.error(errMsg);
+      throw new Error(errMsg);
+    }
+    return res.data;
   }
 
   async deletePaymentsByMoveId(moveId) {
     if (!this.isReady() || this.tableSupport.account_payment === false) return;
-    try {
-      const res = await callPostgrest(`/account_payment?move_id=eq.${moveId}`, { method: 'DELETE' });
-      if (res.status === 404) {
-        this.tableSupport.account_payment = false;
-      }
-    } catch (err) {
-      console.warn('[Supabase] Error eliminando pagos vinculados:', err.message);
+    const res = await callPostgrest(`/account_payment?move_id=eq.${moveId}`, { method: 'DELETE' });
+    if (res.status === 404) {
+      this.tableSupport.account_payment = false;
+      return null;
     }
+    if (!res.ok) {
+      const errMsg = `[Supabase] Error eliminando pagos vinculados al asiento ${moveId} (HTTP ${res.status}): ${res.error}`;
+      console.error(errMsg);
+      throw new Error(errMsg);
+    }
+    return res.data;
   }
 
   async saveSettings(settings) {
     if (!this.isReady() || this.tableSupport.res_config_settings === false) return;
-    try {
-      const payload = serializeSettings(settings);
-      const res = await callPostgrest('/res_config_settings', {
-        method: 'POST',
-        headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
-        body: payload
-      });
-      if (res.status === 404) {
-        this.tableSupport.res_config_settings = false;
-      }
-    } catch (err) {
-      console.warn('[Supabase] Error guardando ajustes:', err.message);
+    const payload = serializeSettings(settings);
+    const res = await callPostgrest('/res_config_settings', {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+      body: payload
+    });
+    if (res.status === 404) {
+      this.tableSupport.res_config_settings = false;
+      return null;
     }
+    if (!res.ok) {
+      const errMsg = `[Supabase] Error guardando ajustes (HTTP ${res.status}): ${res.error}`;
+      console.error(errMsg);
+      throw new Error(errMsg);
+    }
+    return res.data;
   }
 
   async resetData() {
     if (!this.isReady()) return;
-    try {
-      if (this.tableSupport.account_payment !== false) {
-        await callPostgrest('/account_payment?id=gt.0', { method: 'DELETE' });
-      }
-      await callPostgrest('/sale_order_line?id=gt.0', { method: 'DELETE' });
-      await callPostgrest('/hr_expense?id=gt.0', { method: 'DELETE' });
-      await callPostgrest('/sale_order?id=gt.0', { method: 'DELETE' });
-      await callPostgrest('/account_move?id=gt.0', { method: 'DELETE' });
-      await callPostgrest('/res_partner?id=gt.0', { method: 'DELETE' });
-      await callPostgrest('/product_template?id=gt.0', { method: 'DELETE' });
-    } catch (err) {
-      console.warn('[Supabase] Error reseteando datos remotos:', err.message);
+    if (this.tableSupport.account_payment !== false) {
+      const payRes = await callPostgrest('/account_payment?id=gt.0', { method: 'DELETE' });
+      if (payRes.status === 404) this.tableSupport.account_payment = false;
     }
+    await callPostgrest('/sale_order_line?id=gt.0', { method: 'DELETE' });
+    await callPostgrest('/hr_expense?id=gt.0', { method: 'DELETE' });
+    await callPostgrest('/sale_order?id=gt.0', { method: 'DELETE' });
+    await callPostgrest('/account_move?id=gt.0', { method: 'DELETE' });
+    await callPostgrest('/res_partner?id=gt.0', { method: 'DELETE' });
+    await callPostgrest('/product_template?id=gt.0', { method: 'DELETE' });
   }
 }
 
 module.exports = {
   loadEnv,
+  cleanEnvVal,
+  isServiceRoleKey,
   getSupabaseConfig,
   isSupabaseConfigured,
   callPostgrest,

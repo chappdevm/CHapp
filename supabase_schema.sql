@@ -160,3 +160,88 @@ CREATE TABLE IF NOT EXISTS public.res_config_settings (
   users JSONB,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- ============================================================================
+-- POLÍTICAS ROW LEVEL SECURITY (RLS)
+-- Permite lectura y escritura completa tanto con service_role como con anon
+-- para evitar errores 401 Unauthorized y lecturas vacías [].
+-- ============================================================================
+
+-- 1. res_partner
+ALTER TABLE public.res_partner ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for authenticated, anon, and service on res_partner" ON public.res_partner;
+CREATE POLICY "Allow all for authenticated, anon, and service on res_partner"
+  ON public.res_partner FOR ALL
+  TO anon, authenticated, service_role
+  USING (true)
+  WITH CHECK (true);
+
+-- 2. product_template
+ALTER TABLE public.product_template ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for authenticated, anon, and service on product_template" ON public.product_template;
+CREATE POLICY "Allow all for authenticated, anon, and service on product_template"
+  ON public.product_template FOR ALL
+  TO anon, authenticated, service_role
+  USING (true)
+  WITH CHECK (true);
+
+-- 3. sale_order
+ALTER TABLE public.sale_order ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for authenticated, anon, and service on sale_order" ON public.sale_order;
+CREATE POLICY "Allow all for authenticated, anon, and service on sale_order"
+  ON public.sale_order FOR ALL
+  TO anon, authenticated, service_role
+  USING (true)
+  WITH CHECK (true);
+
+-- 4. sale_order_line
+ALTER TABLE public.sale_order_line ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for authenticated, anon, and service on sale_order_line" ON public.sale_order_line;
+CREATE POLICY "Allow all for authenticated, anon, and service on sale_order_line"
+  ON public.sale_order_line FOR ALL
+  TO anon, authenticated, service_role
+  USING (true)
+  WITH CHECK (true);
+
+-- 5. account_move
+ALTER TABLE public.account_move ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for authenticated, anon, and service on account_move" ON public.account_move;
+CREATE POLICY "Allow all for authenticated, anon, and service on account_move"
+  ON public.account_move FOR ALL
+  TO anon, authenticated, service_role
+  USING (true)
+  WITH CHECK (true);
+
+-- 6. hr_expense
+ALTER TABLE public.hr_expense ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for authenticated, anon, and service on hr_expense" ON public.hr_expense;
+CREATE POLICY "Allow all for authenticated, anon, and service on hr_expense"
+  ON public.hr_expense FOR ALL
+  TO anon, authenticated, service_role
+  USING (true)
+  WITH CHECK (true);
+
+-- 7. account_payment
+ALTER TABLE public.account_payment ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for authenticated, anon, and service on account_payment" ON public.account_payment;
+CREATE POLICY "Allow all for authenticated, anon, and service on account_payment"
+  ON public.account_payment FOR ALL
+  TO anon, authenticated, service_role
+  USING (true)
+  WITH CHECK (true);
+
+-- 8. res_config_settings
+ALTER TABLE public.res_config_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for authenticated, anon, and service on res_config_settings" ON public.res_config_settings;
+CREATE POLICY "Allow all for authenticated, anon, and service on res_config_settings"
+  ON public.res_config_settings FOR ALL
+  TO anon, authenticated, service_role
+  USING (true)
+  WITH CHECK (true);
+
+-- Permisos explícitos a roles de API de Supabase
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+

@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 const {
   isSupabaseConfigured,
   getSupabaseConfig,
+  cleanEnvVal,
+  isServiceRoleKey,
   callPostgrest,
   SupabasePersistence,
   serializePartner,
@@ -21,6 +23,7 @@ const {
   serializeSettings,
   deserializeSettings
 } = require('../server/supabase');
+const { ERPStore } = require('../server/store');
 
 describe('Supabase Persistence Layer & PostgREST Architecture', () => {
   it('detects Supabase configuration correctly from environment', () => {
@@ -404,5 +407,103 @@ describe('Supabase Persistence Layer & PostgREST Architecture', () => {
       await callPostgrest(`/res_partner?id=eq.${relId}`, { method: 'DELETE' });
       await callPostgrest(`/product_template?id=eq.${relId}`, { method: 'DELETE' });
     }
+  });
+
+  it('sanitizes environment variables, strips quotes/newlines/spaces, and supports all key aliases', () => {
+    assert.equal(cleanEnvVal('  "https://example.supabase.co" \r\n'), 'https://example.supabase.co');
+    assert.equal(cleanEnvVal(" 'secret_key_123' \n"), 'secret_key_123');
+    assert.equal(cleanEnvVal(undefined), '');
+
+    assert.equal(isServiceRoleKey('sb_secret_abc123'), true);
+    assert.equal(isServiceRoleKey('sb_publishable_abc123'), false);
+
+    // Simulated JWT service_role
+    const payload = Buffer.from(JSON.stringify({ role: 'service_role' })).toString('base64');
+    const fakeServiceJwt = `header.${payload}.signature`;
+    assert.equal(isServiceRoleKey(fakeServiceJwt), true);
+
+    const anonPayload = Buffer.from(JSON.stringify({ role: 'anon' })).toString('base64');
+    const fakeAnonJwt = `header.${anonPayload}.signature`;
+    assert.equal(isServiceRoleKey(fakeAnonJwt), false);
+  });
+
+  it('protects against destructive empty array [] wipes when anon key or error occurs', async () => {
+    const oldServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    try {
+      const persistence = new SupabasePersistence();
+      assert.equal(persistence.config.isServiceRole, false);
+
+      const existingData = {
+        contacts: [{ id: 1, name: 'Contacto Local Existente' }],
+        products: [{ id: 1, name: 'Producto Local Existente' }],
+        expenses: [],
+        sales: [],
+        accounting: { moves: [], payments: [] },
+        settings: { company_name: 'Local Test' }
+      };
+
+      // With anon key, PostgREST returns [] due to RLS, but loadAll must NOT wipe existing contacts
+      const loaded = await persistence.loadAll(existingData);
+      assert.ok(loaded);
+      assert.ok(loaded.contacts.length >= 1, 'Local contacts must be preserved if remote returns empty with anon key');
+      assert.equal(loaded.contacts[0].name, 'Contacto Local Existente');
+    } finally {
+      process.env.SUPABASE_SERVICE_ROLE_KEY = oldServiceKey;
+    }
+  });
+
+  it('propagates write errors from Supabase instead of failing silently', async () => {
+    const oldServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    try {
+      const persistence = new SupabasePersistence();
+      await assert.rejects(
+        async () => {
+          await persistence.savePartner({ id: 999999, name: 'Test Unauthorized Contact' });
+        },
+        /\[Supabase\] Error guardando contacto/
+      );
+    } finally {
+      process.env.SUPABASE_SERVICE_ROLE_KEY = oldServiceKey;
+    }
+  });
+
+  it('updateSequencesFromData aligns sequences using both IDs and formatted string references to prevent upsert collisions', () => {
+    const os = require('os');
+    const path = require('path');
+    const tmpDb = path.join(os.tmpdir(), `chapp_test_seq_${Date.now()}.json`);
+    const store = new ERPStore(tmpDb, { useSupabase: false });
+    store.data = {
+      meta: { sequences: { contact: 1, product: 1, expense: 1, sale: 1, move_inv: 1, payment: 1 } },
+      contacts: [{ id: 10, name: 'Contacto 10' }],
+      products: [{ id: 15, name: 'Producto 15' }],
+      expenses: [{ id: 2, reference: 'EXP/2026/0045', name: 'Gasto 45' }],
+      sales: [{ id: 3, name: 'S00078', partner_name: 'Cliente' }],
+      accounting: {
+        moves: [
+          { id: 4, name: 'INV/2026/0120', move_type: 'out_invoice' },
+          { id: 5, name: 'BILL/2026/0034', move_type: 'in_invoice' },
+          { id: 6, name: 'MISC/2026/0088', move_type: 'entry' }
+        ],
+        payments: [{ id: 7, name: 'PAY/2026/0052' }]
+      }
+    };
+
+    store.updateSequencesFromData();
+    assert.equal(store.data.meta.sequences.contact, 11);
+    assert.equal(store.data.meta.sequences.product, 16);
+    assert.equal(store.data.meta.sequences.expense, 46);
+    assert.equal(store.data.meta.sequences.sale, 79);
+    assert.equal(store.data.meta.sequences.move_inv, 121);
+    assert.equal(store.data.meta.sequences.move_bill, 35);
+    assert.equal(store.data.meta.sequences.move_misc, 89);
+    assert.equal(store.data.meta.sequences.payment, 53);
+
+    try {
+      if (require('fs').existsSync(tmpDb)) require('fs').unlinkSync(tmpDb);
+    } catch (_) {}
   });
 });
