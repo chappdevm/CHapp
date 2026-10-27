@@ -28,6 +28,18 @@ function sendJson(res, status, payload) {
 }
 
 function readJsonBody(req) {
+  if (req.body !== undefined && req.body !== null) {
+    if (typeof req.body === 'object') return Promise.resolve(req.body);
+    if (typeof req.body === 'string') {
+      if (!req.body.trim()) return Promise.resolve({});
+      try {
+        return Promise.resolve(JSON.parse(req.body));
+      } catch (e) {
+        return Promise.reject(new Error('JSON malformado'));
+      }
+    }
+  }
+
   return new Promise((resolve, reject) => {
     let raw = '';
     req.on('data', (chunk) => {
@@ -50,8 +62,12 @@ function readJsonBody(req) {
 
 function createHandler(store = new ERPStore(undefined, { useSupabase: isSupabaseConfigured() })) {
   return async function handler(req, res) {
-    const parsedUrl = new URL(req.url, 'http://localhost');
-    const pathname = decodeURI(parsedUrl.pathname);
+    const rawUrl = req.originalUrl || req.url;
+    const parsedUrl = new URL(rawUrl, 'http://localhost');
+    let pathname = decodeURI(parsedUrl.pathname);
+    if (pathname === '/api/index.js' && req.headers && req.headers['x-matched-path']) {
+      pathname = decodeURI(new URL(req.headers['x-matched-path'], 'http://localhost').pathname);
+    }
     const method = req.method.toUpperCase();
 
     if (pathname.startsWith('/api/')) {
@@ -157,6 +173,7 @@ function createHandler(store = new ERPStore(undefined, { useSupabase: isSupabase
 
         return sendJson(res, 404, { ok: false, error: 'Endpoint API no encontrado: ' + pathname });
       } catch (err) {
+        console.error(`[API Error] ${method} ${pathname}:`, err.message || err);
         return sendJson(res, 400, { ok: false, error: err.message || 'Error en la operación' });
       }
     }
@@ -211,11 +228,17 @@ function createAppServer(dbPath, options) {
 if (require.main === module) {
   const server = createAppServer(undefined, { useSupabase: isSupabaseConfigured() });
   server.listen(PORT, () => {
+    const { getSupabaseConfig } = require('./server/supabase');
+    const supa = getSupabaseConfig();
     console.log('====================================================');
     console.log('  CHapp ERP — Basado en Odoo 20 Enterprise');
     console.log(`  URL: http://localhost:${PORT}`);
+    console.log(`  Supabase: ${supa.enabled ? 'CONECTADO (' + (supa.isServiceRole ? 'service_role' : 'anon/público') + ')' : 'DESACTIVADO (almacenamiento local)'}`);
+    if (supa.enabled && !supa.isServiceRole) {
+      console.warn('  [AVISO] Supabase configurado con clave anon. Para evitar restricciones RLS, configure SUPABASE_SERVICE_ROLE_KEY.');
+    }
     console.log('====================================================');
   });
 }
 
-module.exports = { createAppServer, createHandler };
+module.exports = { createAppServer, createHandler, readJsonBody };

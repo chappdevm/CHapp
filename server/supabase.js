@@ -47,12 +47,33 @@ const tableAvailability = {
 };
 
 function cleanEnvVal(val) {
-  if (!val) return '';
+  if (val === undefined || val === null) return '';
   let str = String(val).trim();
-  if ((str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"))) {
-    str = str.slice(1, -1).trim();
-  }
+  let prev;
+  do {
+    prev = str;
+    str = str.trim();
+    if (
+      (str.startsWith('"') && str.endsWith('"')) ||
+      (str.startsWith("'") && str.endsWith("'")) ||
+      (str.startsWith('`') && str.endsWith('`'))
+    ) {
+      str = str.slice(1, -1).trim();
+    }
+  } while (str !== prev);
   return str;
+}
+
+function normalizeSupabaseUrl(raw) {
+  let url = cleanEnvVal(raw);
+  if (!url) return '';
+  if (!/^https?:\/\//i.test(url)) {
+    url = 'https://' + url;
+  }
+  url = url.replace(/\/+$/, '');
+  url = url.replace(/\/rest\/v1\/?$/i, '');
+  url = url.replace(/\/rest\/?$/i, '');
+  return url.replace(/\/+$/, '');
 }
 
 function isServiceRoleKey(key) {
@@ -62,27 +83,48 @@ function isServiceRoleKey(key) {
   try {
     const parts = cleaned.split('.');
     if (parts.length === 3) {
-      const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
-      if (payload && payload.role === 'service_role') return true;
+      const payloadStr = Buffer.from(parts[1], 'base64url').toString('utf8');
+      const payload = JSON.parse(payloadStr);
+      if (payload && (payload.role === 'service_role' || payload.role === 'supabase_admin')) return true;
     }
   } catch (_) {}
   return false;
 }
 
+function formatSupabaseError(actionDesc, res) {
+  let extraHint = '';
+  if (res.status === 401 || (res.error && res.error.includes('row-level security'))) {
+    extraHint = ' [RLS Block: Configure SUPABASE_SERVICE_ROLE_KEY en Render/Vercel o aplique las políticas de supabase_schema.sql]';
+  }
+  return `[Supabase] ${actionDesc} (HTTP ${res.status}): ${res.error}${extraHint}`;
+}
+
 function getSupabaseConfig() {
-  const rawUrl = cleanEnvVal(
+  const url = normalizeSupabaseUrl(
     process.env.SUPABASE_URL ||
     process.env.NEXT_PUBLIC_SUPABASE_URL ||
     process.env.VITE_SUPABASE_URL ||
+    process.env.REACT_APP_SUPABASE_URL ||
+    process.env.SUPABASE_API_URL ||
+    process.env.SUPABASE_ENDPOINT ||
     ''
   );
-  const url = rawUrl.replace(/\/+$/, '');
 
   let serviceKey = cleanEnvVal(
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.SUPABASE_SERVICE_KEY ||
     process.env.SERVICE_ROLE_KEY ||
     process.env.SUPABASE_SECRET_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE ||
+    process.env.SUPABASE_ROLE_KEY ||
+    process.env.SUPABASE_SECRET ||
+    process.env.SERVICE_ROLE ||
+    process.env.SERVICE_KEY ||
+    process.env.SUPABASE_SERVICE_TOKEN ||
+    process.env.SUPABASE_ADMIN_KEY ||
+    process.env.SUPABASE_MASTER_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.REACT_APP_SUPABASE_SERVICE_ROLE_KEY ||
     ''
   );
 
@@ -91,10 +133,16 @@ function getSupabaseConfig() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
     process.env.SUPABASE_KEY ||
     process.env.VITE_SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_KEY ||
+    process.env.VITE_SUPABASE_KEY ||
+    process.env.REACT_APP_SUPABASE_ANON_KEY ||
+    process.env.REACT_APP_SUPABASE_KEY ||
+    process.env.SUPABASE_PUBLIC_KEY ||
+    process.env.SUPABASE_API_KEY ||
     ''
   );
 
-  // If serviceKey was not set via explicit service alias, but anonKey / generic SUPABASE_KEY is a service_role key:
+  // If serviceKey was not set via explicit service alias, but anonKey / generic key is actually a service_role key:
   if (!serviceKey && isServiceRoleKey(anonKey)) {
     serviceKey = anonKey;
   }
@@ -701,7 +749,7 @@ class SupabasePersistence {
       body: payload
     });
     if (!res.ok) {
-      const errMsg = `[Supabase] Error guardando contacto (HTTP ${res.status}): ${res.error}`;
+      const errMsg = formatSupabaseError('Error guardando contacto', res);
       console.error(errMsg);
       throw new Error(errMsg);
     }
@@ -712,7 +760,7 @@ class SupabasePersistence {
     if (!this.isReady()) return;
     const res = await callPostgrest(`/res_partner?id=eq.${id}`, { method: 'DELETE' });
     if (!res.ok) {
-      const errMsg = `[Supabase] Error eliminando contacto ${id} (HTTP ${res.status}): ${res.error}`;
+      const errMsg = formatSupabaseError(`Error eliminando contacto ${id}`, res);
       console.error(errMsg);
       throw new Error(errMsg);
     }
@@ -728,7 +776,7 @@ class SupabasePersistence {
       body: payload
     });
     if (!res.ok) {
-      const errMsg = `[Supabase] Error guardando producto (HTTP ${res.status}): ${res.error}`;
+      const errMsg = formatSupabaseError('Error guardando producto', res);
       console.error(errMsg);
       throw new Error(errMsg);
     }
@@ -744,7 +792,7 @@ class SupabasePersistence {
       body: payload
     });
     if (!res.ok) {
-      const errMsg = `[Supabase] Error guardando gasto (HTTP ${res.status}): ${res.error}`;
+      const errMsg = formatSupabaseError('Error guardando gasto', res);
       console.error(errMsg);
       throw new Error(errMsg);
     }
@@ -760,7 +808,7 @@ class SupabasePersistence {
       body: payload
     });
     if (!orderRes.ok) {
-      const errMsg = `[Supabase] Error guardando pedido de venta (HTTP ${orderRes.status}): ${orderRes.error}`;
+      const errMsg = formatSupabaseError('Error guardando pedido de venta', orderRes);
       console.error(errMsg);
       throw new Error(errMsg);
     }
@@ -768,7 +816,7 @@ class SupabasePersistence {
     // Synchronize sale order lines
     const delRes = await callPostgrest(`/sale_order_line?order_id=eq.${order.id}`, { method: 'DELETE' });
     if (!delRes.ok && delRes.status !== 404) {
-      const errMsg = `[Supabase] Error limpiando líneas del pedido ${order.id} (HTTP ${delRes.status}): ${delRes.error}`;
+      const errMsg = formatSupabaseError(`Error limpiando líneas del pedido ${order.id}`, delRes);
       console.error(errMsg);
       throw new Error(errMsg);
     }
@@ -780,7 +828,7 @@ class SupabasePersistence {
         body: linePayloads
       });
       if (!lineRes.ok) {
-        const errMsg = `[Supabase] Error guardando líneas del pedido (HTTP ${lineRes.status}): ${lineRes.error}`;
+        const errMsg = formatSupabaseError('Error guardando líneas del pedido', lineRes);
         console.error(errMsg);
         throw new Error(errMsg);
       }
@@ -797,7 +845,7 @@ class SupabasePersistence {
       body: payload
     });
     if (!res.ok) {
-      const errMsg = `[Supabase] Error guardando documento contable (HTTP ${res.status}): ${res.error}`;
+      const errMsg = formatSupabaseError('Error guardando documento contable', res);
       console.error(errMsg);
       throw new Error(errMsg);
     }
@@ -817,7 +865,7 @@ class SupabasePersistence {
       return null;
     }
     if (!res.ok) {
-      const errMsg = `[Supabase] Error guardando pago (HTTP ${res.status}): ${res.error}`;
+      const errMsg = formatSupabaseError('Error guardando pago', res);
       console.error(errMsg);
       throw new Error(errMsg);
     }
@@ -832,7 +880,7 @@ class SupabasePersistence {
       return null;
     }
     if (!res.ok) {
-      const errMsg = `[Supabase] Error eliminando pagos vinculados al asiento ${moveId} (HTTP ${res.status}): ${res.error}`;
+      const errMsg = formatSupabaseError(`Error eliminando pagos vinculados al asiento ${moveId}`, res);
       console.error(errMsg);
       throw new Error(errMsg);
     }
@@ -852,7 +900,7 @@ class SupabasePersistence {
       return null;
     }
     if (!res.ok) {
-      const errMsg = `[Supabase] Error guardando ajustes (HTTP ${res.status}): ${res.error}`;
+      const errMsg = formatSupabaseError('Error guardando ajustes', res);
       console.error(errMsg);
       throw new Error(errMsg);
     }
@@ -877,6 +925,8 @@ class SupabasePersistence {
 module.exports = {
   loadEnv,
   cleanEnvVal,
+  normalizeSupabaseUrl,
+  formatSupabaseError,
   isServiceRoleKey,
   getSupabaseConfig,
   isSupabaseConfigured,

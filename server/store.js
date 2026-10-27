@@ -272,11 +272,13 @@ class ERPStore {
     }
   }
 
-  async ensureSynced() {
+  async ensureSynced(maxAgeMs = 15000) {
     if (!this.supabase || !this.supabase.isReady()) return;
-    if (this._hasSyncedOnce) return;
+    const now = Date.now();
+    if (this._hasSyncedOnce && this._lastSyncTime && (now - this._lastSyncTime < maxAgeMs)) {
+      return;
+    }
     await this.syncFromSupabaseIfAvailable();
-    this._hasSyncedOnce = true;
   }
 
   async syncFromSupabaseIfAvailable() {
@@ -323,6 +325,8 @@ class ERPStore {
         this.updateSequencesFromData();
         this.save();
       }
+      this._hasSyncedOnce = true;
+      this._lastSyncTime = Date.now();
     } catch (err) {
       console.warn('[Store] syncFromSupabase error:', err.message);
     }
@@ -545,7 +549,13 @@ class ERPStore {
       this.data.contacts[idx] = updated;
       this.save();
       if (this.supabase) {
-        await this.supabase.savePartner(updated);
+        try {
+          await this.supabase.savePartner(updated);
+        } catch (err) {
+          this.data.contacts[idx] = existing;
+          this.save();
+          throw err;
+        }
       }
       return this.getEnrichedContacts().find((c) => Number(c.id) === Number(updated.id));
     }
@@ -581,7 +591,13 @@ class ERPStore {
     this.data.contacts.unshift(newContact);
     this.save();
     if (this.supabase) {
-      await this.supabase.savePartner(newContact);
+      try {
+        await this.supabase.savePartner(newContact);
+      } catch (err) {
+        this.data.contacts.shift();
+        this.save();
+        throw err;
+      }
     }
     return this.getEnrichedContacts().find((c) => Number(c.id) === Number(id));
   }
@@ -598,7 +614,13 @@ class ERPStore {
     const removed = this.data.contacts.splice(idx, 1)[0];
     this.save();
     if (this.supabase) {
-      await this.supabase.deletePartner(id);
+      try {
+        await this.supabase.deletePartner(id);
+      } catch (err) {
+        this.data.contacts.splice(idx, 0, removed);
+        this.save();
+        throw err;
+      }
     }
     return removed;
   }
@@ -631,6 +653,7 @@ class ERPStore {
     if (payload.id) {
       const idx = this.data.products.findIndex((p) => Number(p.id) === Number(payload.id));
       if (idx === -1) throw new Error('Producto no encontrado.');
+      const oldProd = { ...this.data.products[idx] };
       this.data.products[idx] = {
         ...this.data.products[idx],
         name,
@@ -646,7 +669,13 @@ class ERPStore {
       };
       this.save();
       if (this.supabase) {
-        await this.supabase.saveProduct(this.data.products[idx]);
+        try {
+          await this.supabase.saveProduct(this.data.products[idx]);
+        } catch (err) {
+          this.data.products[idx] = oldProd;
+          this.save();
+          throw err;
+        }
       }
       return this.data.products[idx];
     }
@@ -668,7 +697,13 @@ class ERPStore {
     this.data.products.push(prod);
     this.save();
     if (this.supabase) {
-      await this.supabase.saveProduct(prod);
+      try {
+        await this.supabase.saveProduct(prod);
+      } catch (err) {
+        this.data.products.pop();
+        this.save();
+        throw err;
+      }
     }
     return prod;
   }
@@ -721,10 +756,17 @@ class ERPStore {
         ...(existing.chatter || []),
         { id: Date.now(), author: this.getActiveAuthor(), date: this.formatNowShort(), text: `Gasto actualizado ($ ${totalAmount.toLocaleString('es-CO')}).` }
       ];
+      const oldExpense = { ...existing };
       this.data.expenses[idx] = updated;
       this.save();
       if (this.supabase) {
-        await this.supabase.saveExpense(updated);
+        try {
+          await this.supabase.saveExpense(updated);
+        } catch (err) {
+          this.data.expenses[idx] = oldExpense;
+          this.save();
+          throw err;
+        }
       }
       return updated;
     }
@@ -764,7 +806,13 @@ class ERPStore {
     this.data.expenses.unshift(newExpense);
     this.save();
     if (this.supabase) {
-      await this.supabase.saveExpense(newExpense);
+      try {
+        await this.supabase.saveExpense(newExpense);
+      } catch (err) {
+        this.data.expenses.shift();
+        this.save();
+        throw err;
+      }
     }
     return newExpense;
   }
@@ -1036,10 +1084,17 @@ class ERPStore {
         ...(existing.chatter || []),
         { id: Date.now(), author: this.getActiveAuthor(), date: this.formatNowShort(), text: `Orden actualizada. Total: $ ${amountTotal.toLocaleString('es-CO')}.` }
       ];
+      const oldOrder = { ...existing };
       this.data.sales[idx] = updated;
       this.save();
       if (this.supabase) {
-        await this.supabase.saveSaleOrder(updated);
+        try {
+          await this.supabase.saveSaleOrder(updated);
+        } catch (err) {
+          this.data.sales[idx] = oldOrder;
+          this.save();
+          throw err;
+        }
       }
       return updated;
     }
@@ -1072,7 +1127,13 @@ class ERPStore {
     this.data.sales.unshift(newOrder);
     this.save();
     if (this.supabase) {
-      await this.supabase.saveSaleOrder(newOrder);
+      try {
+        await this.supabase.saveSaleOrder(newOrder);
+      } catch (err) {
+        this.data.sales.shift();
+        this.save();
+        throw err;
+      }
     }
     return newOrder;
   }
@@ -1362,13 +1423,20 @@ class ERPStore {
           { id: Date.now(), author: this.getActiveAuthor(), date: this.formatNowShort(), text: `Borrador actualizado ($ ${amountTotal.toLocaleString('es-CO')}).` }
         ]
       };
+      const oldMove = { ...existing };
       this.data.accounting.moves[existingIdx] = updatedMove;
       if (payload.auto_post) {
         return this.transitionAccountMove(updatedMove.id, 'post');
       }
       this.save();
       if (this.supabase) {
-        await this.supabase.saveAccountMove(updatedMove);
+        try {
+          await this.supabase.saveAccountMove(updatedMove);
+        } catch (err) {
+          this.data.accounting.moves[existingIdx] = oldMove;
+          this.save();
+          throw err;
+        }
       }
       return updatedMove;
     }
@@ -1407,7 +1475,13 @@ class ERPStore {
     }
     this.save();
     if (this.supabase) {
-      await this.supabase.saveAccountMove(newMove);
+      try {
+        await this.supabase.saveAccountMove(newMove);
+      } catch (err) {
+        this.data.accounting.moves.shift();
+        this.save();
+        throw err;
+      }
     }
     return newMove;
   }
@@ -1569,6 +1643,7 @@ class ERPStore {
         activeUser = { id: foundUser.id, name: foundUser.name, email: foundUser.email, role: foundUser.role };
       }
     }
+    const oldSettings = { ...this.data.settings };
     this.data.settings = {
       ...this.data.settings,
       ...payload,
@@ -1578,7 +1653,13 @@ class ERPStore {
     };
     this.save();
     if (this.supabase) {
-      await this.supabase.saveSettings(this.data.settings);
+      try {
+        await this.supabase.saveSettings(this.data.settings);
+      } catch (err) {
+        this.data.settings = oldSettings;
+        this.save();
+        throw err;
+      }
     }
     return this.data.settings;
   }

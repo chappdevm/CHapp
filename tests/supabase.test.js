@@ -4,6 +4,8 @@ const {
   isSupabaseConfigured,
   getSupabaseConfig,
   cleanEnvVal,
+  normalizeSupabaseUrl,
+  formatSupabaseError,
   isServiceRoleKey,
   callPostgrest,
   SupabasePersistence,
@@ -24,6 +26,7 @@ const {
   deserializeSettings
 } = require('../server/supabase');
 const { ERPStore } = require('../server/store');
+const { readJsonBody } = require('../index');
 
 describe('Supabase Persistence Layer & PostgREST Architecture', () => {
   it('detects Supabase configuration correctly from environment', () => {
@@ -412,7 +415,12 @@ describe('Supabase Persistence Layer & PostgREST Architecture', () => {
   it('sanitizes environment variables, strips quotes/newlines/spaces, and supports all key aliases', () => {
     assert.equal(cleanEnvVal('  "https://example.supabase.co" \r\n'), 'https://example.supabase.co');
     assert.equal(cleanEnvVal(" 'secret_key_123' \n"), 'secret_key_123');
+    assert.equal(cleanEnvVal(" `https://example.supabase.co` "), 'https://example.supabase.co');
     assert.equal(cleanEnvVal(undefined), '');
+
+    assert.equal(normalizeSupabaseUrl('example.supabase.co'), 'https://example.supabase.co');
+    assert.equal(normalizeSupabaseUrl('https://example.supabase.co/rest/v1/'), 'https://example.supabase.co');
+    assert.equal(normalizeSupabaseUrl(' https://example.supabase.co/rest/ '), 'https://example.supabase.co');
 
     assert.equal(isServiceRoleKey('sb_secret_abc123'), true);
     assert.equal(isServiceRoleKey('sb_publishable_abc123'), false);
@@ -425,6 +433,24 @@ describe('Supabase Persistence Layer & PostgREST Architecture', () => {
     const anonPayload = Buffer.from(JSON.stringify({ role: 'anon' })).toString('base64');
     const fakeAnonJwt = `header.${anonPayload}.signature`;
     assert.equal(isServiceRoleKey(fakeAnonJwt), false);
+  });
+
+  it('handles pre-parsed request bodies on serverless environments like Vercel', async () => {
+    const parsed = await readJsonBody({ body: { name: 'Contacto Vercel', is_company: true } });
+    assert.equal(parsed.name, 'Contacto Vercel');
+
+    const parsedStr = await readJsonBody({ body: '{"name":"Contacto Cadena"}' });
+    assert.equal(parsedStr.name, 'Contacto Cadena');
+
+    const parsedEmpty = await readJsonBody({ body: '   ' });
+    assert.deepEqual(parsedEmpty, {});
+
+    await assert.rejects(
+      async () => {
+        await readJsonBody({ body: '{invalid-json' });
+      },
+      /JSON malformado/
+    );
   });
 
   it('protects against destructive empty array [] wipes when anon key or error occurs', async () => {
@@ -454,12 +480,13 @@ describe('Supabase Persistence Layer & PostgREST Architecture', () => {
     }
   });
 
-  it('propagates write errors from Supabase instead of failing silently', async () => {
+  it('propagates write errors from Supabase instead of failing silently and provides RLS hints', async () => {
     const oldServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     delete process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     try {
       const persistence = new SupabasePersistence();
+      // Test 1: RLS block with anon key
       await assert.rejects(
         async () => {
           await persistence.savePartner({ id: 999999, name: 'Test Unauthorized Contact' });
@@ -469,6 +496,48 @@ describe('Supabase Persistence Layer & PostgREST Architecture', () => {
     } finally {
       process.env.SUPABASE_SERVICE_ROLE_KEY = oldServiceKey;
     }
+
+    // Test 2: Constraint validation rejection with service role key
+    const persistence = new SupabasePersistence();
+    await assert.rejects(
+      async () => {
+        await persistence.savePartner({ id: 'not_a_valid_id', name: 'Invalid Contact' });
+      },
+      /\[Supabase\] Error guardando contacto/
+    );
+  });
+
+  it('rolls back in-memory and disk state when Supabase write fails', async () => {
+    const os = require('os');
+    const path = require('path');
+    const fs = require('fs');
+    const tmpDb = path.join(os.tmpdir(), `chapp_rollback_test_${Date.now()}.json`);
+    const store = new ERPStore(tmpDb, { useSupabase: false });
+    // Mock failing supabase persistence
+    store.supabase = {
+      isReady: () => true,
+      savePartner: async () => {
+        throw new Error('[Supabase] Simulated write rejection');
+      }
+    };
+
+    assert.equal(store.data.contacts.length, 0);
+
+    await assert.rejects(
+      async () => {
+        await store.saveContact({ name: 'Contacto Que Falla' });
+      },
+      /Simulated write rejection/
+    );
+
+    // Verify contact was NOT left in memory or on disk
+    assert.equal(store.data.contacts.length, 0, 'In-memory contacts must be rolled back on write failure');
+    const diskContent = JSON.parse(fs.readFileSync(tmpDb, 'utf8'));
+    assert.equal(diskContent.contacts.length, 0, 'On-disk contacts must be rolled back on write failure');
+
+    try {
+      if (fs.existsSync(tmpDb)) fs.unlinkSync(tmpDb);
+    } catch (_) {}
   });
 
   it('updateSequencesFromData aligns sequences using both IDs and formatted string references to prevent upsert collisions', () => {
