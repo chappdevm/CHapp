@@ -23,6 +23,11 @@ if (!fs.existsSync(tmpDbPath)) {
 const store = new ERPStore(tmpDbPath, { useSupabase: isSupabaseConfigured() });
 const handler = createHandler(store);
 
-module.exports = (req, res) => {
+module.exports = async (req, res) => {
+  if (store.ensureSynced) {
+    try {
+      await store.ensureSynced(15000);
+    } catch (_) {}
+  }
   return handler(req, res);
 };

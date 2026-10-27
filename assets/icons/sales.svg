@@ -1,1 +1,32 @@
-<svg width="50" height="50" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg"><path d="M4 25a4 4 0 0 1 4-4h7v25H4V25Z" fill="#985184"/><path d="M26 8c0-2.21 1.876-4 4.19-4H46v38c0 2.21-1.876 4-4.19 4H26V8Z" fill="#FBB945"/><path d="M15 17.067C15 14.821 16.876 13 19.19 13H35v28.933C35 44.179 33.124 46 30.81 46H15V17.067Z" fill="#FC868B"/><path d="M26 46h4.81c2.314 0 4.19-1.821 4.19-4.067V13h-9v33Z" fill="#F86126"/><path d="m15 46 4.995-.002A4.005 4.005 0 0 0 24 41.995V21h-9v25Z" fill="#962B48"/></svg>
+<svg width="50" height="50" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="salesDropShadow" x="-10%" y="-10%" width="125%" height="125%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+    <linearGradient id="bar1Grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#E879F9"/>
+      <stop offset="100%" stop-color="#A855F7"/>
+    </linearGradient>
+    <linearGradient id="bar2Grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FB7185"/>
+      <stop offset="100%" stop-color="#E11D48"/>
+    </linearGradient>
+    <linearGradient id="bar3Grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FDE047"/>
+      <stop offset="100%" stop-color="#F59E0B"/>
+    </linearGradient>
+  </defs>
+  <!-- Bar 1 (Left - Violet / Magenta) -->
+  <path d="M4 25a4 4 0 0 1 4-4h7v25H4V25Z" fill="url(#bar1Grad)" filter="url(#salesDropShadow)" stroke="rgba(255,255,255,0.3)" stroke-width="0.8"/>
+  <path d="M4 25a4 4 0 0 1 4-4h7v3H4V25Z" fill="#F5D0FE" opacity="0.6"/>
+
+  <!-- Bar 2 (Middle - Coral / Rose) -->
+  <path d="M15 17.067C15 14.821 16.876 13 19.19 13H35v28.933C35 44.179 33.124 46 30.81 46H15V17.067Z" fill="url(#bar2Grad)" filter="url(#salesDropShadow)" stroke="rgba(255,255,255,0.3)" stroke-width="0.8"/>
+  <path d="M26 46h4.81c2.314 0 4.19-1.821 4.19-4.067V13h-9v33Z" fill="#BE123C" opacity="0.4"/>
+  <path d="M15 17.067C15 14.821 16.876 13 19.19 13H35v3H19.19C16.876 16 15 17.067 15 17.067Z" fill="#FFE4E6" opacity="0.6"/>
+
+  <!-- Bar 3 (Right - Amber / Gold) -->
+  <path d="M26 8c0-2.21 1.876-4 4.19-4H46v38c0 2.21-1.876 4-4.19 4H26V8Z" fill="url(#bar3Grad)" filter="url(#salesDropShadow)" stroke="rgba(255,255,255,0.3)" stroke-width="0.8"/>
+  <path d="M26 8c0-2.21 1.876-4 4.19-4H46v3H30.19C27.876 7 26 8 26 8Z" fill="#FEF9C3" opacity="0.7"/>
+  <path d="M37 46h4.81c2.314 0 4.19-1.821 4.19-4.067V4h-9v42Z" fill="#D97706" opacity="0.35"/>
+</svg>

@@ -656,5 +656,110 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
       }
     });
   });
+
+  it('supports installment/partial invoicing with consecutive invoices, residual tracking, partner autocomplete, and PDF preview branding', async () => {
+    // 1. Create a partner with complete fiscal details
+    const partnerRes = await req('/api/contacts', 'POST', {
+      name: 'Constructora del Eje SAS',
+      vat: '901.445.889-2',
+      doc_type: 'NIT',
+      street: 'Avenida Circunvalar # 14-20',
+      city: 'Pereira',
+      state_name: 'Risaralda',
+      country_name: 'Colombia',
+      phone: '6063345566',
+      mobile: '3104567890',
+      email: 'facturacion@constructoradeleje.com',
+      payment_term: '30 Días',
+      is_company: true
+    });
+    assert.equal(partnerRes.status, 200);
+    const partnerId = partnerRes.json.contact.id;
+
+    // 2. Create and confirm a sale order for $2,000,000 COP
+    const saleRes = await req('/api/sales', 'POST', {
+      partner_id: partnerId,
+      lines: [
+        {
+          product_id: 1,
+          name: 'Ventanería de Aluminio Perfil 744 - Metro Lineal',
+          quantity: 20,
+          price_unit: 100000,
+          discount: 0,
+          tax_rate: 0
+        }
+      ]
+    });
+    assert.equal(saleRes.status, 200);
+    const orderId = saleRes.json.order.id;
+    assert.equal(saleRes.json.order.amount_total, 2000000);
+
+    const confirmRes = await req(`/api/sales/${orderId}/action`, 'POST', { action: 'action_confirm' });
+    assert.equal(confirmRes.status, 200);
+    assert.equal(confirmRes.json.order.state, 'sale');
+    assert.equal(confirmRes.json.order.invoice_status, 'to invoice');
+
+    // 3. Generate first installment invoice (Abono 1: $800,000)
+    const inv1Res = await req(`/api/sales/${orderId}/action`, 'POST', {
+      action: 'create_invoice',
+      amount: 800000
+    });
+    assert.equal(inv1Res.status, 200);
+    const inv1 = inv1Res.json.invoice;
+    assert.ok(inv1, 'First installment invoice must be returned');
+    assert.equal(inv1.amount_total, 800000);
+    assert.equal(inv1.is_installment, true);
+    assert.equal(inv1.installment_number, 1);
+    assert.equal(inv1.order_residual, 1200000);
+    assert.equal(inv1Res.json.order.invoice_status, 'to invoice', 'Order residual remains, so invoice_status must stay to invoice');
+    assert.equal(inv1Res.json.order.invoice_ids.length, 1);
+
+    // 4. Generate second installment invoice (Abono 2: $1,200,000)
+    const inv2Res = await req(`/api/sales/${orderId}/action`, 'POST', {
+      action: 'create_invoice',
+      amount: 1200000
+    });
+    assert.equal(inv2Res.status, 200);
+    const inv2 = inv2Res.json.invoice;
+    assert.ok(inv2, 'Second installment invoice must be returned');
+    assert.notEqual(inv1.name, inv2.name, 'Consecutive invoices must have unique names');
+    assert.equal(inv2.amount_total, 1200000);
+    assert.equal(inv2.is_installment, true);
+    assert.equal(inv2.installment_number, 2);
+    assert.equal(inv2.order_residual, 0);
+    assert.equal(inv2Res.json.order.invoice_status, 'invoiced', 'Order is 100% billed, status must become invoiced');
+    assert.equal(inv2Res.json.order.invoice_ids.length, 2);
+
+    // 5. Attempting to invoice further must be rejected
+    const inv3Res = await req(`/api/sales/${orderId}/action`, 'POST', {
+      action: 'create_invoice',
+      amount: 100000
+    });
+    assert.equal(inv3Res.status, 400);
+    assert.match(inv3Res.json.error, /ya fue facturado en su totalidad/);
+
+    // 6. Verify client autocomplete and PDF generation assets
+    const appJsContent = fs.readFileSync(path.join(__dirname, '../assets/js/app.js'), 'utf8');
+    const cssContent = fs.readFileSync(path.join(__dirname, '../assets/css/odoo20.css'), 'utf8');
+
+    assert.ok(appJsContent.includes('renderSalePartnerDetailsHtml'), 'app.js must provide partner autocomplete details helper');
+    assert.ok(appJsContent.includes('Cédula / NIT'), 'app.js partner details must include Cédula / NIT');
+    assert.ok(appJsContent.includes('Celular / Teléfono'), 'app.js partner details must include Celular / Teléfono');
+    assert.ok(appJsContent.includes('renderInvoicePdfSheetHtml'), 'app.js must provide invoice PDF rendering helper');
+    assert.ok(appJsContent.includes('GH Aluminios'), 'app.js PDF helper must include GH Aluminios branding');
+    assert.ok(appJsContent.includes('downloadInvoicePdf'), 'app.js must provide download / print invoice PDF function');
+    assert.ok(appJsContent.includes('Metro Lineal'), 'app.js must offer Metro Lineal UoM');
+
+    // Smart button styling (.oe_stat_button)
+    assert.ok(cssContent.includes('.oe_stat_button'), 'CSS must define .oe_stat_button');
+    assert.ok(cssContent.includes('min-height: 52px;'), 'Smart button min-height must be enlarged to 52px');
+
+    // Verify dark mode sales icons exist
+    const salesPng = fs.readFileSync(path.join(__dirname, '../assets/icons/sales.png'));
+    const salesSvg = fs.readFileSync(path.join(__dirname, '../assets/icons/sales.svg'), 'utf8');
+    assert.ok(salesPng.length > 5000, 'sales.png must be high resolution');
+    assert.ok(salesSvg.includes('salesDropShadow') && salesSvg.includes('linearGradient') && salesSvg.includes('#E879F9'), 'sales.svg must feature luminous gradient and drop shadow for dark contrast');
+  });
 });
+
 

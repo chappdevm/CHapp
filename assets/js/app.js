@@ -891,21 +891,21 @@
               !isNew
                 ? `
               <div class="o_button_box">
-                <button type="button" class="o_stat_button" id="btnSmartSales">
+                <button type="button" class="o_stat_button oe_stat_button" id="btnSmartSales">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
                   <div class="o_stat_info">
                     <span class="o_stat_value">${existing.sales_count || 0} Ventas</span>
                     <span class="o_stat_text">${formatMoney(existing.sales_total || 0)}</span>
                   </div>
                 </button>
-                <button type="button" class="o_stat_button" id="btnSmartInvoices">
+                <button type="button" class="o_stat_button oe_stat_button" id="btnSmartInvoices">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
                   <div class="o_stat_info">
                     <span class="o_stat_value">${existing.invoices_count || 0} Facturas</span>
                     <span class="o_stat_text">${formatMoney(existing.invoiced_total || 0)}</span>
                   </div>
                 </button>
-                <button type="button" class="o_stat_button" id="btnSmartExpenses">
+                <button type="button" class="o_stat_button oe_stat_button" id="btnSmartExpenses">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
                   <div class="o_stat_info">
                     <span class="o_stat_value">${existing.expenses_count || 0} Gastos</span>
@@ -1423,7 +1423,7 @@
               !isNew && existing.move_id
                 ? `
               <div class="o_button_box">
-                <button type="button" class="o_stat_button" id="btnOpenExpenseMove">
+                <button type="button" class="o_stat_button oe_stat_button" id="btnOpenExpenseMove">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
                   <div class="o_stat_info">
                     <span class="o_stat_value">Asiento Contable</span>
@@ -1819,6 +1819,387 @@
     });
   }
 
+  function renderSalePartnerDetailsHtml(p) {
+    if (!p) {
+      return `<span style="color: var(--o-text-muted); font-size: 0.82rem;">Seleccione un cliente para autocompletar Cédula/NIT, Dirección y Celular/Teléfono.</span>`;
+    }
+    const nitStr = p.vat ? `${p.doc_type || (p.is_company ? 'NIT' : 'CC')} ${p.vat}` : `${p.doc_type || 'NIT'}: Sin registrar`;
+    const addrStr = [p.street, p.city, p.state_name].filter(Boolean).join(', ') || 'Sin dirección registrada';
+    const phoneStr = [p.mobile, p.phone].filter(Boolean).join(' / ') || 'Sin celular registrado';
+
+    return `
+      <div class="o_partner_details_row">
+        <span class="o_detail_label">Cédula / NIT</span>
+        <strong class="o_detail_value" id="dispPartnerVat">${esc(nitStr)}</strong>
+      </div>
+      <div class="o_partner_details_row">
+        <span class="o_detail_label">Dirección</span>
+        <strong class="o_detail_value" id="dispPartnerAddr">${esc(addrStr)}</strong>
+      </div>
+      <div class="o_partner_details_row">
+        <span class="o_detail_label">Celular / Teléfono</span>
+        <strong class="o_detail_value" id="dispPartnerPhone">${esc(phoneStr)}</strong>
+      </div>
+    `;
+  }
+
+  function renderOrderLinkedInvoicesHtml(order) {
+    if (!order || !order.id || order.state === 'draft' || order.state === 'sent') return '';
+    const moves = (state.data.accounting && state.data.accounting.moves) || [];
+    const linkedInvoices = moves.filter((m) => (order.invoice_ids || []).includes(m.id) || m.origin === order.name || m.ref === order.name);
+    if (linkedInvoices.length === 0) return '';
+
+    const totalOrder = Number(order.amount_total || 0);
+    const totalInvoiced = linkedInvoices.filter((m) => m.state !== 'cancel').reduce((s, m) => s + Number(m.amount_total || 0), 0);
+    const remaining = Math.max(0, totalOrder - totalInvoiced);
+
+    return `
+      <div class="o_linked_invoices_panel">
+        <div class="o_linked_invoices_header">
+          <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+            Facturas Vinculadas (${linkedInvoices.length})
+          </h3>
+          <span class="o_badge ${remaining <= 0 ? 'o_badge_success' : 'o_badge_warning'}">
+            ${remaining <= 0 ? 'Facturado al 100%' : `Pendiente de Facturar: ${formatMoney(remaining)}`}
+          </span>
+        </div>
+
+        <div class="o_invoicing_progress">
+          <div class="o_progress_item">
+            <span>Total de la Orden:</span>
+            <strong>${formatMoney(totalOrder)}</strong>
+          </div>
+          <div class="o_progress_item is-invoiced">
+            <span>Total Facturado a la Fecha:</span>
+            <strong>${formatMoney(totalInvoiced)}</strong>
+          </div>
+          <div class="o_progress_item is-residual">
+            <span>Saldo Restante por Facturar:</span>
+            <strong>${formatMoney(remaining)}</strong>
+          </div>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="o_list_table">
+            <thead>
+              <tr>
+                <th>Número de Factura</th>
+                <th>Fecha de Emisión</th>
+                <th>Concepto / Tipo</th>
+                <th class="text-end">Monto Facturado</th>
+                <th class="text-end">Saldo Factura</th>
+                <th>Estado Pago</th>
+                <th class="text-end">Acceso</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${linkedInvoices.map((inv, idx) => `
+                <tr>
+                  <th>${esc(inv.name)}</th>
+                  <td>${esc(inv.invoice_date)}</td>
+                  <td><span class="o_badge o_badge_info">${esc(inv.is_installment ? `Abono Cuota #${inv.installment_number || (idx + 1)}` : 'Factura')}</span></td>
+                  <td class="text-end"><strong>${formatMoney(inv.amount_total)}</strong></td>
+                  <td class="text-end">${formatMoney(inv.amount_residual)}</td>
+                  <td>${paymentStateBadge(inv.payment_state)}</td>
+                  <td class="text-end">
+                    <button type="button" class="btn btn-sm btn-secondary btn-goto-invoice" data-invoice-id="${inv.id}">Ver Factura y PDF</button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  function promptInvoiceCreation(order, remaining, callback) {
+    let modal = document.getElementById('modalInvoiceChoice');
+    if (!modal) {
+      modal = document.createElement('dialog');
+      modal.id = 'modalInvoiceChoice';
+      modal.className = 'o_dialog';
+      document.body.appendChild(modal);
+    }
+
+    modal.innerHTML = `
+      <div class="o_dialog_box" style="max-width: 520px;">
+        <div class="o_dialog_header">
+          <h3>Facturar Pedido ${esc(order.name)}</h3>
+          <button type="button" class="o_dialog_close" id="btnCloseInvChoice" aria-label="Cerrar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        </div>
+        <div class="o_dialog_body">
+          <p style="font-size: 0.88rem; color: var(--o-text-muted); margin-bottom: 1rem;">
+            Seleccione si desea facturar el total pendiente o registrar una cuota / abono específico con trazabilidad legal:
+          </p>
+
+          <div style="background: var(--o-hover-bg); border: 1px solid var(--o-border-color); border-radius: 8px; padding: 0.85rem; margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.35rem;">
+              <span>Total de la Orden:</span>
+              <strong>${formatMoney(order.amount_total)}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; color: var(--o-warning, #d97706); font-weight: 700;">
+              <span>Saldo Pendiente por Facturar:</span>
+              <span>${formatMoney(remaining)}</span>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.25rem;">
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+              <input type="radio" name="invOption" id="optFullInvoice" value="full" checked />
+              <div>
+                <strong>Facturar Total Pendiente (${formatMoney(remaining)})</strong>
+                <div style="font-size: 0.76rem; color: var(--o-text-muted);">Genera la factura por el saldo total de la orden.</div>
+              </div>
+            </label>
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+              <input type="radio" name="invOption" id="optPartialInvoice" value="partial" />
+              <div>
+                <strong>Registrar Abono / Cuota Parcial</strong>
+                <div style="font-size: 0.76rem; color: var(--o-text-muted);">Genera una factura legal consecutiva independiente por el valor abonado.</div>
+              </div>
+            </label>
+          </div>
+
+          <div id="boxPartialAmount" style="display: none; background: var(--o-view-bg); border: 1.5px solid var(--o-action); border-radius: 8px; padding: 0.85rem; margin-bottom: 1rem;">
+            <label for="invPartialAmount" style="font-weight: 600; font-size: 0.84rem; display: block; margin-bottom: 0.35rem;">Valor del Abono (COP):</label>
+            <input type="number" id="invPartialAmount" class="o_input" min="1" max="${remaining}" step="any" value="${Math.min(remaining, Math.round(remaining / 2))}" style="font-size: 1.1rem; font-weight: 700;" />
+            <div id="lblResidualCalc" style="font-size: 0.8rem; color: var(--o-text-muted); margin-top: 0.5rem;"></div>
+          </div>
+        </div>
+        <div class="o_dialog_footer">
+          <button type="button" class="btn btn-secondary" id="btnCancelInvChoice">Cancelar</button>
+          <button type="button" class="btn btn-action" id="btnConfirmInvChoice">Generar Factura Legal</button>
+        </div>
+      </div>
+    `;
+
+    const optFull = modal.querySelector('#optFullInvoice');
+    const optPart = modal.querySelector('#optPartialInvoice');
+    const boxPart = modal.querySelector('#boxPartialAmount');
+    const inpPart = modal.querySelector('#invPartialAmount');
+    const lblCalc = modal.querySelector('#lblResidualCalc');
+
+    const updateCalc = () => {
+      const val = Number(inpPart.value || 0);
+      const rest = Math.max(0, remaining - val);
+      lblCalc.innerHTML = `Saldo restante que quedará en la orden: <strong style="color: ${rest === 0 ? 'var(--o-success, #059669)' : 'var(--o-warning, #d97706)'};">${formatMoney(rest)}</strong>`;
+    };
+
+    optFull.addEventListener('change', () => {
+      boxPart.style.display = 'none';
+    });
+    optPart.addEventListener('change', () => {
+      boxPart.style.display = 'block';
+      updateCalc();
+      inpPart.focus();
+    });
+    inpPart.addEventListener('input', updateCalc);
+
+    modal.showModal();
+
+    const close = () => {
+      modal.close();
+    };
+
+    modal.querySelector('#btnCloseInvChoice').addEventListener('click', close);
+    modal.querySelector('#btnCancelInvChoice').addEventListener('click', close);
+
+    modal.querySelector('#btnConfirmInvChoice').addEventListener('click', () => {
+      let amount = remaining;
+      if (optPart.checked) {
+        amount = Number(inpPart.value || 0);
+        if (amount <= 0 || amount > remaining) {
+          showToast(`El valor del abono debe estar entre $ 1 y ${formatMoney(remaining)}.`, true);
+          return;
+        }
+      }
+      close();
+      callback(amount);
+    });
+  }
+
+  function renderInvoicePdfSheetHtml(invoice) {
+    const company = state.data.settings || {};
+    const partner = (state.data.contacts || []).find((c) => Number(c.id) === Number(invoice.partner_id)) || {
+      name: invoice.partner_name || 'Consumidor Final',
+      vat: '',
+      doc_type: 'NIT',
+      street: '',
+      city: 'Pereira',
+      state_name: 'Risaralda',
+      mobile: '',
+      phone: '',
+      email: ''
+    };
+
+    const lines = invoice.lines || [];
+    const linkedSale = (state.data.sales || []).find((s) => s.name === invoice.origin || s.name === invoice.ref);
+    const totalSaleAmount = linkedSale ? Number(linkedSale.amount_total || 0) : Number(invoice.order_total || invoice.amount_total);
+    const isAbono = invoice.is_installment || Boolean(invoice.installment_number) || Boolean(invoice.order_residual !== undefined && invoice.order_residual !== null && invoice.order_residual > 0);
+
+    return `
+      <div class="o_pdf_sheet" id="invoicePdfSheet">
+        <div class="o_pdf_brand_header">
+          <div class="o_pdf_company_info">
+            <h2>${esc(company.company_name || 'GH Aluminios')}</h2>
+            <p><strong>NIT:</strong> ${esc(company.company_vat || '900.876.543-1')}</p>
+            <p>${esc(company.fiscal_regime || 'Responsable de IVA - Régimen Ordinario')}</p>
+            <p>${esc(company.company_address || 'Cra. 7 #18-45')} · ${esc(company.company_city || 'Pereira')}, Colombia</p>
+            <p>Email: ${esc(company.company_email || 'chappdevm@gmail.com')}</p>
+          </div>
+          <div class="o_pdf_doc_box">
+            <div class="doc_type_title">${invoice.move_type === 'in_invoice' ? 'Factura Proveedor' : 'Factura de Venta'}</div>
+            <div class="doc_number">${esc(invoice.name)}</div>
+            <div style="font-size: 0.76rem; color: #4b5563;">Fecha: <strong>${esc(invoice.invoice_date || '')}</strong></div>
+            <div style="font-size: 0.76rem; color: #4b5563;">Vence: <strong>${esc(invoice.invoice_date_due || '')}</strong></div>
+            ${invoice.origin ? `<div style="font-size: 0.74rem; color: #1e40af; margin-top: 4px;">Orden: <strong>${esc(invoice.origin)}</strong></div>` : ''}
+          </div>
+        </div>
+
+        <div class="o_pdf_client_section">
+          <div class="o_pdf_client_col">
+            <p style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: #6b7280;">Adquiriente / Cliente</p>
+            <p style="font-size: 0.95rem; font-weight: 700; color: #111827;">${esc(partner.name)}</p>
+            <p><strong>${esc(partner.doc_type || 'NIT')}:</strong> ${esc(partner.vat || 'No registrado')}</p>
+            <p><strong>Dirección:</strong> ${esc([partner.street, partner.city, partner.state_name].filter(Boolean).join(', ') || 'Pereira, Risaralda')}</p>
+          </div>
+          <div class="o_pdf_client_col">
+            <p style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: #6b7280;">Datos de Contacto</p>
+            <p><strong>Tel / Celular:</strong> ${esc([partner.mobile, partner.phone].filter(Boolean).join(' / ') || 'No registrado')}</p>
+            <p><strong>Correo:</strong> ${esc(partner.email || 'No registrado')}</p>
+            <p><strong>Forma de Pago:</strong> ${esc(partner.payment_term || '30 Días')}</p>
+          </div>
+        </div>
+
+        ${isAbono ? `
+          <div class="o_pdf_trace_box">
+            <div style="font-weight: 700; color: #1e3a8a; margin-bottom: 4px;">
+              Trazabilidad de Abono / Cuota (${esc(invoice.origin || 'Venta')})
+            </div>
+            <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+              <span>Valor Total Pedido: <strong>${formatMoney(totalSaleAmount)}</strong></span>
+              <span>Abono en esta Factura: <strong style="color: #059669;">${formatMoney(invoice.amount_total)}</strong></span>
+              <span>Saldo Restante Orden: <strong style="color: #d97706;">${formatMoney(invoice.order_residual || 0)}</strong></span>
+            </div>
+          </div>
+        ` : ''}
+
+        <table class="o_pdf_items_table">
+          <thead>
+            <tr>
+              <th>Concepto / Producto</th>
+              <th style="width: 50px; text-align: center;">Cant.</th>
+              <th style="width: 105px; text-align: right;">Vr. Unitario</th>
+              <th style="width: 65px; text-align: center;">IVA</th>
+              <th style="width: 110px; text-align: right;">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${lines.map((l) => `
+              <tr>
+                <td><strong>${esc(l.name)}</strong></td>
+                <td style="text-align: center;">${l.quantity || 1}</td>
+                <td style="text-align: right;">${formatMoney(l.price_unit || 0)}</td>
+                <td style="text-align: center;">${l.tax_rate ?? 19}%</td>
+                <td style="text-align: right;"><strong>${formatMoney(l.subtotal || (Number(l.quantity || 1) * Number(l.price_unit || 0)))}</strong></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <div class="o_pdf_totals_section">
+          <table class="o_pdf_totals_table">
+            <tr>
+              <td>Subtotal:</td>
+              <td style="text-align: right;"><strong>${formatMoney(invoice.amount_untaxed || 0)}</strong></td>
+            </tr>
+            <tr>
+              <td>IVA (19%):</td>
+              <td style="text-align: right;"><strong>${formatMoney(invoice.amount_tax || 0)}</strong></td>
+            </tr>
+            <tr class="is-grand-total">
+              <td>TOTAL:</td>
+              <td style="text-align: right;">${formatMoney(invoice.amount_total || 0)}</td>
+            </tr>
+            ${invoice.amount_residual > 0 ? `
+              <tr style="color: #dc2626; font-weight: 600;">
+                <td>Saldo Pendiente:</td>
+                <td style="text-align: right;">${formatMoney(invoice.amount_residual)}</td>
+              </tr>
+            ` : `
+              <tr style="color: #059669; font-weight: 600;">
+                <td>Estado Pago:</td>
+                <td style="text-align: right;">PAGADA</td>
+              </tr>
+            `}
+          </table>
+        </div>
+
+        <div class="o_pdf_legal_footer">
+          Esta factura de venta es título valor conforme al Código de Comercio colombiano.<br/>
+          Generado automáticamente por <strong>GH Aluminios</strong> — CHapp ERP.
+        </div>
+      </div>
+    `;
+  }
+
+  function downloadInvoicePdf(invoice) {
+    const company = state.data.settings || {};
+    const sheetHtml = renderInvoicePdfSheetHtml(invoice);
+
+    const fullHtml = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Factura ${invoice.name} - ${company.company_name || 'GH Aluminios'}</title>
+  <style>
+    body { margin: 0; padding: 24px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #fff; color: #111; }
+    .o_pdf_sheet { max-width: 800px; margin: 0 auto; padding: 24px; border: 1px solid #ddd; }
+    .o_pdf_brand_header { display: flex; justify-content: space-between; border-bottom: 2px solid #031626; padding-bottom: 12px; margin-bottom: 16px; }
+    .o_pdf_company_info h2 { margin: 0 0 4px 0; color: #031626; }
+    .o_pdf_company_info p { margin: 2px 0; font-size: 13px; color: #444; }
+    .o_pdf_doc_box { border: 1.5px solid #031626; padding: 10px 16px; text-align: center; border-radius: 6px; background: #f8fafc; }
+    .doc_type_title { font-weight: bold; font-size: 13px; }
+    .doc_number { font-size: 18px; font-weight: bold; color: #e11d48; margin: 4px 0; }
+    .o_pdf_client_section { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 6px; margin-bottom: 16px; }
+    .o_pdf_client_col p { margin: 3px 0; font-size: 13px; }
+    .o_pdf_trace_box { background: #eff6ff; border: 1.5px dashed #3b82f6; border-radius: 6px; padding: 10px 14px; margin-bottom: 16px; font-size: 13px; }
+    .o_pdf_items_table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 13px; }
+    .o_pdf_items_table th { background: #031626; color: #fff; padding: 8px 10px; text-align: left; }
+    .o_pdf_items_table td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; }
+    .o_pdf_items_table tr:nth-child(even) td { background: #f8fafc; }
+    .o_pdf_totals_section { display: flex; justify-content: flex-end; margin-bottom: 16px; }
+    .o_pdf_totals_table { width: 260px; border-collapse: collapse; font-size: 14px; }
+    .o_pdf_totals_table td { padding: 4px 8px; }
+    .is-grand-total td { font-weight: bold; font-size: 16px; border-top: 2px solid #031626; padding-top: 8px; }
+    .o_pdf_legal_footer { border-top: 1px solid #e2e8f0; padding-top: 12px; font-size: 11px; color: #666; text-align: center; }
+    @media print {
+      body { padding: 0; }
+      .o_pdf_sheet { border: none; padding: 0; max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  ${sheetHtml}
+  <script>
+    window.onload = function() { window.print(); };
+  </script>
+</body>
+</html>`;
+
+    const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, '_blank');
+    if (!win) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Factura_${invoice.name.replace(/\//g, '_')}.html`;
+      a.click();
+    }
+  }
+
   function renderSaleOrderForm(container) {
     const isNew = state.activeRecordId === 'new';
     const defaultProd = (state.data.products || [])[0] || { id: 1, name: 'Servicio', list_price: 1000000, tax_rate: 19 };
@@ -1872,6 +2253,7 @@
     }
 
     const draft = state.formDraft;
+    const selectedPartner = (state.data.contacts || []).find((c) => Number(c.id) === Number(draft.partner_id));
     const stages = [
       { id: 'draft', label: 'Cotización' },
       { id: 'sent', label: 'Cotización Enviada' },
@@ -1933,7 +2315,7 @@
               !isNew && existing.invoice_ids && existing.invoice_ids.length > 0
                 ? `
               <div class="o_button_box">
-                <button type="button" class="o_stat_button" id="btnOpenSaleInvoice">
+                <button type="button" class="o_stat_button oe_stat_button" id="btnOpenSaleInvoice">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
                   <div class="o_stat_info">
                     <span class="o_stat_value">${existing.invoice_ids.length} Factura(s)</span>
@@ -1961,6 +2343,9 @@
                     )
                     .join('')}
                 </select>
+              </div>
+              <div id="salePartnerDetailsCard" class="o_partner_details_card ${!selectedPartner ? 'is-empty' : ''}">
+                ${renderSalePartnerDetailsHtml(selectedPartner)}
               </div>
               <div class="o_field_row">
                 <label for="fSalePaymentTerm">Plazos de Pago</label>
@@ -2062,6 +2447,8 @@
               <label for="fSaleNotes">Términos y Condiciones</label>
               <textarea id="fSaleNotes" class="o_textarea" rows="2">${esc(draft.notes || '')}</textarea>
             </div>
+
+            ${renderOrderLinkedInvoicesHtml(existing)}
           </div>
         </div>
 
@@ -2097,6 +2484,19 @@
         line.tax_rate = lineTaxVal === '' ? '' : Number(lineTaxVal);
       });
     };
+
+    const partnerSelectEl = document.getElementById('fSalePartner');
+    if (partnerSelectEl) {
+      partnerSelectEl.addEventListener('change', () => {
+        syncSaleDraft();
+        const p = (state.data.contacts || []).find((c) => Number(c.id) === Number(partnerSelectEl.value));
+        const card = document.getElementById('salePartnerDetailsCard');
+        if (card) {
+          card.className = `o_partner_details_card ${!p ? 'is-empty' : ''}`;
+          card.innerHTML = renderSalePartnerDetailsHtml(p);
+        }
+      });
+    }
 
     // Line events
     container.querySelectorAll('.line-product').forEach((sel) => {
@@ -2160,6 +2560,7 @@
         showToast('Debe seleccionar un producto en cada línea del pedido.', true);
         throw new Error('Debe seleccionar un producto en cada línea del pedido.');
       }
+
       const payload = {
         id: isNew ? undefined : existing.id,
         partner_id: Number(state.formDraft.partner_id),
@@ -2189,15 +2590,44 @@
     container.querySelectorAll('[data-sale-action]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const action = btn.getAttribute('data-sale-action');
+
+        if (action === 'create_invoice') {
+          const moves = (state.data.accounting && state.data.accounting.moves) || [];
+          const existingInvs = moves.filter((m) => (existing.invoice_ids || []).includes(m.id) && m.state !== 'cancel');
+          const invoicedTotal = existingInvs.reduce((s, m) => s + Number(m.amount_total || 0), 0);
+          const orderTotal = Number(existing.amount_total || 0);
+          const remaining = Math.max(0, orderTotal - invoicedTotal);
+
+          if (remaining <= 0) {
+            return showToast('Este pedido de venta ya fue facturado en su totalidad.', true);
+          }
+
+          promptInvoiceCreation(existing, remaining, async (chosenAmount) => {
+            try {
+              await saveOrderNow();
+              const res = await apiCall(`/api/sales/${state.activeRecordId}/action`, 'POST', {
+                action: 'create_invoice',
+                amount: chosenAmount
+              });
+              state.formDraft = null;
+              showToast(`Factura ${res.invoice ? res.invoice.name : ''} generada exitosamente.`);
+              if (res.invoice) {
+                openApp('accounting', { submenu: 'out_invoice', viewType: 'form', recordId: res.invoice.id });
+              } else {
+                renderModuleWorkspace();
+              }
+            } catch (err) {
+              showToast(err.message, true);
+            }
+          });
+          return;
+        }
+
         try {
           await saveOrderNow();
           const res = await apiCall(`/api/sales/${state.activeRecordId}/action`, 'POST', { action });
           state.formDraft = null;
-          if (action === 'create_invoice' && res.invoice) {
-            showToast(`Factura ${res.invoice.name} creada en Contabilidad.`);
-          } else {
-            showToast('Estado del pedido actualizado.');
-          }
+          showToast('Estado del pedido actualizado.');
           renderModuleWorkspace();
         } catch (err) {
           showToast(err.message, true);
@@ -2212,6 +2642,13 @@
         openApp('accounting', { submenu: 'out_invoice', viewType: 'form', recordId: invId });
       });
     }
+
+    container.querySelectorAll('.btn-goto-invoice').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const moveId = Number(btn.getAttribute('data-invoice-id'));
+        openApp('accounting', { submenu: 'out_invoice', viewType: 'form', recordId: moveId });
+      });
+    });
   }
 
   function renderProductsSubmodule(container) {
@@ -2367,7 +2804,7 @@
 
           <form id="productForm" class="o_form_sheet" onsubmit="return false;">
             <div class="o_button_box">
-              <div class="o_stat_button" style="cursor: default;">
+              <div class="o_stat_button oe_stat_button" style="cursor: default;">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
                 <div class="o_stat_info">
                   <span class="o_stat_value">${formatMoney(existing.list_price || 0)}</span>
@@ -2401,7 +2838,8 @@
                     <select id="prodUom" class="o_select">
                       <option value="" ${!existing.uom ? 'selected disabled' : ''}>— Seleccione Unidad de Medida —</option>
                       <option value="Metro Cuadrado" ${existing.uom === 'Metro Cuadrado' ? 'selected' : ''}>Metro Cuadrado (m²)</option>
-                      <option value="Metro Liso" ${existing.uom === 'Metro Liso' ? 'selected' : ''}>Metro Liso</option>
+                      <option value="Metro Lineal" ${existing.uom === 'Metro Lineal' || existing.uom === 'Metro Liso' ? 'selected' : ''}>Metro Lineal</option>
+                      <option value="Metro Liso" style="display: none;">Metro Liso</option>
                     </select>
                   </div>
                   <div class="o_field_row">
@@ -2908,9 +3346,22 @@
     const calcTotal = calcUntaxed + calcTax;
     const calcResidual = isEditable ? calcTotal : Number(existing.amount_residual || 0);
 
+    const previewData = {
+      ...existing,
+      partner_id: draft.partner_id || existing.partner_id,
+      invoice_date: draft.invoice_date || existing.invoice_date,
+      invoice_date_due: draft.invoice_date_due || existing.invoice_date_due,
+      lines: draft.lines || existing.lines,
+      amount_untaxed: calcUntaxed,
+      amount_tax: calcTax,
+      amount_total: calcTotal,
+      amount_residual: calcResidual
+    };
+
     container.innerHTML = `
-      <div class="o_form_view">
-        <div class="o_form_sheet_bg">
+      <div class="o_invoice_split_container">
+        <div class="o_form_view">
+          <div class="o_form_sheet_bg">
           <div class="o_form_statusbar">
             <div class="o_statusbar_buttons">
               ${
@@ -3084,7 +3535,30 @@
 
         ${renderChatterHtml('moves', existing)}
       </div>
-    `;
+
+      <aside class="o_invoice_pdf_panel" aria-label="Previsualización PDF de la Factura">
+        <div class="o_pdf_panel_header">
+          <div class="o_pdf_panel_title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+            Factura Legal (PDF)
+          </div>
+          <div class="o_pdf_panel_actions">
+            <button type="button" class="btn btn-sm btn-secondary" id="btnPrintInvoicePdf" title="Imprimir documento">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+              Imprimir
+            </button>
+            <button type="button" class="btn btn-sm btn-primary" id="btnDownloadInvoicePdf" title="Descargar o Abrir PDF">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              Descargar
+            </button>
+          </div>
+        </div>
+        <div class="o_pdf_paper_viewport">
+          ${renderInvoicePdfSheetHtml(previewData)}
+        </div>
+      </aside>
+    </div>
+  `;
 
     wireChatterEvents('moves', existing.id);
 
@@ -3209,6 +3683,30 @@
         document.getElementById('payDate').value = new Date().toISOString().slice(0, 10);
         document.getElementById('payRef').value = existing.name;
         dialog.showModal();
+      });
+    }
+
+    const partnerMoveEl = document.getElementById('fMovePartner');
+    if (partnerMoveEl) {
+      partnerMoveEl.addEventListener('change', () => {
+        syncMoveDraft();
+        renderAccountMoveForm(container);
+      });
+    }
+
+    const btnDownloadPdf = document.getElementById('btnDownloadInvoicePdf');
+    if (btnDownloadPdf) {
+      btnDownloadPdf.addEventListener('click', () => {
+        syncMoveDraft();
+        downloadInvoicePdf(previewData);
+      });
+    }
+
+    const btnPrintPdf = document.getElementById('btnPrintInvoicePdf');
+    if (btnPrintPdf) {
+      btnPrintPdf.addEventListener('click', () => {
+        syncMoveDraft();
+        downloadInvoicePdf(previewData);
       });
     }
   }

@@ -251,7 +251,13 @@ class ERPStore {
       : (process.env.NODE_ENV !== 'test' && !isTestPath && isSupabaseConfigured());
     this.supabase = useSupabase ? new SupabasePersistence() : null;
     this.data = null;
+    this._hasSyncedOnce = false;
+    this._lastSyncTime = 0;
+    this._syncPromise = null;
     this.load();
+    if (this.supabase && this.supabase.isReady() && !isTestPath && options.autoSync !== false) {
+      this.ensureSynced(0).catch(() => {});
+    }
   }
 
   load() {
@@ -275,10 +281,20 @@ class ERPStore {
   async ensureSynced(maxAgeMs = 15000) {
     if (!this.supabase || !this.supabase.isReady()) return;
     const now = Date.now();
-    if (this._hasSyncedOnce && this._lastSyncTime && (now - this._lastSyncTime < maxAgeMs)) {
-      return;
+    const needsSync = !this._hasSyncedOnce || !this._lastSyncTime || (now - this._lastSyncTime >= maxAgeMs);
+    if (!needsSync) return;
+
+    if (this._syncPromise) {
+      return this._syncPromise;
     }
-    await this.syncFromSupabaseIfAvailable();
+    this._syncPromise = (async () => {
+      try {
+        await this.syncFromSupabaseIfAvailable();
+      } finally {
+        this._syncPromise = null;
+      }
+    })();
+    return this._syncPromise;
   }
 
   async syncFromSupabaseIfAvailable() {
@@ -397,11 +413,19 @@ class ERPStore {
   }
 
   save() {
-    const dir = path.dirname(this.dbPath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
+    try {
+      const dir = path.dirname(this.dbPath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(this.dbPath, JSON.stringify(this.data, null, 2), 'utf8');
+    } catch (err) {
+      if (err.code === 'EROFS' || err.code === 'EACCES' || err.code === 'EPERM') {
+        // Read-only filesystem in serverless environments (e.g. Vercel)
+      } else {
+        console.warn('[Store] Local file write error:', err.message);
+      }
     }
-    fs.writeFileSync(this.dbPath, JSON.stringify(this.data, null, 2), 'utf8');
   }
 
   async reset() {
@@ -1142,7 +1166,7 @@ class ERPStore {
     return newOrder;
   }
 
-  async transitionSaleOrder(id, action) {
+  async transitionSaleOrder(id, action, params = {}) {
     const order = this.data.sales.find((s) => Number(s.id) === Number(id));
     if (!order) throw new Error('Pedido de venta no encontrado.');
     let invoice = null;
@@ -1156,7 +1180,7 @@ class ERPStore {
         date: this.formatNowShort(),
         text: 'Cotización enviada por correo electrónico al cliente.'
       });
-    } else if (action === 'confirm') {
+    } else if (action === 'confirm' || action === 'action_confirm') {
       if (order.state !== 'draft' && order.state !== 'sent') {
         throw new Error('Solo las cotizaciones pueden confirmarse como Pedido de Venta.');
       }
@@ -1187,30 +1211,53 @@ class ERPStore {
         throw new Error('Este pedido de venta ya fue facturado en su totalidad.');
       }
 
+      const rawReq = params && (params.amount !== undefined ? params.amount : params.advance_amount);
+      const reqAmount = rawReq !== undefined && rawReq !== null && String(rawReq).trim() !== ''
+        ? round2(Number(rawReq))
+        : null;
+
+      let billTotal = deltaTotal;
+      let isPartialInstallment = false;
+
+      if (reqAmount !== null && Number.isFinite(reqAmount) && reqAmount > 0) {
+        if (reqAmount > deltaTotal) {
+          throw new Error(`El valor del abono (${reqAmount}) no puede superar el saldo pendiente de facturar (${deltaTotal}).`);
+        }
+        billTotal = reqAmount;
+        if (billTotal < deltaTotal) {
+          isPartialInstallment = true;
+        }
+      }
+
+      let billUntaxed = 0;
+      let billTax = 0;
+      if (Math.abs(billTotal - deltaTotal) < 0.001) {
+        billUntaxed = deltaUntaxed;
+        billTax = deltaTax;
+      } else {
+        const orderTotal = round2(order.amount_total);
+        const taxRatio = orderTotal > 0 ? (order.amount_tax / orderTotal) : 0;
+        billTax = round2(billTotal * taxRatio);
+        billUntaxed = round2(billTotal - billTax);
+      }
+
+      const pendingResidualAfterThis = round2(deltaTotal - billTotal);
+      const installmentNum = existingInvoices.length + 1;
+      const isAbono = isPartialInstallment || existingInvoices.length > 0;
+      const isDeltaInvoice = existingInvoices.length > 0 && invoicedTotal > 0;
+
       const invSeq = this.nextSeq('move_inv');
       const moveId = this.data.accounting.moves.reduce((m, x) => Math.max(m, Number(x.id)), 0) + 1;
       const invName = `INV/2026/${this.padSeq(invSeq, 4)}`;
-      const invDate = todayStr();
+      const invDate = (params && params.invoice_date) ? String(params.invoice_date).trim() : todayStr();
       const dueDate = addDays(invDate, 30);
 
-      const isDeltaInvoice = existingInvoices.length > 0 && invoicedTotal > 0;
-      const moveLines = isDeltaInvoice
-        ? [
-            {
-              id: 1,
-              product_id: order.lines[0] ? order.lines[0].product_id : 1,
-              name: `Ajuste / Saldo adicional orden ${order.name}`,
-              account_code: '413501',
-              account_name: 'Ingresos por Servicios de Software y Consultoría',
-              quantity: 1,
-              price_unit: deltaUntaxed,
-              tax_rate: deltaUntaxed > 0 ? round2((deltaTax / deltaUntaxed) * 100) : 0,
-              subtotal: deltaUntaxed,
-              tax_amount: deltaTax,
-              total: deltaTotal
-            }
-          ]
-        : order.lines.map((l, i) => ({
+      const conceptNote = isAbono
+        ? `Abono / Cuota #${installmentNum} a la orden ${order.name} (Saldo restante: $ ${pendingResidualAfterThis.toLocaleString('es-CO')})`
+        : `Facturación orden ${order.name}`;
+
+      const moveLines = (!isAbono && !isDeltaInvoice)
+        ? order.lines.map((l, i) => ({
             id: i + 1,
             product_id: l.product_id,
             name: `${l.product_name}${l.description && l.description !== l.product_name ? ' - ' + l.description : ''}`,
@@ -1222,31 +1269,46 @@ class ERPStore {
             subtotal: l.subtotal,
             tax_amount: l.tax_amount,
             total: l.total
-          }));
+          }))
+        : [
+            {
+              id: 1,
+              product_id: order.lines[0] ? order.lines[0].product_id : 1,
+              name: conceptNote,
+              account_code: '413501',
+              account_name: 'Ingresos por Servicios de Software y Consultoría',
+              quantity: 1,
+              price_unit: billUntaxed,
+              tax_rate: billUntaxed > 0 ? round2((billTax / billUntaxed) * 100) : 0,
+              subtotal: billUntaxed,
+              tax_amount: billTax,
+              total: billTotal
+            }
+          ];
 
       const journalItems = [
         {
           account_code: '130505',
           account_name: 'Clientes Nacionales (Cuentas por Cobrar)',
           label: `${invName} - ${order.partner_name}`,
-          debit: deltaTotal,
+          debit: billTotal,
           credit: 0
         },
         {
           account_code: '413501',
           account_name: 'Ingresos por Servicios de Software y Consultoría',
-          label: `Ingresos orden ${order.name}`,
+          label: `${conceptNote}`,
           debit: 0,
-          credit: deltaUntaxed
+          credit: billUntaxed
         }
       ];
-      if (deltaTax > 0) {
+      if (billTax > 0) {
         journalItems.push({
           account_code: '240801',
           account_name: 'IVA Generado en Ventas (19%)',
           label: `IVA Generado ${invName}`,
           debit: 0,
-          credit: deltaTax
+          credit: billTax
         });
       }
 
@@ -1267,23 +1329,39 @@ class ERPStore {
         payment_state: 'not_paid',
         lines: moveLines,
         journal_items: journalItems,
-        amount_untaxed: deltaUntaxed,
-        amount_tax: deltaTax,
-        amount_total: deltaTotal,
-        amount_residual: deltaTotal,
+        amount_untaxed: billUntaxed,
+        amount_tax: billTax,
+        amount_total: billTotal,
+        amount_residual: billTotal,
+        order_total: round2(order.amount_total),
+        invoiced_prior: invoicedTotal,
+        advance_amount: billTotal,
+        order_residual: pendingResidualAfterThis,
+        installment_number: installmentNum,
+        is_installment: isAbono,
         chatter: [
-          { id: Date.now(), author: this.getActiveAuthor(), date: this.formatNowShort(), text: `Factura ${invName} creada y publicada desde el pedido ${order.name}.` }
+          {
+            id: Date.now(),
+            author: this.getActiveAuthor(),
+            date: this.formatNowShort(),
+            text: isAbono
+              ? `Factura ${invName} creada y publicada por concepto de Abono Cuota #${installmentNum} ($ ${billTotal.toLocaleString('es-CO')}). Saldo pendiente de la orden: $ ${pendingResidualAfterThis.toLocaleString('es-CO')}.`
+              : `Factura ${invName} creada y publicada desde el pedido ${order.name}.`
+          }
         ]
       };
 
       this.data.accounting.moves.unshift(invoice);
       order.invoice_ids = [...(order.invoice_ids || []), invoice.id];
-      order.invoice_status = 'invoiced';
+      const newInvoicedTotal = round2(invoicedTotal + billTotal);
+      order.invoice_status = newInvoicedTotal >= round2(order.amount_total) ? 'invoiced' : 'to invoice';
       order.chatter.push({
         id: Date.now() + 1,
         author: this.getActiveAuthor(),
         date: this.formatNowShort(),
-        text: `Factura de cliente ${invName} creada en Contabilidad.`
+        text: isAbono
+          ? `Factura de cliente ${invName} emitida por Abono Cuota #${installmentNum} de $ ${billTotal.toLocaleString('es-CO')}. Total facturado: $ ${newInvoicedTotal.toLocaleString('es-CO')}. Saldo restante: $ ${pendingResidualAfterThis.toLocaleString('es-CO')}.`
+          : `Factura de cliente ${invName} creada en Contabilidad.`
       });
     } else if (action === 'cancel') {
       const hasPostedInvoices = (order.invoice_ids || []).some((mid) => {

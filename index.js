@@ -62,11 +62,14 @@ function readJsonBody(req) {
 
 function createHandler(store = new ERPStore(undefined, { useSupabase: isSupabaseConfigured() })) {
   return async function handler(req, res) {
-    const rawUrl = req.originalUrl || req.url;
+    const rawUrl = req.headers?.['x-forwarded-uri'] || req.headers?.['x-invoke-path'] || req.headers?.['x-matched-path'] || req.originalUrl || req.url;
     const parsedUrl = new URL(rawUrl, 'http://localhost');
     let pathname = decodeURI(parsedUrl.pathname);
-    if (pathname === '/api/index.js' && req.headers && req.headers['x-matched-path']) {
-      pathname = decodeURI(new URL(req.headers['x-matched-path'], 'http://localhost').pathname);
+    if (pathname === '/api/index.js') {
+      const matchHeader = req.headers && (req.headers['x-matched-path'] || req.headers['x-forwarded-uri'] || req.headers['x-invoke-path'] || req.headers['x-original-url']);
+      if (matchHeader) {
+        pathname = decodeURI(new URL(matchHeader, 'http://localhost').pathname);
+      }
     }
     const method = req.method.toUpperCase();
 
@@ -132,7 +135,7 @@ function createHandler(store = new ERPStore(undefined, { useSupabase: isSupabase
         const saleActionMatch = pathname.match(/^\/api\/sales\/(\d+)\/action$/);
         if (method === 'POST' && saleActionMatch) {
           const body = await readJsonBody(req);
-          const result = await store.transitionSaleOrder(Number(saleActionMatch[1]), body.action);
+          const result = await store.transitionSaleOrder(Number(saleActionMatch[1]), body.action, body);
           return sendJson(res, 200, { ok: true, ...result, state: store.getBootstrapState() });
         }
 

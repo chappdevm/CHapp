@@ -3,11 +3,11 @@
     "version": "20.0.1.0",
     "based_on": "Odoo 20 Enterprise",
     "sequences": {
-      "contact": 1,
-      "product": 1,
-      "expense": 1,
-      "sale": 1,
-      "move_inv": 1,
+      "contact": 2,
+      "product": 2,
+      "expense": 2,
+      "sale": 2,
+      "move_inv": 2,
       "move_bill": 1,
       "move_misc": 1,
       "payment": 1,
@@ -17,7 +17,7 @@
   },
   "settings": {
     "company_name": "GH Aluminios",
-    "company_vat": "",
+    "company_vat": "900.876.543-1",
     "company_email": "chappdevm@gmail.com",
     "company_phone": "",
     "company_city": "Bogotá D.C.",
@@ -51,10 +51,116 @@
       }
     ]
   },
-  "contacts": [],
-  "products": [],
-  "expenses": [],
-  "sales": [],
+  "contacts": [
+    {
+      "id": 1,
+      "name": "Workflow Test SAS",
+      "is_company": true,
+      "company_name": "Workflow Test SAS",
+      "doc_type": "NIT",
+      "vat": "",
+      "function": "Empresa",
+      "street": "",
+      "city": "Bogotá D.C.",
+      "state_name": "Cundinamarca",
+      "country": "Colombia",
+      "email": "workflow@test.com",
+      "phone": "",
+      "mobile": "",
+      "website": "",
+      "customer_rank": 1,
+      "supplier_rank": 0,
+      "category_ids": [
+        "Contacto"
+      ],
+      "payment_term": "30 Días",
+      "color": 2,
+      "notes": "",
+      "active": true,
+      "created_at": "2026-10-26T21:32:05.921676+00:00",
+      "chatter": []
+    }
+  ],
+  "products": [
+    {
+      "id": 1,
+      "name": "Servicio Auditoria Live",
+      "default_code": "PRD-001",
+      "type": "service",
+      "list_price": 300000,
+      "standard_price": 150000,
+      "tax_rate": 19,
+      "category": "General",
+      "can_be_sold": true,
+      "can_be_expensed": true,
+      "uom": "Unidad"
+    }
+  ],
+  "expenses": [
+    {
+      "id": 1,
+      "reference": "EXP/2026/0001",
+      "name": "Gasto Transporte Live",
+      "employee_name": "Tester",
+      "department": "Operaciones & Proyectos",
+      "product_id": 1,
+      "product_name": "Servicio Auditoria Live",
+      "date": "2026-10-26",
+      "payment_mode": "own_account",
+      "quantity": 1,
+      "price_unit": 80000,
+      "tax_rate": 0,
+      "untaxed_amount": 80000,
+      "tax_amount": 0,
+      "total_amount": 80000,
+      "partner_id": 1,
+      "partner_name": "Workflow Test SAS",
+      "receipt_ref": "",
+      "notes": "",
+      "state": "approved",
+      "move_id": null,
+      "payment_id": null,
+      "chatter": []
+    }
+  ],
+  "sales": [
+    {
+      "id": 1,
+      "name": "S00001",
+      "partner_id": 1,
+      "partner_name": "Workflow Test SAS",
+      "date_order": "2026-10-26",
+      "validity_date": "2026-11-25",
+      "salesperson": "Administrador CHapp",
+      "payment_term": "30 Días",
+      "state": "sale",
+      "invoice_status": "invoiced",
+      "amount_untaxed": 600000,
+      "amount_tax": 114000,
+      "amount_total": 714000,
+      "notes": "Condiciones de pago y entrega según cotización.",
+      "invoice_ids": [
+        1
+      ],
+      "lines": [
+        {
+          "id": 6,
+          "product_id": 1,
+          "product_name": "Servicio Auditoria Live",
+          "description": "Servicio Auditoria Live",
+          "quantity": 2,
+          "uom": "Unidad",
+          "price_unit": 300000,
+          "discount": 0,
+          "tax_rate": 19,
+          "subtotal": 600000,
+          "tax_amount": 114000,
+          "total": 714000
+        }
+      ],
+      "chatter": []
+    }
+  ],
   "accounting": {
     "journals": [
       {
@@ -208,7 +314,67 @@
         "active": true
       }
     ],
-    "moves": [],
+    "moves": [
+      {
+        "id": 1,
+        "name": "INV/2026/0001",
+        "move_type": "out_invoice",
+        "journal_id": 1,
+        "journal_code": "INV",
+        "journal_name": "Facturas de Clientes",
+        "partner_id": 1,
+        "partner_name": "Workflow Test SAS",
+        "invoice_date": "2026-10-26",
+        "invoice_date_due": "2026-11-25",
+        "ref": "S00001",
+        "origin": "S00001",
+        "state": "posted",
+        "payment_state": "paid",
+        "amount_untaxed": 600000,
+        "amount_tax": 114000,
+        "amount_total": 714000,
+        "amount_residual": 0,
+        "lines": [
+          {
+            "id": 1,
+            "product_id": null,
+            "name": "S00001",
+            "account_code": "413501",
+            "account_name": "Ingresos por Servicios de Software y Consultoría",
+            "quantity": 1,
+            "price_unit": 600000,
+            "tax_rate": 19,
+            "subtotal": 600000,
+            "tax_amount": 114000,
+            "total": 714000
+          }
+        ],
+        "journal_items": [
+          {
+            "account_code": "130505",
+            "account_name": "Clientes Nacionales (Cuentas por Cobrar)",
+            "label": "Workflow Test SAS",
+            "debit": 714000,
+            "credit": 0
+          },
+          {
+            "account_code": "413501",
+            "account_name": "Ingresos por Servicios de Software y Consultoría",
+            "label": "Ingresos por facturación",
+            "debit": 0,
+            "credit": 600000
+          },
+          {
+            "account_code": "240801",
+            "account_name": "IVA Generado en Ventas (19%)",
+            "label": "IVA Generado",
+            "debit": 0,
+            "credit": 114000
+          }
+        ],
+        "chatter": []
+      }
+    ],
     "payments": []
   }
 }

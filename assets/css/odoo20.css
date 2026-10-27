@@ -1578,39 +1578,49 @@ button, input, select, textarea {
   border-bottom: 1px solid var(--o-border-color);
 }
 
-.o_stat_button {
+.o_stat_button,
+.oe_stat_button {
   display: inline-flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.4rem 0.85rem;
-  min-height: 42px;
+  gap: 0.75rem;
+  padding: 0.65rem 1.25rem;
+  min-height: 52px;
   background-color: var(--o-view-bg);
-  border: 1px solid var(--o-border-color);
-  border-radius: 6px;
+  border: 1.5px solid var(--o-border-color);
+  border-radius: 8px;
   cursor: pointer;
   text-align: start;
-  transition: border-color 0.12s ease;
+  transition: all 0.15s ease;
   touch-action: manipulation;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.o_stat_button:hover {
+.o_stat_button:hover,
+.oe_stat_button:hover {
   border-color: var(--o-action);
+  background-color: var(--o-hover-bg);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
 }
 
-.o_stat_button .o_stat_info {
+.o_stat_button .o_stat_info,
+.oe_stat_button .o_stat_info {
   display: flex;
   flex-direction: column;
-  line-height: 1.15;
+  line-height: 1.2;
 }
 
-.o_stat_button .o_stat_value {
+.o_stat_button .o_stat_value,
+.oe_stat_button .o_stat_value {
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: 1.05rem;
   color: var(--o-action);
 }
 
-.o_stat_button .o_stat_text {
-  font-size: 0.74rem;
+.o_stat_button .o_stat_text,
+.oe_stat_button .o_stat_text {
+  font-size: 0.82rem;
+  font-weight: 500;
   color: var(--o-text-muted);
 }
 
@@ -2260,3 +2270,345 @@ dialog.o_dialog::backdrop {
     justify-content: center;
   }
 }
+
+/* ==========================================================================
+   Autocompletado de Tercero en Ventas (sale.order)
+   ========================================================================== */
+.o_partner_details_card {
+  grid-column: 1 / -1;
+  background-color: var(--o-hover-bg);
+  border: 1px solid var(--o-border-color);
+  border-left: 4px solid var(--o-action);
+  border-radius: 8px;
+  padding: 0.85rem 1.15rem;
+  margin-top: 0.25rem;
+  margin-bottom: 0.65rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  align-items: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.o_partner_details_card.is-empty {
+  border-left-color: var(--o-border-color);
+  background: transparent;
+  border-style: dashed;
+  padding: 0.6rem 1rem;
+}
+
+.o_partner_details_row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.o_partner_details_row .o_detail_label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--o-text-muted);
+  letter-spacing: 0.03em;
+}
+
+.o_partner_details_row .o_detail_value {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--o-text-main);
+}
+
+/* ==========================================================================
+   Panel de Facturas Vinculadas a la Orden (sale.order)
+   ========================================================================== */
+.o_linked_invoices_panel {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  background: var(--o-hover-bg);
+  border: 1px solid var(--o-border-color);
+  border-radius: 10px;
+}
+
+.o_linked_invoices_header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.o_linked_invoices_header h3 {
+  font-size: 1.1rem;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.o_invoicing_progress {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: var(--o-view-bg);
+  border: 1px solid var(--o-border-color);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.o_progress_item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.o_progress_item span {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  color: var(--o-text-muted);
+}
+
+.o_progress_item strong {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--o-text-main);
+}
+
+.o_progress_item.is-residual strong {
+  color: var(--o-warning, #d97706);
+}
+
+.o_progress_item.is-invoiced strong {
+  color: var(--o-success, #059669);
+}
+
+/* ==========================================================================
+   Split View y Previsualización Lateral de Factura PDF
+   ========================================================================== */
+.o_invoice_split_container {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 480px;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 1200px) {
+  .o_invoice_split_container {
+    grid-template-columns: 1fr;
+  }
+}
+
+.o_invoice_pdf_panel {
+  background: var(--o-view-bg);
+  border: 1px solid var(--o-border-color);
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100vh - 2rem);
+  display: flex;
+  flex-direction: column;
+}
+
+.o_pdf_panel_header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1.15rem;
+  background: var(--o-navbar-bg, #031626);
+  color: #fff;
+  border-bottom: 1px solid var(--o-border-color);
+}
+
+.o_pdf_panel_title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.o_pdf_panel_actions {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.o_pdf_paper_viewport {
+  padding: 1.25rem;
+  overflow-y: auto;
+  background: #525659;
+  flex: 1;
+}
+
+/* Simulación física de Hoja A4 / Factura Legal */
+.o_pdf_sheet {
+  background: #ffffff;
+  color: #1f2937;
+  padding: 1.75rem 1.5rem;
+  border-radius: 4px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.35);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  margin: 0 auto;
+  max-width: 100%;
+}
+
+.o_pdf_sheet h1, .o_pdf_sheet h2, .o_pdf_sheet h3, .o_pdf_sheet h4 {
+  color: #111827;
+  margin-top: 0;
+}
+
+.o_pdf_brand_header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 2px solid #031626;
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+}
+
+.o_pdf_company_info h2 {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #031626;
+  margin-bottom: 0.2rem;
+  letter-spacing: 0.02em;
+}
+
+.o_pdf_company_info p {
+  margin: 0.15rem 0;
+  font-size: 0.78rem;
+  color: #4b5563;
+}
+
+.o_pdf_doc_box {
+  background: #f8fafc;
+  border: 1.5px solid #031626;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  text-align: center;
+  min-width: 160px;
+}
+
+.o_pdf_doc_box .doc_type_title {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #031626;
+  text-transform: uppercase;
+}
+
+.o_pdf_doc_box .doc_number {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #e11d48;
+  margin: 0.2rem 0;
+}
+
+.o_pdf_client_section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.o_pdf_client_col p {
+  margin: 0.2rem 0;
+  font-size: 0.8rem;
+}
+
+.o_pdf_items_table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+  font-size: 0.8rem;
+}
+
+.o_pdf_items_table th {
+  background: #031626;
+  color: #ffffff;
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+}
+
+.o_pdf_items_table td {
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid #e2e8f0;
+  color: #374151;
+}
+
+.o_pdf_items_table tr:nth-child(even) td {
+  background: #f8fafc;
+}
+
+.o_pdf_trace_box {
+  background: #eff6ff;
+  border: 1.5px dashed #3b82f6;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.8rem;
+}
+
+.o_pdf_trace_box strong {
+  color: #1e40af;
+}
+
+.o_pdf_totals_section {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 1.25rem;
+}
+
+.o_pdf_totals_table {
+  width: 240px;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.o_pdf_totals_table td {
+  padding: 0.25rem 0.5rem;
+}
+
+.o_pdf_totals_table .is-grand-total td {
+  font-size: 1.05rem;
+  font-weight: 800;
+  border-top: 2px solid #031626;
+  color: #031626;
+  padding-top: 0.45rem;
+}
+
+.o_pdf_legal_footer {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 0.85rem;
+  font-size: 0.72rem;
+  color: #6b7280;
+  text-align: center;
+  line-height: 1.4;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .o_pdf_sheet, .o_pdf_sheet * {
+    visibility: visible;
+  }
+  .o_pdf_sheet {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+}
+
