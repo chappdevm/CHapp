@@ -865,6 +865,16 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.ok(jsText.includes("title: 'Cotización Enviada'"), 'Sales kanban must have Cotización Enviada stage');
     assert.ok(jsText.includes("title: 'Pedido de Venta'"), 'Sales kanban must have Pedido de Venta stage');
 
+    // 1b. Gastos y Contactos con tableros Kanban por etapas/columnas
+    assert.ok(jsText.includes("title: 'Presentado'"), 'Expenses kanban must have Presentado stage');
+    assert.ok(jsText.includes("title: 'Aprobado'"), 'Expenses kanban must have Aprobado stage');
+    assert.ok(jsText.includes("title: 'Clientes'"), 'Contacts kanban must have Clientes column');
+    assert.ok(jsText.includes("title: 'Proveedores'"), 'Contacts kanban must have Proveedores column');
+
+    // 1c. Facturas: switcher deshabilitado, siempre lista por defecto
+    assert.ok(jsText.includes("state.currentApp === 'accounting'"), 'Must check accounting app for list-only view');
+    assert.ok(jsText.includes("switcher.innerHTML = '';"), 'Invoices must hide view switcher and force list view');
+
     // 2. Facturas vinculadas directamente clickeables en la fila
     assert.ok(cssText.includes('.o_invoice_link_row'), 'CSS must style .o_invoice_link_row for row click navigation');
     assert.ok(jsText.includes('class="o_invoice_link_row" data-invoice-id="'), 'Linked invoice rows must have data-invoice-id on <tr>');

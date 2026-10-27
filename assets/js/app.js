@@ -54,8 +54,8 @@
       name: 'Contabilidad',
       icon: '/assets/icons/accounting.png',
       xmlid: 'account.menu_finance',
-      defaultSubmenu: 'dashboard',
-      defaultView: 'kanban',
+      defaultSubmenu: 'out_invoice',
+      defaultView: 'list',
       submenus: [
         { id: 'dashboard', label: 'Tablero' },
         { id: 'out_invoice', label: 'Facturas Clientes' },
@@ -489,8 +489,12 @@
     });
 
     // View Switcher (Kanban / List)
-    if (state.currentApp === 'accounting' && state.submenu === 'dashboard') {
+    // En las facturas y contabilidad se quita la opción de elegir lista/kanban: siempre lista por defecto
+    if (state.currentApp === 'accounting' || (state.currentApp === 'sales' && state.submenu === 'products')) {
       switcher.innerHTML = '';
+      if (state.viewType !== 'form') {
+        state.viewType = 'list';
+      }
     } else {
       switcher.innerHTML = `
         <button type="button" class="o_switch_btn ${state.viewType === 'list' ? 'is-active' : ''}" data-view="list" title="Vista Lista">
@@ -644,33 +648,76 @@
     `;
 
     if (state.viewType === 'kanban') {
+      const contactCols = [
+        {
+          id: 'customers',
+          title: 'Clientes',
+          color: '#10b981',
+          filter: (c) => Number(c.customer_rank) > 0 || (c.category_ids || []).includes('Cliente')
+        },
+        {
+          id: 'suppliers',
+          title: 'Proveedores',
+          color: '#f59e0b',
+          filter: (c) => (Number(c.supplier_rank) > 0 || (c.category_ids || []).includes('Proveedor')) && !(Number(c.customer_rank) > 0)
+        },
+        {
+          id: 'others',
+          title: 'Otros Contactos',
+          color: '#3b82f6',
+          filter: (c) => !(Number(c.customer_rank) > 0 || (c.category_ids || []).includes('Cliente')) && !(Number(c.supplier_rank) > 0 || (c.category_ids || []).includes('Proveedor'))
+        }
+      ];
+
       container.innerHTML =
         bannerHtml +
-        `<div class="o_kanban_view">
-          ${contacts
-            .map(
-              (c) => `
-              <article class="o_kanban_record" data-contact-id="${c.id}">
-                <div class="o_kanban_avatar">${esc(initials(c.name))}</div>
-                <div class="o_kanban_details">
-                  <div style="display: flex; justify-content: space-between; gap: 0.4rem;">
-                    <span class="o_kanban_title">${esc(c.name)}</span>
-                    <span class="o_badge ${c.is_company ? 'o_badge_info' : 'o_badge_muted'}">${c.is_company ? 'Compañía' : 'Individual'}</span>
+        `<div class="o_kanban_board">
+          ${contactCols
+            .map((col) => {
+              const colContacts = contacts.filter(col.filter);
+              return `
+              <div class="o_kanban_column" style="--col-accent: ${col.color};">
+                <div class="o_kanban_col_header">
+                  <div class="o_kanban_col_title_wrap">
+                    <span class="o_kanban_col_title">${esc(col.title)}</span>
+                    <span class="o_badge o_badge_muted">${colContacts.length}</span>
                   </div>
-                  <div class="o_kanban_subtitle">${esc(c.function || '')} ${c.vat ? '· ' + esc(c.doc_type || 'NIT') + ': ' + esc(c.vat) : ''}</div>
-                  <div class="o_kanban_subtitle">📍 ${esc(c.city || 'Pereira')}, ${esc(c.country || 'Colombia')}</div>
-                  <div class="o_kanban_subtitle">✉️ ${esc(c.email || 'Sin correo')} · 📞 ${esc(c.phone || c.mobile || '—')}</div>
-                  <div style="display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.2rem;">
-                    ${(c.category_ids || []).map((t) => `<span class="o_tag">${esc(t)}</span>`).join('')}
-                  </div>
-                  <div class="o_kanban_footer">
-                    <span>🛒 ${c.sales_count || 0} Ventas (${formatMoney(c.sales_total || 0)})</span>
-                    <span>🧾 ${c.invoices_count || 0} Facturas</span>
-                  </div>
+                  <span class="o_kanban_col_sum">${colContacts.length} contacto(s)</span>
                 </div>
-              </article>
-            `
-            )
+                <div class="o_kanban_col_cards">
+                  ${
+                    colContacts.length === 0
+                      ? `<div class="o_kanban_col_empty">Sin contactos en ${esc(col.title.toLowerCase())}</div>`
+                      : colContacts
+                          .map(
+                            (c) => `
+                        <article class="o_kanban_record" data-contact-id="${c.id}" style="cursor: pointer;">
+                          <div class="o_kanban_avatar">${esc(initials(c.name))}</div>
+                          <div class="o_kanban_details">
+                            <div style="display: flex; justify-content: space-between; gap: 0.4rem;">
+                              <span class="o_kanban_title">${esc(c.name)}</span>
+                              <span class="o_badge ${c.is_company ? 'o_badge_info' : 'o_badge_muted'}">${c.is_company ? 'Compañía' : 'Individual'}</span>
+                            </div>
+                            <div class="o_kanban_subtitle">${esc(c.function || '')} ${c.vat ? '· ' + esc(c.doc_type || 'NIT') + ': ' + esc(c.vat) : ''}</div>
+                            <div class="o_kanban_subtitle">📍 ${esc(c.city || 'Pereira')}, ${esc(c.country || 'Colombia')}</div>
+                            <div class="o_kanban_subtitle">✉️ ${esc(c.email || 'Sin correo')} · 📞 ${esc(c.phone || c.mobile || '—')}</div>
+                            <div style="display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.2rem;">
+                              ${(c.category_ids || []).map((t) => `<span class="o_tag">${esc(t)}</span>`).join('')}
+                            </div>
+                            <div class="o_kanban_footer">
+                              <span>🛒 ${c.sales_count || 0} Ventas (${formatMoney(c.sales_total || 0)})</span>
+                              <span>🧾 ${c.invoices_count || 0} Facturas</span>
+                            </div>
+                          </div>
+                        </article>
+                      `
+                          )
+                          .join('')
+                  }
+                </div>
+              </div>
+            `;
+            })
             .join('')}
         </div>`;
 
@@ -1259,29 +1306,59 @@
         </div>
       `;
     } else if (state.viewType === 'kanban') {
+      const stageCols = [
+        { id: 'draft', title: 'Borrador', color: '#64748b', filter: (e) => e.state === 'draft' },
+        { id: 'reported', title: 'Presentado', color: '#0284c7', filter: (e) => e.state === 'reported' },
+        { id: 'approved', title: 'Aprobado', color: '#eab308', filter: (e) => e.state === 'approved' },
+        { id: 'done', title: 'Pagado', color: '#10b981', filter: (e) => e.state === 'done' }
+      ];
+
       container.innerHTML =
         statusHeader +
-        `<div class="o_kanban_view">
-          ${expenses
-            .map(
-              (e) => `
-              <article class="o_kanban_record" data-expense-id="${e.id}">
-                <div class="o_kanban_avatar">${esc(initials(e.employee_name))}</div>
-                <div class="o_kanban_details">
-                  <div style="display: flex; justify-content: space-between; gap: 0.4rem;">
-                    <span class="o_kanban_title">${esc(e.name)}</span>
-                    ${expenseBadge(e.state)}
+        `<div class="o_kanban_board">
+          ${stageCols
+            .map((col) => {
+              const colExpenses = expenses.filter(col.filter);
+              const colSum = colExpenses.reduce((acc, e) => acc + Number(e.total_amount || 0), 0);
+              return `
+              <div class="o_kanban_column" style="--col-accent: ${col.color};">
+                <div class="o_kanban_col_header">
+                  <div class="o_kanban_col_title_wrap">
+                    <span class="o_kanban_col_title">${esc(col.title)}</span>
+                    <span class="o_badge o_badge_muted">${colExpenses.length}</span>
                   </div>
-                  <div class="o_kanban_subtitle">${esc(e.reference)} · ${esc(e.employee_name)} (${esc(e.department)})</div>
-                  <div class="o_kanban_subtitle">📅 ${esc(e.date)} · ${esc(e.product_name)}</div>
-                  <div class="o_kanban_footer">
-                    <span>${e.payment_mode === 'company_account' ? '💳 Pagado por Compañía' : '👤 Empleado (a reembolsar)'}</span>
-                    <strong>${formatMoney(e.total_amount)}</strong>
-                  </div>
+                  <span class="o_kanban_col_sum">${formatMoney(colSum)}</span>
                 </div>
-              </article>
-            `
-            )
+                <div class="o_kanban_col_cards">
+                  ${
+                    colExpenses.length === 0
+                      ? `<div class="o_kanban_col_empty">Sin gastos en ${esc(col.title.toLowerCase())}</div>`
+                      : colExpenses
+                          .map(
+                            (e) => `
+                        <article class="o_kanban_record" data-expense-id="${e.id}" style="cursor: pointer;">
+                          <div class="o_kanban_avatar">${esc(initials(e.employee_name))}</div>
+                          <div class="o_kanban_details">
+                            <div style="display: flex; justify-content: space-between; gap: 0.4rem;">
+                              <span class="o_kanban_title">${esc(e.name)}</span>
+                              ${expenseBadge(e.state)}
+                            </div>
+                            <div class="o_kanban_subtitle">${esc(e.reference)} · ${esc(e.employee_name)} (${esc(e.department)})</div>
+                            <div class="o_kanban_subtitle">📅 ${esc(e.date)} · ${esc(e.product_name)}</div>
+                            <div class="o_kanban_footer">
+                              <span>${e.payment_mode === 'company_account' ? '💳 Compañía' : '👤 A reembolsar'}</span>
+                              <strong>${formatMoney(e.total_amount)}</strong>
+                            </div>
+                          </div>
+                        </article>
+                      `
+                          )
+                          .join('')
+                  }
+                </div>
+              </div>
+            `;
+            })
             .join('')}
         </div>`;
 
@@ -3058,6 +3135,8 @@
       renderAccountMoveForm(container);
       return;
     }
+    // Facturas y documentos contables siempre se visualizan en lista por defecto
+    state.viewType = 'list';
 
     if (state.submenu === 'dashboard') {
       updatePager(acc.journals.length, acc.journals.length);
