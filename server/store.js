@@ -278,10 +278,10 @@ class ERPStore {
     }
   }
 
-  async ensureSynced(maxAgeMs = 15000) {
+  async ensureSynced(maxAgeMs = 0) {
     if (!this.supabase || !this.supabase.isReady()) return;
     const now = Date.now();
-    const needsSync = !this._hasSyncedOnce || !this._lastSyncTime || (now - this._lastSyncTime >= maxAgeMs);
+    const needsSync = !this._hasSyncedOnce || !this._lastSyncTime || maxAgeMs <= 0 || (now - this._lastSyncTime >= maxAgeMs);
     if (!needsSync) return;
 
     if (this._syncPromise) {
@@ -736,6 +736,28 @@ class ERPStore {
     return prod;
   }
 
+  async deleteProduct(id) {
+    const idx = this.data.products.findIndex((p) => Number(p.id) === Number(id));
+    if (idx === -1) throw new Error('Producto no encontrado.');
+    const hasSalesLines = this.data.sales.some((s) => (s.lines || []).some((l) => Number(l.product_id) === Number(id)));
+    const hasExpenses = this.data.expenses.some((e) => Number(e.product_id) === Number(id));
+    if (hasSalesLines || hasExpenses) {
+      throw new Error('No se puede eliminar el producto porque tiene ventas o gastos asociados.');
+    }
+    const removed = this.data.products.splice(idx, 1)[0];
+    this.save();
+    if (this.supabase) {
+      try {
+        await this.supabase.deleteProduct(id);
+      } catch (err) {
+        this.data.products.splice(idx, 0, removed);
+        this.save();
+        throw err;
+      }
+    }
+    return removed;
+  }
+
   // ==================== GASTOS (hr.expense) ====================
   async saveExpense(payload) {
     if (!payload || typeof payload !== 'object') throw new Error('Datos de gasto inválidos.');
@@ -1169,6 +1191,8 @@ class ERPStore {
   async transitionSaleOrder(id, action, params = {}) {
     const order = this.data.sales.find((s) => Number(s.id) === Number(id));
     if (!order) throw new Error('Pedido de venta no encontrado.');
+    const oldOrderSnapshot = JSON.parse(JSON.stringify(order));
+    const oldMovesSnapshot = this.data.accounting ? [...this.data.accounting.moves] : [];
     let invoice = null;
 
     if (action === 'send') {
@@ -1394,9 +1418,18 @@ class ERPStore {
 
     this.save();
     if (this.supabase) {
-      await this.supabase.saveSaleOrder(order);
-      if (action === 'create_invoice' && invoice) {
-        await this.supabase.saveAccountMove(invoice);
+      try {
+        await this.supabase.saveSaleOrder(order);
+        if (action === 'create_invoice' && invoice) {
+          await this.supabase.saveAccountMove(invoice);
+        }
+      } catch (err) {
+        Object.assign(order, oldOrderSnapshot);
+        if (this.data.accounting) {
+          this.data.accounting.moves = oldMovesSnapshot;
+        }
+        this.save();
+        throw err;
       }
     }
     return { order, ...(invoice ? { invoice } : {}) };

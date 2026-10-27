@@ -1875,9 +1875,10 @@ button, input, select, textarea {
     margin-bottom: 1rem;
   }
 
-  .o_stat_button {
-    min-height: 44px;
-    padding: 0.45rem 0.75rem;
+  .o_stat_button,
+  .oe_stat_button {
+    min-height: 48px;
+    padding: 0.55rem 0.95rem;
     justify-content: flex-start;
   }
 

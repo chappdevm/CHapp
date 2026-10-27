@@ -76,7 +76,7 @@ function createHandler(store = new ERPStore(undefined, { useSupabase: isSupabase
     if (pathname.startsWith('/api/')) {
       try {
         if (store.ensureSynced) {
-          await store.ensureSynced();
+          await store.ensureSynced(0);
         }
 
         if (method === 'GET' && pathname === '/api/bootstrap') {
@@ -109,6 +109,12 @@ function createHandler(store = new ERPStore(undefined, { useSupabase: isSupabase
           const body = await readJsonBody(req);
           const product = await store.saveProduct(body);
           return sendJson(res, 200, { ok: true, product, state: store.getBootstrapState() });
+        }
+
+        const productDelMatch = pathname.match(/^\/api\/products\/(\d+)$/);
+        if (method === 'DELETE' && productDelMatch) {
+          const removed = await store.deleteProduct(Number(productDelMatch[1]));
+          return sendJson(res, 200, { ok: true, removed, state: store.getBootstrapState() });
         }
 
         // Expenses

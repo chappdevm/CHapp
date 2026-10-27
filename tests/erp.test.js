@@ -760,6 +760,83 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.ok(salesPng.length > 5000, 'sales.png must be high resolution');
     assert.ok(salesSvg.includes('salesDropShadow') && salesSvg.includes('linearGradient') && salesSvg.includes('#E879F9'), 'sales.svg must feature luminous gradient and drop shadow for dark contrast');
   });
+
+  it('enforces referential integrity on product deletion and handles multi-part installment abonos with precision', async () => {
+    // 1. Create a standalone product and try to delete
+    const prodRes = await req('/api/products', 'POST', {
+      name: 'Perfil Aluminio Anonimizado 1x1',
+      list_price: 35000,
+      standard_price: 18000,
+      uom: 'Metro Lineal'
+    });
+    assert.equal(prodRes.status, 200);
+    const prodId = prodRes.json.product.id;
+
+    // 2. Link this product to a sale order
+    const partnerRes = await req('/api/contacts', 'POST', { name: 'Cliente Trazabilidad Cuotas SAS' });
+    const partnerId = partnerRes.json.contact.id;
+
+    const saleRes = await req('/api/sales', 'POST', {
+      partner_id: partnerId,
+      lines: [
+        { product_id: prodId, description: 'Perfil 1x1', quantity: 10, price_unit: 100000, discount: 0, tax_rate: 19 }
+      ]
+    });
+    const orderId = saleRes.json.order.id;
+    const orderTotal = saleRes.json.order.amount_total; // 1,190,000
+
+    // 3. Attempting to delete product linked to order must be rejected
+    const delFailRes = await req(`/api/products/${prodId}`, 'DELETE');
+    assert.equal(delFailRes.status, 400);
+    assert.match(delFailRes.json.error, /asociados/);
+
+    // 4. Confirm order
+    await req(`/api/sales/${orderId}/action`, 'POST', { action: 'confirm' });
+
+    // 5. Test 3 fractional installment payments
+    // Part 1: $400,000 abono
+    const abono1 = await req(`/api/sales/${orderId}/action`, 'POST', {
+      action: 'create_invoice',
+      amount: 400000
+    });
+    assert.equal(abono1.status, 200);
+    assert.equal(abono1.json.invoice.amount_total, 400000);
+    assert.equal(abono1.json.invoice.order_residual, 790000);
+    assert.equal(abono1.json.order.invoice_status, 'to invoice');
+
+    // Part 2: $390,000 abono
+    const abono2 = await req(`/api/sales/${orderId}/action`, 'POST', {
+      action: 'create_invoice',
+      amount: 390000
+    });
+    assert.equal(abono2.status, 200);
+    assert.equal(abono2.json.invoice.amount_total, 390000);
+    assert.equal(abono2.json.invoice.order_residual, 400000);
+    assert.equal(abono2.json.order.invoice_status, 'to invoice');
+
+    // Part 3: final $400,000 abono to complete order
+    const abono3 = await req(`/api/sales/${orderId}/action`, 'POST', {
+      action: 'create_invoice',
+      amount: 400000
+    });
+    assert.equal(abono3.status, 200);
+    assert.equal(abono3.json.invoice.amount_total, 400000);
+    assert.equal(abono3.json.invoice.order_residual, 0);
+    assert.equal(abono3.json.order.invoice_status, 'invoiced');
+    assert.equal(abono3.json.order.invoice_ids.length, 3);
+
+    // 6. Create unlinked product and delete successfully
+    const tempProdRes = await req('/api/products', 'POST', {
+      name: 'Perfil Temporal Para Eliminar',
+      list_price: 20000,
+      uom: 'Metro Lineal'
+    });
+    const tempId = tempProdRes.json.product.id;
+    const delOkRes = await req(`/api/products/${tempId}`, 'DELETE');
+    assert.equal(delOkRes.status, 200);
+    assert.ok(delOkRes.json.ok);
+    assert.equal(delOkRes.json.removed.id, tempId);
+  });
 });
 
 

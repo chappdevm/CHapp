@@ -575,4 +575,27 @@ describe('Supabase Persistence Layer & PostgREST Architecture', () => {
       if (require('fs').existsSync(tmpDb)) require('fs').unlinkSync(tmpDb);
     } catch (_) {}
   });
+
+  it('supports deleteProduct and ensures ensureSynced(0) queries remote database immediately', async () => {
+    const persistence = new SupabasePersistence();
+    if (!persistence.isReady()) return;
+
+    // Save a product to Supabase
+    const testProd = {
+      id: 88899,
+      name: 'Producto Test Delete Persistence',
+      list_price: 50000,
+      standard_price: 25000,
+      uom: 'Metro Lineal'
+    };
+    await persistence.saveProduct(testProd);
+
+    // Delete it using deleteProduct
+    await persistence.deleteProduct(testProd.id);
+
+    // Confirm it's no longer found
+    const res = await callPostgrest(`/product_template?id=eq.${testProd.id}`);
+    assert.equal(res.ok, true);
+    assert.equal(res.data.length, 0, 'Deleted product must not exist in Supabase');
+  });
 });

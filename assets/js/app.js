@@ -2313,17 +2313,22 @@
           <div class="o_form_sheet">
             ${
               !isNew && existing.invoice_ids && existing.invoice_ids.length > 0
-                ? `
+                ? (() => {
+                    const moves = (state.data.accounting && state.data.accounting.moves) || [];
+                    const orderMoves = moves.filter((m) => (existing.invoice_ids || []).includes(m.id) && m.state !== 'cancel');
+                    const totalInvSum = orderMoves.reduce((s, m) => s + Number(m.amount_total || 0), 0);
+                    return `
               <div class="o_button_box">
-                <button type="button" class="o_stat_button oe_stat_button" id="btnOpenSaleInvoice">
+                <button type="button" class="o_stat_button oe_stat_button" id="btnOpenSaleInvoice" title="Ver facturas generadas">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
                   <div class="o_stat_info">
                     <span class="o_stat_value">${existing.invoice_ids.length} Factura(s)</span>
-                    <span class="o_stat_text">Ver en Contabilidad</span>
+                    <span class="o_stat_text">Total: ${formatMoney(totalInvSum)}</span>
                   </div>
                 </button>
               </div>
-            `
+            `;
+                  })()
                 : ''
             }
 
@@ -2638,8 +2643,18 @@
     const openInvBtn = document.getElementById('btnOpenSaleInvoice');
     if (openInvBtn) {
       openInvBtn.addEventListener('click', () => {
-        const invId = existing.invoice_ids[existing.invoice_ids.length - 1];
-        openApp('accounting', { submenu: 'out_invoice', viewType: 'form', recordId: invId });
+        if (existing.invoice_ids.length === 1) {
+          const invId = existing.invoice_ids[0];
+          openApp('accounting', { submenu: 'out_invoice', viewType: 'form', recordId: invId });
+        } else {
+          const panel = container.querySelector('.o_linked_invoices_panel');
+          if (panel) {
+            panel.scrollIntoView({ behavior: 'smooth' });
+          } else {
+            const invId = existing.invoice_ids[existing.invoice_ids.length - 1];
+            openApp('accounting', { submenu: 'out_invoice', viewType: 'form', recordId: invId });
+          }
+        }
       });
     }
 

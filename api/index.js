@@ -26,7 +26,7 @@ const handler = createHandler(store);
 module.exports = async (req, res) => {
   if (store.ensureSynced) {
     try {
-      await store.ensureSynced(15000);
+      await store.ensureSynced(0);
     } catch (_) {}
   }
   return handler(req, res);

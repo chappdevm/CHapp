@@ -796,6 +796,17 @@ class SupabasePersistence {
     return res.data;
   }
 
+  async deleteProduct(id) {
+    if (!this.isReady()) return;
+    const res = await callPostgrest(`/product_template?id=eq.${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const errMsg = formatSupabaseError(`Error eliminando producto ${id}`, res);
+      console.error(errMsg);
+      throw new Error(errMsg);
+    }
+    return res.data;
+  }
+
   async saveExpense(expense) {
     if (!this.isReady()) return;
     const payload = serializeExpense(expense);
