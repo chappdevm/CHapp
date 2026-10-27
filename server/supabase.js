@@ -233,15 +233,19 @@ async function callPostgrest(endpoint, options = {}) {
 // ==================== MAPPERS ====================
 
 function serializePartner(p) {
+  let vatVal = p.vat ? String(p.vat).trim() : null;
+  if (vatVal && p.doc_type && !/^(NIT|CC|CE|TI|PP|RC|PEP|PPT|DIE)\b/i.test(vatVal)) {
+    vatVal = `${String(p.doc_type).trim().toUpperCase()} ${vatVal}`;
+  }
   return {
     id: Number(p.id),
     name: String(p.name || '').trim(),
     is_company: p.is_company !== undefined ? Boolean(p.is_company) : true,
-    vat: p.vat ? String(p.vat).trim() : null,
+    vat: vatVal,
     function: p.function ? String(p.function).trim() : null,
     street: p.street ? String(p.street).trim() : null,
-    city: p.city ? String(p.city).trim() : 'Bogotá D.C.',
-    state_name: p.state_name ? String(p.state_name).trim() : 'Cundinamarca',
+    city: p.city ? String(p.city).trim() : 'Pereira',
+    state_name: p.state_name ? String(p.state_name).trim() : 'Risaralda',
     country: p.country ? String(p.country).trim() : 'Colombia',
     email: p.email ? String(p.email).trim() : null,
     phone: p.phone ? String(p.phone).trim() : null,
@@ -258,16 +262,25 @@ function serializePartner(p) {
 
 function deserializePartner(r) {
   const id = Number(r.id);
+  const isCompany = Boolean(r.is_company);
+  let rawVat = String(r.vat || '').trim();
+  let docType = r.doc_type || (isCompany ? 'NIT' : 'CC');
+  const vatMatch = rawVat.match(/^(NIT|CC|CE|TI|PP|RC|PEP|PPT|DIE)\s+(.+)$/i);
+  if (vatMatch) {
+    docType = vatMatch[1].toUpperCase();
+    rawVat = vatMatch[2].trim();
+  }
   return {
     id,
     name: r.name,
-    is_company: Boolean(r.is_company),
-    company_name: r.is_company ? r.name : '',
-    vat: r.vat || '',
-    function: r.function || (r.is_company ? 'Empresa' : 'Contacto'),
+    is_company: isCompany,
+    company_name: isCompany ? r.name : '',
+    doc_type: docType,
+    vat: rawVat,
+    function: r.function || (isCompany ? 'Empresa' : 'Contacto'),
     street: r.street || '',
-    city: r.city || 'Bogotá D.C.',
-    state_name: r.state_name || 'Cundinamarca',
+    city: r.city || 'Pereira',
+    state_name: r.state_name || 'Risaralda',
     country: r.country || 'Colombia',
     email: r.email || '',
     phone: r.phone || '',

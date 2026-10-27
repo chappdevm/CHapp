@@ -521,11 +521,13 @@ class ERPStore {
       const idx = this.data.contacts.findIndex((c) => Number(c.id) === Number(payload.id));
       if (idx === -1) throw new Error('Contacto no encontrado.');
       const existing = this.data.contacts[idx];
+      const isCompanyVal = payload.is_company !== undefined ? Boolean(payload.is_company) : existing.is_company;
       const updated = {
         ...existing,
         name,
-        is_company: payload.is_company !== undefined ? Boolean(payload.is_company) : existing.is_company,
+        is_company: isCompanyVal,
         company_name: payload.company_name !== undefined ? String(payload.company_name).trim() : existing.company_name,
+        doc_type: payload.doc_type !== undefined ? String(payload.doc_type).trim() : (existing.doc_type || (isCompanyVal ? 'NIT' : 'CC')),
         vat: payload.vat !== undefined ? String(payload.vat).trim() : existing.vat,
         function: payload.function !== undefined ? String(payload.function).trim() : existing.function,
         street: payload.street !== undefined ? String(payload.street).trim() : existing.street,
@@ -561,16 +563,18 @@ class ERPStore {
     }
 
     const id = this.nextSeq('contact');
+    const isCompanyNew = payload.is_company !== undefined ? Boolean(payload.is_company) : true;
     const newContact = {
       id,
       name,
-      is_company: payload.is_company !== undefined ? Boolean(payload.is_company) : true,
+      is_company: isCompanyNew,
       company_name: String(payload.company_name || '').trim(),
+      doc_type: String(payload.doc_type || (isCompanyNew ? 'NIT' : 'CC')).trim(),
       vat: String(payload.vat || '').trim(),
-      function: String(payload.function || (payload.is_company ? 'Empresa' : 'Contacto')).trim(),
+      function: String(payload.function || (isCompanyNew ? 'Empresa' : 'Contacto')).trim(),
       street: String(payload.street || '').trim(),
-      city: String(payload.city || 'Bogotá D.C.').trim(),
-      state_name: String(payload.state_name || 'Cundinamarca').trim(),
+      city: String(payload.city || 'Pereira').trim(),
+      state_name: String(payload.state_name || 'Risaralda').trim(),
       country: String(payload.country || 'Colombia').trim(),
       email: String(payload.email || '').trim(),
       phone: String(payload.phone || '').trim(),

@@ -650,8 +650,8 @@
                     <span class="o_kanban_title">${esc(c.name)}</span>
                     <span class="o_badge ${c.is_company ? 'o_badge_info' : 'o_badge_muted'}">${c.is_company ? 'Compañía' : 'Individual'}</span>
                   </div>
-                  <div class="o_kanban_subtitle">${esc(c.function || '')} ${c.vat ? '· NIT/CC: ' + esc(c.vat) : ''}</div>
-                  <div class="o_kanban_subtitle">📍 ${esc(c.city || 'Bogotá')}, ${esc(c.country || 'Colombia')}</div>
+                  <div class="o_kanban_subtitle">${esc(c.function || '')} ${c.vat ? '· ' + esc(c.doc_type || 'NIT') + ': ' + esc(c.vat) : ''}</div>
+                  <div class="o_kanban_subtitle">📍 ${esc(c.city || 'Pereira')}, ${esc(c.country || 'Colombia')}</div>
                   <div class="o_kanban_subtitle">✉️ ${esc(c.email || 'Sin correo')} · 📞 ${esc(c.phone || c.mobile || '—')}</div>
                   <div style="display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.2rem;">
                     ${(c.category_ids || []).map((t) => `<span class="o_tag">${esc(t)}</span>`).join('')}
@@ -699,7 +699,7 @@
                   (c) => `
                   <tr data-contact-id="${c.id}">
                     <th>${esc(c.name)}</th>
-                    <td>${esc(c.vat || '—')}</td>
+                    <td>${c.vat ? esc((c.doc_type ? c.doc_type + ' ' : '') + c.vat) : '—'}</td>
                     <td><span class="o_badge ${c.is_company ? 'o_badge_info' : 'o_badge_muted'}">${c.is_company ? 'Compañía' : 'Individual'}</span></td>
                     <td>${esc(c.email || '—')}</td>
                     <td>${esc(c.phone || c.mobile || '—')}</td>
@@ -732,26 +732,119 @@
     });
   }
 
+  const COLOMBIA_DOC_TYPES = [
+    { code: 'NIT', label: 'NIT - Número de Identificación Tributaria' },
+    { code: 'CC', label: 'CC - Cédula de Ciudadanía' },
+    { code: 'CE', label: 'CE - Cédula de Extranjería' },
+    { code: 'TI', label: 'TI - Tarjeta de Identidad' },
+    { code: 'PP', label: 'PP - Pasaporte' },
+    { code: 'RC', label: 'RC - Registro Civil' },
+    { code: 'PEP', label: 'PEP - Permiso Especial de Permanencia' },
+    { code: 'PPT', label: 'PPT - Permiso por Protección Temporal' },
+    { code: 'DIE', label: 'DIE - Documento de Identificación Extranjero' }
+  ];
+
+  const COLOMBIA_CITIES = [
+    'Apartadó',
+    'Arauca',
+    'Armenia',
+    'Barrancabermeja',
+    'Barranquilla',
+    'Bello',
+    'Bogotá D.C.',
+    'Bucaramanga',
+    'Buenaventura',
+    'Buga',
+    'Cali',
+    'Cartagena',
+    'Cartago',
+    'Caucasia',
+    'Chía',
+    'Ciénaga',
+    'Cúcuta',
+    'Dosquebradas',
+    'Duitama',
+    'Envigado',
+    'Espinal',
+    'Facatativá',
+    'Florencia',
+    'Floridablanca',
+    'Fusagasugá',
+    'Girardot',
+    'Girón',
+    'Ibagué',
+    'Inírida',
+    'Ipiales',
+    'Itagüí',
+    'Jamundí',
+    'La Dorada',
+    'Leticia',
+    'Magangué',
+    'Maicao',
+    'Malambo',
+    'Manizales',
+    'Medellín',
+    'Mitú',
+    'Mocoa',
+    'Montería',
+    'Mosquera',
+    'Neiva',
+    'Ocaña',
+    'Palmira',
+    'Pamplona',
+    'Pasto',
+    'Pereira',
+    'Piedecuesta',
+    'Pitalito',
+    'Popayán',
+    'Puerto Carreño',
+    'Quibdó',
+    'Riohacha',
+    'Rionegro',
+    'Sabanalarga',
+    'Sabaneta',
+    'San Andrés',
+    'San Gil',
+    'Santa Marta',
+    'Santa Rosa de Cabal',
+    'Sincelejo',
+    'Soacha',
+    'Sogamoso',
+    'Soledad',
+    'Tuluá',
+    'Tumaco',
+    'Tunja',
+    'Turbo',
+    'Uribia',
+    'Valledupar',
+    'Villavicencio',
+    'Yopal',
+    'Yumbo',
+    'Zipaquirá'
+  ];
+
   function renderContactForm(container) {
     const isNew = state.activeRecordId === 'new';
+    const defaultIsSupplier = state.submenu === 'suppliers';
     const existing = isNew
       ? {
           name: '',
           is_company: true,
           company_name: '',
+          doc_type: 'NIT',
           vat: '',
-          function: 'Cliente Corporativo',
+          function: defaultIsSupplier ? 'Proveedor Corporativo' : 'Cliente Corporativo',
           street: '',
-          city: 'Bogotá D.C.',
-          state_name: 'Cundinamarca',
+          city: 'Pereira',
+          state_name: 'Risaralda',
           country: 'Colombia',
           email: '',
           phone: '',
           mobile: '',
           website: '',
-          customer_rank: 1,
-          supplier_rank: 0,
-          category_ids: ['Cliente'],
+          customer_rank: defaultIsSupplier ? 0 : 1,
+          supplier_rank: defaultIsSupplier ? 1 : 0,
+          category_ids: [defaultIsSupplier ? 'Proveedor' : 'Cliente'],
           payment_term: '',
           notes: '',
           sales_count: 0,
@@ -768,6 +861,13 @@
       return renderModuleWorkspace();
     }
 
+    const currentDocType = existing.doc_type || (existing.is_company ? 'NIT' : 'CC');
+    const currentCity = existing.city || 'Pereira';
+    const cityOptions = COLOMBIA_CITIES.includes(currentCity)
+      ? COLOMBIA_CITIES
+      : [currentCity, ...COLOMBIA_CITIES];
+    const isSupplierSelected = Number(existing.supplier_rank || 0) > 0 && Number(existing.customer_rank || 0) === 0;
+
     container.innerHTML = `
       <div class="o_form_view">
         <div class="o_form_sheet_bg">
@@ -782,7 +882,7 @@
               }
             </div>
             <div class="o_statusbar_status">
-              <span class="o_arrow_button is-current">${existing.is_company ? 'Compañía' : 'Persona Individual'}</span>
+              <span class="o_arrow_button is-current" id="contactTypeStatusPill">${existing.is_company ? 'Compañía' : 'Persona Individual'}</span>
             </div>
           </div>
 
@@ -817,7 +917,7 @@
                 : ''
             }
 
-            <div style="display: flex; gap: 1.25rem; margin-bottom: 0.75rem;">
+            <div style="display: flex; gap: 1.25rem; margin-bottom: 0.5rem;">
               <label style="display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer;">
                 <input type="radio" name="is_company" value="true" ${existing.is_company ? 'checked' : ''} />
                 <span>Compañía</span>
@@ -828,6 +928,17 @@
               </label>
             </div>
 
+            <div style="display: flex; gap: 1.25rem; margin-bottom: 0.75rem;">
+              <label style="display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer;">
+                <input type="radio" name="contact_role" value="customer" ${!isSupplierSelected ? 'checked' : ''} />
+                <span>Cliente</span>
+              </label>
+              <label style="display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer;">
+                <input type="radio" name="contact_role" value="supplier" ${isSupplierSelected ? 'checked' : ''} />
+                <span>Proveedor</span>
+              </label>
+            </div>
+
             <div class="o_form_title_group">
               <label for="fContactName">Nombre o Razón Social *</label>
               <input type="text" id="fContactName" class="o_input_title" value="${esc(existing.name)}" placeholder="Ej. Grupo Empresarial Andino S.A.S." required />
@@ -835,7 +946,15 @@
 
             <div class="o_group">
               <div class="o_field_row">
-                <label for="fContactVat">NIT / Documento de Identidad</label>
+                <label for="fContactDocType">Tipo de Documento</label>
+                <select id="fContactDocType" class="o_select">
+                  ${COLOMBIA_DOC_TYPES.map(
+                    (dt) => `<option value="${esc(dt.code)}" ${currentDocType === dt.code ? 'selected' : ''}>${esc(dt.label)}</option>`
+                  ).join('')}
+                </select>
+              </div>
+              <div class="o_field_row">
+                <label for="fContactVat">Número de Documento</label>
                 <input type="text" id="fContactVat" class="o_input" value="${esc(existing.vat)}" placeholder="Ej. 900.312.450-1" />
               </div>
               <div class="o_field_row">
@@ -855,16 +974,16 @@
                 <input type="text" id="fContactMobile" class="o_input" value="${esc(existing.mobile)}" />
               </div>
               <div class="o_field_row">
-                <label for="fContactWebsite">Sitio Web</label>
-                <input type="text" id="fContactWebsite" class="o_input" value="${esc(existing.website)}" placeholder="https://..." />
-              </div>
-              <div class="o_field_row">
                 <label for="fContactStreet">Dirección Fiscal</label>
                 <input type="text" id="fContactStreet" class="o_input" value="${esc(existing.street)}" />
               </div>
               <div class="o_field_row">
                 <label for="fContactCity">Ciudad</label>
-                <input type="text" id="fContactCity" class="o_input" value="${esc(existing.city)}" />
+                <select id="fContactCity" class="o_select">
+                  ${cityOptions
+                    .map((city) => `<option value="${esc(city)}" ${currentCity === city ? 'selected' : ''}>${esc(city)}</option>`)
+                    .join('')}
+                </select>
               </div>
               <div class="o_field_row">
                 <label for="fContactPaymentTerm">Plazo de Pago Predeterminado</label>
@@ -878,14 +997,6 @@
               <div class="o_field_row">
                 <label for="fContactTags">Etiquetas (separadas por coma)</label>
                 <input type="text" id="fContactTags" class="o_input" value="${esc((existing.category_ids || []).join(', '))}" placeholder="VIP, Cliente, Proveedor" />
-              </div>
-              <div class="o_field_row">
-                <label for="fCustomerRank">Clasificación Cliente (0 = No, 1-3 = Sí)</label>
-                <input type="number" id="fCustomerRank" class="o_input" min="0" max="10" value="${Number(existing.customer_rank || 0)}" />
-              </div>
-              <div class="o_field_row">
-                <label for="fSupplierRank">Clasificación Proveedor (0 = No, 1-3 = Sí)</label>
-                <input type="number" id="fSupplierRank" class="o_input" min="0" max="10" value="${Number(existing.supplier_rank || 0)}" />
               </div>
             </div>
 
@@ -902,25 +1013,57 @@
 
     wireChatterEvents('contacts', existing.id);
 
+    // Sync statusbar pill and default document type when toggling Compañía / Individual
+    container.querySelectorAll('input[name="is_company"]').forEach((radio) => {
+      radio.addEventListener('change', () => {
+        const isComp = document.querySelector('input[name="is_company"]:checked').value === 'true';
+        const pill = document.getElementById('contactTypeStatusPill');
+        if (pill) pill.textContent = isComp ? 'Compañía' : 'Persona Individual';
+        if (isNew) {
+          const docSelect = document.getElementById('fContactDocType');
+          if (docSelect && (docSelect.value === 'NIT' || docSelect.value === 'CC')) {
+            docSelect.value = isComp ? 'NIT' : 'CC';
+          }
+        }
+      });
+    });
+
+    // Sync default tags and function when toggling Cliente / Proveedor on a new contact
+    container.querySelectorAll('input[name="contact_role"]').forEach((radio) => {
+      radio.addEventListener('change', () => {
+        if (!isNew) return;
+        const role = document.querySelector('input[name="contact_role"]:checked').value;
+        const tagsInput = document.getElementById('fContactTags');
+        if (tagsInput && (tagsInput.value.trim() === 'Cliente' || tagsInput.value.trim() === 'Proveedor')) {
+          tagsInput.value = role === 'supplier' ? 'Proveedor' : 'Cliente';
+        }
+        const fnInput = document.getElementById('fContactFunction');
+        if (fnInput && (fnInput.value.trim() === 'Cliente Corporativo' || fnInput.value.trim() === 'Proveedor Corporativo')) {
+          fnInput.value = role === 'supplier' ? 'Proveedor Corporativo' : 'Cliente Corporativo';
+        }
+      });
+    });
+
     document.getElementById('btnSaveContact').addEventListener('click', async () => {
       try {
         const isComp = document.querySelector('input[name="is_company"]:checked').value === 'true';
+        const role = document.querySelector('input[name="contact_role"]:checked').value;
         const payload = {
           id: isNew ? undefined : existing.id,
           name: document.getElementById('fContactName').value,
           is_company: isComp,
+          doc_type: document.getElementById('fContactDocType').value,
           vat: document.getElementById('fContactVat').value,
           function: document.getElementById('fContactFunction').value,
           email: document.getElementById('fContactEmail').value,
           phone: document.getElementById('fContactPhone').value,
           mobile: document.getElementById('fContactMobile').value,
-          website: document.getElementById('fContactWebsite').value,
           street: document.getElementById('fContactStreet').value,
           city: document.getElementById('fContactCity').value,
           payment_term: document.getElementById('fContactPaymentTerm').value,
           category_ids: document.getElementById('fContactTags').value,
-          customer_rank: Number(document.getElementById('fCustomerRank').value || 0),
-          supplier_rank: Number(document.getElementById('fSupplierRank').value || 0),
+          customer_rank: role === 'customer' ? 1 : 0,
+          supplier_rank: role === 'supplier' ? 1 : 0,
           notes: document.getElementById('fContactNotes').value
         };
         const res = await apiCall('/api/contacts', 'POST', payload);

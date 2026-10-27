@@ -78,6 +78,7 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     const created = await req('/api/contacts', 'POST', {
       name: 'Inversiones El Dorado S.A.S.',
       is_company: true,
+      doc_type: 'NIT',
       vat: '901.555.888-0',
       city: 'Barranquilla',
       email: 'info@eldorado.co',
@@ -85,7 +86,16 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     });
     assert.equal(created.status, 200);
     assert.equal(created.json.contact.name, 'Inversiones El Dorado S.A.S.');
+    assert.equal(created.json.contact.doc_type, 'NIT');
     assert.deepEqual(created.json.contact.category_ids, ['VIP', 'Costa']);
+
+    // Default city on new contact without city specified is Pereira
+    const defaultCityContact = await req('/api/contacts', 'POST', {
+      name: 'Comercializadora Risaralda S.A.S.'
+    });
+    assert.equal(defaultCityContact.status, 200);
+    assert.equal(defaultCityContact.json.contact.city, 'Pereira');
+    await req(`/api/contacts/${defaultCityContact.json.contact.id}`, 'DELETE');
 
     // Update contact
     const updated = await req('/api/contacts', 'POST', {
@@ -440,12 +450,12 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.equal(userRes.json.settings.active_user.name, 'Laura Gómez');
 
     // Verify CSS responsive table supports columns 8 and 9
-    const cssText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'css', 'odoo20.css'), 'utf8');
+    const cssText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'css', 'odoo20.css'), 'utf8').replace(/\r\n/g, '\n');
     assert.ok(cssText.includes('td:nth-child(8)::before { content: var(--label-8'), 'CSS should support --label-8');
     assert.ok(cssText.includes('td:nth-child(9)::before { content: var(--label-9'), 'CSS should support --label-9');
 
     // Verify app.js contains header draft sync, dynamic bank balance, Alt+H, and 9-column labels
-    const jsText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
+    const jsText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8').replace(/\r\n/g, '\n');
     assert.ok(!jsText.includes('formatMoney(48500000)'), 'Should not contain hardcoded 48500000 bank balance');
     assert.ok(jsText.includes('const syncSaleDraft = () =>'), 'Should include syncSaleDraft');
     assert.ok(jsText.includes("--label-9: 'Estado'"), 'Should include --label-9: Estado');
@@ -453,9 +463,9 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
   });
 
   it('validates comprehensive responsiveness, tap target sizes (>= 44px), and multi-screen layouts (<600px, 600-1024px, >1200px)', () => {
-    const cssText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'css', 'odoo20.css'), 'utf8');
-    const htmlText = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-    const jsText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
+    const cssText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'css', 'odoo20.css'), 'utf8').replace(/\r\n/g, '\n');
+    const htmlText = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8').replace(/\r\n/g, '\n');
+    const jsText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8').replace(/\r\n/g, '\n');
 
     // 1. Viewport meta & Dynamic viewport units (100dvh)
     assert.ok(htmlText.includes('<meta name="viewport" content="width=device-width, initial-scale=1.0"'), 'HTML must have responsive viewport meta');
@@ -561,8 +571,8 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.equal(updateRes.json.state.products.length, initialCount, 'Updating product in-place must not duplicate record');
 
     // 3. Verify frontend code contracts for Products list view vs detailed form card view
-    const jsText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
-    const htmlText = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    const jsText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8').replace(/\r\n/g, '\n');
+    const htmlText = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8').replace(/\r\n/g, '\n');
 
     assert.ok(jsText.includes('function renderProductsSubmodule(container)'), 'Must define renderProductsSubmodule');
     assert.ok(jsText.includes('function renderProductForm(container)'), 'Must define renderProductForm');
@@ -583,8 +593,17 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.ok(!jsText.includes('id="prodCanBeSold"'), 'Must remove prodCanBeSold checkbox from form');
     assert.ok(!jsText.includes('id="prodCanBeExpensed"'), 'Must remove prodCanBeExpensed checkbox from form');
 
+    // Contact form regression checks: Colombian doc types, Colombian cities (default Pereira), Cliente/Proveedor radio, removed Website & numeric rank inputs
+    assert.ok(jsText.includes('id="fContactDocType"'), 'Contact form must have Colombian document type select');
+    assert.ok(jsText.includes("city: 'Pereira'"), 'New contact form must default city to Pereira');
+    assert.ok(jsText.includes('<select id="fContactCity"'), 'Contact city field must be a dropdown select');
+    assert.ok(jsText.includes('name="contact_role"'), 'Contact form must have Cliente / Proveedor role check');
+    assert.ok(!jsText.includes('id="fContactWebsite"'), 'Contact form must not include Sitio Web field');
+    assert.ok(!jsText.includes('id="fCustomerRank"'), 'Contact form must not include numeric Clasificación Cliente field');
+    assert.ok(!jsText.includes('id="fSupplierRank"'), 'Contact form must not include numeric Clasificación Proveedor field');
+
     // 4. Verify table column alignment and exact 6-column matching
-    const cssContent = fs.readFileSync(path.join(__dirname, '..', 'assets', 'css', 'odoo20.css'), 'utf8');
+    const cssContent = fs.readFileSync(path.join(__dirname, '..', 'assets', 'css', 'odoo20.css'), 'utf8').replace(/\r\n/g, '\n');
     assert.ok(cssContent.includes('.o_list_table thead th {\n  padding: 0.65rem 0.85rem;') && cssContent.includes('text-align: start;'), 'Table header th must have text-align: start');
     assert.ok(cssContent.includes('.o_list_table thead th:first-child {\n  position: sticky;\n  inset-inline-start: 0;\n  z-index: 3;\n}'), 'First column header must have sticky inset-inline-start: 0');
     assert.ok(cssContent.includes('.o_list_table tbody th {\n  position: sticky;\n  inset-inline-start: 0;\n  z-index: 1;\n  background-color: var(--o-view-bg);\n  padding: 0.65rem 0.85rem;\n  font-weight: 600;\n  color: var(--o-text-main);\n  border-bottom: 1px solid var(--o-border-color);\n  white-space: nowrap;\n  text-align: start;\n}'), 'Table body th must have text-align: start');
