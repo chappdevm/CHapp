@@ -568,6 +568,15 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.ok(jsText.includes("renderProductsSubmodule(container)"), 'Must route to renderProductsSubmodule on list view');
     assert.ok(jsText.includes("data-product-id"), 'Products table/cards must have data-product-id to open detailed card on click');
     assert.ok(jsText.includes("btnNewProductList"), 'Must provide New Product button in products catalog');
+    assert.ok(jsText.includes("const isProductSubmenu = state.currentApp === 'sales' && state.submenu === 'products'"), 'Must handle product control panel');
+    assert.ok(jsText.includes("const newRecordLabel = isProductSubmenu ? 'Nuevo Producto' : 'Nuevo'"), 'Control panel must use Nuevo Producto label');
+    assert.ok(!jsText.includes('id="btnNewProductList">Nuevo Producto</button>'), 'Must remove duplicate creation button from product view body');
+    assert.ok(!jsText.includes('<span class="o_stat_label">Almacenables / Consumibles</span>'), 'Must remove Almacenables card from banner');
+    assert.ok(jsText.includes('<option value="Metro Cuadrado"'), 'Must support Metro Cuadrado in UoM');
+    assert.ok(jsText.includes('<option value="Metro Liso"'), 'Must support Metro Liso in UoM');
+    assert.ok(!jsText.includes('id="prodType"'), 'Must remove prodType input from form');
+    assert.ok(!jsText.includes('id="prodCost"'), 'Must remove prodCost input from form');
+    assert.ok(!jsText.includes('id="prodCanBeSold"'), 'Must remove prodCanBeSold checkbox from form');
 
     // 4. Verify ZERO emojis and symbols inside <button> tags across index.html and app.js
     const emojiRegex = /[\p{Extended_Pictographic}\u2600-\u27BF\u2300-\u23FF\u2B50\u203C\u2049\u2139\u2194-\u21AA\u2702-\u27B0✕✓💾✉➕🔍]/u;

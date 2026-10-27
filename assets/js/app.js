@@ -390,10 +390,12 @@
     const searchContainer = document.getElementById('cpSearchContainer');
 
     // Action buttons
+    const isProductSubmenu = state.currentApp === 'sales' && state.submenu === 'products';
+    const newRecordLabel = isProductSubmenu ? 'Nuevo Producto' : 'Nuevo';
     if (state.viewType === 'form') {
       actionBtns.innerHTML = `
         <button type="button" class="btn btn-secondary" id="btnCpBackToList">Volver</button>
-        <button type="button" class="btn btn-primary" id="btnCpNewRecord">Nuevo</button>
+        <button type="button" class="btn btn-primary" id="btnCpNewRecord" data-id="btnNewProductList">${newRecordLabel}</button>
       `;
     } else if (state.currentApp === 'accounting' && state.submenu === 'dashboard') {
       actionBtns.innerHTML = `
@@ -405,7 +407,7 @@
         <button type="button" class="btn btn-primary" id="btnGoToInvoicesForPay">Registrar Pago en Factura</button>
       `;
     } else {
-      actionBtns.innerHTML = `<button type="button" class="btn btn-primary" id="btnCpNewRecord">Nuevo</button>`;
+      actionBtns.innerHTML = `<button type="button" class="btn btn-primary" id="btnCpNewRecord" data-id="btnNewProductList">${newRecordLabel}</button>`;
     }
 
     // Breadcrumbs
@@ -2041,25 +2043,7 @@
         <div class="o_stat_card">
           <span class="o_stat_label">Catálogo de Productos</span>
           <span class="o_stat_value">${(state.data.products || []).length}</span>
-          <span class="o_stat_sub">Servicios y productos registrados</span>
-        </div>
-        <div class="o_stat_card">
-          <span class="o_stat_label">Servicios</span>
-          <span class="o_stat_value">${(state.data.products || []).filter((p) => p.type === 'service' || !p.type).length}</span>
-          <span class="o_stat_sub">Consultoría, licencias y soporte</span>
-        </div>
-        <div class="o_stat_card">
-          <span class="o_stat_label">Almacenables / Consumibles</span>
-          <span class="o_stat_value">${(state.data.products || []).filter((p) => p.type === 'product' || p.type === 'consu').length}</span>
-          <span class="o_stat_sub">Bienes tangibles y suministros</span>
-        </div>
-      </div>
-    `;
-
-    const topBarHtml = `
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; gap: 0.5rem; flex-wrap: wrap;">
-        <div style="display: flex; align-items: center; gap: 0.5rem;">
-          <button type="button" class="btn btn-primary" id="btnNewProductList">Nuevo Producto</button>
+          <span class="o_stat_sub">Productos registrados</span>
         </div>
       </div>
     `;
@@ -2067,7 +2051,6 @@
     if (state.viewType === 'kanban') {
       container.innerHTML =
         bannerHtml +
-        topBarHtml +
         `
         <div class="o_kanban_view">
           ${
@@ -2082,13 +2065,12 @@
                   <div class="o_kanban_details">
                     <div style="display: flex; justify-content: space-between; gap: 0.4rem;">
                       <span class="o_kanban_title">${esc(p.name)}</span>
-                      <span class="o_badge ${p.type === 'service' ? 'o_badge_info' : 'o_badge_success'}">${p.type === 'service' ? 'Servicio' : 'Producto'}</span>
+                      <span class="o_badge o_badge_info">${esc(p.uom || 'Metro Cuadrado')}</span>
                     </div>
                     <div class="o_kanban_subtitle">SKU: ${esc(p.default_code || '—')} · ${esc(p.category || 'General')}</div>
-                    <div class="o_kanban_subtitle">Precio: <strong>${formatMoney(p.list_price)}</strong> · Costo: ${formatMoney(p.standard_price || 0)}</div>
+                    <div class="o_kanban_subtitle">Precio: <strong>${formatMoney(p.list_price)}</strong></div>
                     <div class="o_kanban_footer">
                       <span class="o_badge o_badge_info">IVA ${Number(p.tax_rate ?? 19)}%</span>
-                      <span class="o_badge ${p.can_be_sold ? 'o_badge_success' : 'o_badge_muted'}">${p.can_be_sold ? 'En Venta' : 'Inactivo'}</span>
                     </div>
                   </div>
                 </article>
@@ -2101,21 +2083,18 @@
     } else {
       container.innerHTML =
         bannerHtml +
-        topBarHtml +
         `
         <div tabindex="0" role="region" aria-labelledby="products-table-caption" class="table-wrapper">
-          <table class="o_list_table" style="--label-2: 'SKU'; --label-3: 'Categoría'; --label-4: 'Tipo'; --label-5: 'Precio Venta'; --label-6: 'Costo'; --label-7: 'IVA'; --label-8: 'Estado';">
-            <caption id="products-table-caption">Catálogo de productos y servicios</caption>
+          <table class="o_list_table" style="--label-2: 'SKU'; --label-3: 'Categoría'; --label-4: 'Unidad'; --label-5: 'Precio Venta'; --label-6: 'IVA';">
+            <caption id="products-table-caption">Catálogo de productos</caption>
             <thead>
               <tr>
-                <th>Producto / Servicio</th>
+                <th>Producto</th>
                 <th>Referencia SKU</th>
                 <th>Categoría</th>
-                <th>Tipo</th>
+                <th>Unidad de Medida</th>
                 <th class="text-end">Precio de Venta</th>
-                <th class="text-end">Costo Estándar</th>
                 <th>Impuesto</th>
-                <th>Estado</th>
               </tr>
             </thead>
             <tbody>
@@ -2123,7 +2102,7 @@
                 products.length === 0
                   ? `
                 <tr>
-                  <td colspan="8" style="text-align: center; padding: 2.5rem; color: var(--o-text-muted);">
+                  <td colspan="6" style="text-align: center; padding: 2.5rem; color: var(--o-text-muted);">
                     No hay productos registrados en el catálogo. Haz clic en <strong>Nuevo Producto</strong> para agregar uno.
                   </td>
                 </tr>
@@ -2135,11 +2114,9 @@
                   <th>${esc(p.name)}</th>
                   <td>${esc(p.default_code || '—')}</td>
                   <td>${esc(p.category || 'General')}</td>
-                  <td>${p.type === 'service' ? 'Servicio' : p.type === 'consu' ? 'Consumible' : 'Almacenable'}</td>
+                  <td>${esc(p.uom || 'Metro Cuadrado')}</td>
                   <td class="text-end"><strong>${formatMoney(p.list_price)}</strong></td>
-                  <td class="text-end">${formatMoney(p.standard_price || 0)}</td>
                   <td><span class="o_badge o_badge_info">IVA ${Number(p.tax_rate ?? 19)}%</span></td>
-                  <td><span class="o_badge ${p.can_be_sold ? 'o_badge_success' : 'o_badge_muted'}">${p.can_be_sold ? 'Vendible' : 'No para venta'}</span></td>
                 </tr>
               `
                       )
@@ -2158,15 +2135,6 @@
         renderModuleWorkspace();
       });
     });
-
-    const newBtn = document.getElementById('btnNewProductList');
-    if (newBtn) {
-      newBtn.addEventListener('click', () => {
-        state.activeRecordId = 'new';
-        state.viewType = 'form';
-        renderModuleWorkspace();
-      });
-    }
   }
 
   function renderProductForm(container) {
@@ -2177,13 +2145,13 @@
           name: '',
           default_code: '',
           category: 'General',
-          type: 'service',
-          uom: 'Unidad',
-          list_price: 100000,
-          standard_price: 40000,
+          type: 'consu',
+          uom: 'Metro Cuadrado',
+          list_price: 0,
+          standard_price: 0,
           tax_rate: 19,
           can_be_sold: true,
-          can_be_expensed: true
+          can_be_expensed: false
         }
       : products.find((p) => Number(p.id) === Number(state.activeRecordId));
 
@@ -2217,18 +2185,11 @@
                   <span class="o_stat_text">Precio de Venta</span>
                 </div>
               </div>
-              <div class="o_stat_button" style="cursor: default;">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
-                <div class="o_stat_info">
-                  <span class="o_stat_value">${formatMoney(existing.standard_price || 0)}</span>
-                  <span class="o_stat_text">Costo Estándar</span>
-                </div>
-              </div>
             </div>
 
             <div class="o_form_title_group">
-              <label for="prodName" class="o_form_label_title">Nombre del Producto / Servicio *</label>
-              <input type="text" id="prodName" class="o_input_title" placeholder="Ej. Licencia Corporativa ERP..." value="${esc(existing.name || '')}" required />
+              <label for="prodName" class="o_form_label_title">Nombre del Producto *</label>
+              <input type="text" id="prodName" class="o_input_title" placeholder="Ej. Alfombra Modular..." value="${esc(existing.name || '')}" required />
             </div>
 
             <div class="o_notebook">
@@ -2240,37 +2201,22 @@
                 <div class="o_group o_prod_add_grid" style="align-items: end;">
                   <div class="o_field_row">
                     <label for="prodSku">Referencia Interna / SKU</label>
-                    <input type="text" id="prodSku" class="o_input" placeholder="Ej. LIC-001" value="${esc(existing.default_code || '')}" />
+                    <input type="text" id="prodSku" class="o_input" placeholder="Ej. PRD-001" value="${esc(existing.default_code || '')}" />
                   </div>
                   <div class="o_field_row">
                     <label for="prodCategory">Categoría</label>
-                    <input type="text" id="prodCategory" class="o_input" placeholder="Ej. Servicios, Software, General" value="${esc(existing.category || 'General')}" />
-                  </div>
-                  <div class="o_field_row">
-                    <label for="prodType">Tipo de Producto</label>
-                    <select id="prodType" class="o_select">
-                      <option value="service" ${existing.type === 'service' ? 'selected' : ''}>Servicio</option>
-                      <option value="consu" ${existing.type === 'consu' ? 'selected' : ''}>Consumible</option>
-                      <option value="product" ${existing.type === 'product' ? 'selected' : ''}>Almacenable / Producto</option>
-                    </select>
+                    <input type="text" id="prodCategory" class="o_input" placeholder="Ej. Pisos, Revestimientos, General" value="${esc(existing.category || 'General')}" />
                   </div>
                   <div class="o_field_row">
                     <label for="prodUom">Unidad de Medida</label>
                     <select id="prodUom" class="o_select">
-                      <option value="Unidad" ${existing.uom === 'Unidad' ? 'selected' : ''}>Unidad</option>
-                      <option value="Horas" ${existing.uom === 'Horas' ? 'selected' : ''}>Horas</option>
-                      <option value="Mes" ${existing.uom === 'Mes' ? 'selected' : ''}>Mes</option>
-                      <option value="Servicio" ${existing.uom === 'Servicio' ? 'selected' : ''}>Servicio</option>
-                      <option value="Paquete" ${existing.uom === 'Paquete' ? 'selected' : ''}>Paquete</option>
+                      <option value="Metro Cuadrado" ${existing.uom === 'Metro Liso' ? '' : 'selected'}>Metro Cuadrado (m²)</option>
+                      <option value="Metro Liso" ${existing.uom === 'Metro Liso' ? 'selected' : ''}>Metro Liso</option>
                     </select>
                   </div>
                   <div class="o_field_row">
                     <label for="prodPrice">Precio de Venta (COP)</label>
                     <input type="number" id="prodPrice" class="o_input" min="0" step="any" value="${existing.list_price ?? 0}" />
-                  </div>
-                  <div class="o_field_row">
-                    <label for="prodCost">Costo Estándar (COP)</label>
-                    <input type="number" id="prodCost" class="o_input" min="0" step="any" value="${existing.standard_price ?? 0}" />
                   </div>
                   <div class="o_field_row">
                     <label for="prodTax">Impuesto IVA (%)</label>
@@ -2279,16 +2225,6 @@
                       <option value="5" ${Number(existing.tax_rate) === 5 ? 'selected' : ''}>IVA 5%</option>
                       <option value="0" ${Number(existing.tax_rate) === 0 ? 'selected' : ''}>Exento 0%</option>
                     </select>
-                  </div>
-                  <div class="o_field_row" style="display: flex; gap: 1.25rem; align-items: center; padding-block: 0.5rem;">
-                    <label style="display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer;">
-                      <input type="checkbox" id="prodCanBeSold" ${existing.can_be_sold !== false ? 'checked' : ''} />
-                      <span>Puede ser vendido</span>
-                    </label>
-                    <label style="display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer;">
-                      <input type="checkbox" id="prodCanBeExpensed" ${existing.can_be_expensed !== false ? 'checked' : ''} />
-                      <span>Puede ser gasto</span>
-                    </label>
                   </div>
                 </div>
               </div>
@@ -2307,25 +2243,21 @@
         }
         const default_code = (document.getElementById('prodSku').value || '').trim();
         const category = (document.getElementById('prodCategory').value || 'General').trim();
-        const type = document.getElementById('prodType').value;
         const uom = document.getElementById('prodUom').value;
         const list_price = Number(document.getElementById('prodPrice').value || 0);
-        const standard_price = Number(document.getElementById('prodCost').value || 0);
         const tax_rate = Number(document.getElementById('prodTax').value || 19);
-        const can_be_sold = document.getElementById('prodCanBeSold').checked;
-        const can_be_expensed = document.getElementById('prodCanBeExpensed').checked;
 
         const payload = {
           name,
           default_code,
           category,
-          type,
+          type: existing.type || 'consu',
           uom,
           list_price,
-          standard_price,
+          standard_price: existing.standard_price || 0,
           tax_rate,
-          can_be_sold,
-          can_be_expensed
+          can_be_sold: true,
+          can_be_expensed: existing.can_be_expensed !== undefined ? existing.can_be_expensed : false
         };
         if (!isNew) {
           payload.id = existing.id;
