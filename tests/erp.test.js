@@ -517,5 +517,71 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.ok(jsText.includes('class="o_cmd_entry"'), 'JS command palette must use o_cmd_entry');
     assert.ok(cssText.includes('.o_badge {\n  display: inline-flex;\n  align-items: center;\n  gap: 0.25rem;\n  padding: 0.15rem 0.55rem;\n  font-size: 0.74rem;\n  font-weight: 600;\n  border-radius: 999px;\n  white-space: nowrap;\n  flex-shrink: 0;\n}'), 'Badges must have flex-shrink: 0');
   });
+
+  it('Module 3 (Ventas -> Productos): ensures list view by default, form view on create/edit, product update in-place, and zero emojis in buttons across entire application', async () => {
+    // 1. Create product via API
+    const createRes = await req('/api/products', 'POST', {
+      name: 'Consultoría Cloud ERP Dedicada',
+      default_code: 'CLOUD-001',
+      list_price: 2500000,
+      standard_price: 1000000,
+      category: 'Servicios Cloud',
+      tax_rate: 19,
+      type: 'service'
+    });
+    assert.equal(createRes.status, 200);
+    assert.ok(createRes.json.ok);
+    assert.ok(createRes.json.product.id > 0);
+    assert.equal(createRes.json.product.name, 'Consultoría Cloud ERP Dedicada');
+    assert.equal(createRes.json.product.list_price, 2500000);
+
+    const prodId = createRes.json.product.id;
+    const initialCount = createRes.json.state.products.length;
+
+    // 2. Update existing product via API with its id
+    const updateRes = await req('/api/products', 'POST', {
+      id: prodId,
+      name: 'Consultoría Cloud ERP Dedicada (Actualizada)',
+      default_code: 'CLOUD-001-REV',
+      list_price: 2800000,
+      standard_price: 1100000,
+      category: 'Infraestructura Cloud',
+      tax_rate: 19,
+      type: 'service'
+    });
+    assert.equal(updateRes.status, 200);
+    assert.ok(updateRes.json.ok);
+    assert.equal(updateRes.json.product.id, prodId);
+    assert.equal(updateRes.json.product.name, 'Consultoría Cloud ERP Dedicada (Actualizada)');
+    assert.equal(updateRes.json.product.list_price, 2800000);
+    assert.equal(updateRes.json.state.products.length, initialCount, 'Updating product in-place must not duplicate record');
+
+    // 3. Verify frontend code contracts for Products list view vs detailed form card view
+    const jsText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
+    const htmlText = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+
+    assert.ok(jsText.includes('function renderProductsSubmodule(container)'), 'Must define renderProductsSubmodule');
+    assert.ok(jsText.includes('function renderProductForm(container)'), 'Must define renderProductForm');
+    assert.ok(jsText.includes("state.submenu === 'products'"), 'Must handle products submenu');
+    assert.ok(jsText.includes("renderProductForm(container)"), 'Must route to renderProductForm on form view');
+    assert.ok(jsText.includes("renderProductsSubmodule(container)"), 'Must route to renderProductsSubmodule on list view');
+    assert.ok(jsText.includes("data-product-id"), 'Products table/cards must have data-product-id to open detailed card on click');
+    assert.ok(jsText.includes("btnNewProductList"), 'Must provide New Product button in products catalog');
+
+    // 4. Verify ZERO emojis inside <button> tags across index.html and app.js
+    const emojiRegex = /[\p{Extended_Pictographic}\u2600-\u27BF\u2300-\u23FF\u2B50\u203C\u2049\u2139\u2194-\u21AA\u2702-\u27B0]/u;
+    const btnRegex = /<button[\s\S]*?<\/button>/gi;
+
+    [htmlText, jsText].forEach((fileContent, idx) => {
+      let match;
+      while ((match = btnRegex.exec(fileContent)) !== null) {
+        const btnHtml = match[0];
+        assert.ok(
+          !emojiRegex.test(btnHtml),
+          `Button in ${idx === 0 ? 'index.html' : 'app.js'} must not contain emojis: ${btnHtml.replace(/\s+/g, ' ')}`
+        );
+      }
+    });
+  });
 });
 

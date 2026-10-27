@@ -182,7 +182,12 @@
     document.documentElement.setAttribute('data-theme', t);
     const icon = document.getElementById('themeIcon');
     const lbl = document.getElementById('themeIconLabel');
-    if (icon) icon.textContent = t === 'dark' ? '🌙' : '☀️';
+    if (icon) {
+      icon.innerHTML =
+        t === 'dark'
+          ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>'
+          : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>';
+    }
     if (lbl) lbl.textContent = t === 'dark' ? 'Oscuro' : 'Claro';
   }
 
@@ -387,13 +392,13 @@
     // Action buttons
     if (state.viewType === 'form') {
       actionBtns.innerHTML = `
-        <button type="button" class="btn btn-secondary" id="btnCpBackToList">← Volver</button>
+        <button type="button" class="btn btn-secondary" id="btnCpBackToList">Volver</button>
         <button type="button" class="btn btn-primary" id="btnCpNewRecord">Nuevo</button>
       `;
     } else if (state.currentApp === 'accounting' && state.submenu === 'dashboard') {
       actionBtns.innerHTML = `
-        <button type="button" class="btn btn-primary" id="btnQuickNewInvoice">+ Factura de Cliente</button>
-        <button type="button" class="btn btn-secondary" id="btnQuickNewBill">+ Factura de Proveedor</button>
+        <button type="button" class="btn btn-primary" id="btnQuickNewInvoice">Nueva Factura de Cliente</button>
+        <button type="button" class="btn btn-secondary" id="btnQuickNewBill">Nueva Factura de Proveedor</button>
       `;
     } else if (state.currentApp === 'accounting' && state.submenu === 'payments') {
       actionBtns.innerHTML = `
@@ -406,7 +411,11 @@
     // Breadcrumbs
     let crumbHtml = `<span class="o_breadcrumb_link" id="crumbRoot">${esc(app.name)}</span> <span>/</span> <span class="${state.viewType === 'form' ? 'o_breadcrumb_link' : ''}" id="crumbSub">${esc(sub.label)}</span>`;
     if (state.viewType === 'form') {
-      const recLabel = state.activeRecordId === 'new' ? 'Nuevo' : `#${state.activeRecordId}`;
+      let recLabel = state.activeRecordId === 'new' ? 'Nuevo' : `#${state.activeRecordId}`;
+      if (state.currentApp === 'sales' && state.submenu === 'products' && state.activeRecordId !== 'new') {
+        const prod = (state.data.products || []).find((p) => Number(p.id) === Number(state.activeRecordId));
+        if (prod && prod.name) recLabel = prod.name;
+      }
       crumbHtml += ` <span>/</span> <span>${esc(recLabel)}</span>`;
     }
     breadcrumbs.innerHTML = crumbHtml;
@@ -416,7 +425,7 @@
       facets.innerHTML = `
         <span class="o_search_facet">
           ${esc(state.partnerContextFilter.name)}
-          <button type="button" id="btnClearPartnerFacet" title="Quitar filtro">✕</button>
+          <button type="button" id="btnClearPartnerFacet" title="Quitar filtro" aria-label="Quitar filtro">&times;</button>
         </span>
       `;
       const clearBtn = document.getElementById('btnClearPartnerFacet');
@@ -475,10 +484,10 @@
     } else {
       switcher.innerHTML = `
         <button type="button" class="o_switch_btn ${state.viewType === 'list' ? 'is-active' : ''}" data-view="list" title="Vista Lista">
-          ☰ Lista
+          Lista
         </button>
         <button type="button" class="o_switch_btn ${state.viewType === 'kanban' ? 'is-active' : ''}" data-view="kanban" title="Vista Kanban">
-          ⊞ Kanban
+          Kanban
         </button>
       `;
       switcher.querySelectorAll('.o_switch_btn').forEach((b) => {
@@ -761,10 +770,10 @@
         <div class="o_form_sheet_bg">
           <div class="o_form_statusbar">
             <div class="o_statusbar_buttons">
-              <button type="button" class="btn btn-action" id="btnSaveContact">💾 Guardar Contacto</button>
+              <button type="button" class="btn btn-action" id="btnSaveContact">Guardar Contacto</button>
               ${
                 !isNew
-                  ? `<button type="button" class="btn btn-secondary" id="btnNewSaleFromContact">+ Nueva Cotización</button>
+                  ? `<button type="button" class="btn btn-secondary" id="btnNewSaleFromContact">Nueva Cotización</button>
                      <button type="button" class="btn btn-danger btn-sm" id="btnDeleteContact">Eliminar</button>`
                   : ''
               }
@@ -780,21 +789,21 @@
                 ? `
               <div class="o_button_box">
                 <button type="button" class="o_stat_button" id="btnSmartSales">
-                  <span>🛒</span>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
                   <div class="o_stat_info">
                     <span class="o_stat_value">${existing.sales_count || 0} Ventas</span>
                     <span class="o_stat_text">${formatMoney(existing.sales_total || 0)}</span>
                   </div>
                 </button>
                 <button type="button" class="o_stat_button" id="btnSmartInvoices">
-                  <span>🧾</span>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
                   <div class="o_stat_info">
                     <span class="o_stat_value">${existing.invoices_count || 0} Facturas</span>
                     <span class="o_stat_text">${formatMoney(existing.invoiced_total || 0)}</span>
                   </div>
                 </button>
                 <button type="button" class="o_stat_button" id="btnSmartExpenses">
-                  <span>💼</span>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
                   <div class="o_stat_info">
                     <span class="o_stat_value">${existing.expenses_count || 0} Gastos</span>
                     <span class="o_stat_text">Asociados</span>
@@ -1227,7 +1236,7 @@
         <div class="o_form_sheet_bg">
           <div class="o_form_statusbar">
             <div class="o_statusbar_buttons">
-              <button type="button" class="btn btn-primary" id="btnSaveExpense">💾 Guardar</button>
+              <button type="button" class="btn btn-primary" id="btnSaveExpense">Guardar</button>
               ${
                 !isNew && existing.state === 'draft'
                   ? `<button type="button" class="btn btn-action" data-exp-action="submit">Enviar al Gerente</button>`
@@ -1235,18 +1244,18 @@
               }
               ${
                 !isNew && existing.state === 'submitted'
-                  ? `<button type="button" class="btn btn-action" data-exp-action="approve">✓ Aprobar Gasto</button>
-                     <button type="button" class="btn btn-danger" data-exp-action="refuse">✕ Rechazar</button>`
+                  ? `<button type="button" class="btn btn-action" data-exp-action="approve">Aprobar Gasto</button>
+                     <button type="button" class="btn btn-danger" data-exp-action="refuse">Rechazar</button>`
                   : ''
               }
               ${
                 !isNew && existing.state === 'approved'
-                  ? `<button type="button" class="btn btn-action" data-exp-action="post">📘 Publicar Asiento Contable</button>`
+                  ? `<button type="button" class="btn btn-action" data-exp-action="post">Publicar Asiento Contable</button>`
                   : ''
               }
               ${
                 !isNew && existing.state === 'posted'
-                  ? `<button type="button" class="btn btn-action" data-exp-action="pay">💳 Registrar Reembolso / Pago</button>`
+                  ? `<button type="button" class="btn btn-action" data-exp-action="pay">Registrar Reembolso / Pago</button>`
                   : ''
               }
               ${
@@ -1268,7 +1277,7 @@
                 ? `
               <div class="o_button_box">
                 <button type="button" class="o_stat_button" id="btnOpenExpenseMove">
-                  <span>📘</span>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
                   <div class="o_stat_info">
                     <span class="o_stat_value">Asiento Contable</span>
                     <span class="o_stat_text">Ver en Contabilidad</span>
@@ -1486,7 +1495,11 @@
   function renderSalesModule() {
     const container = document.getElementById('moduleContent');
     if (state.submenu === 'products') {
-      renderProductsSubmodule(container);
+      if (state.viewType === 'form') {
+        renderProductForm(container);
+      } else {
+        renderProductsSubmodule(container);
+      }
       return;
     }
 
@@ -1698,20 +1711,20 @@
         <div class="o_form_sheet_bg">
           <div class="o_form_statusbar">
             <div class="o_statusbar_buttons">
-              <button type="button" class="btn btn-primary" id="btnSaveSaleOrder">💾 Guardar</button>
+              <button type="button" class="btn btn-primary" id="btnSaveSaleOrder">Guardar</button>
               ${
                 !isNew && existing.state === 'draft'
-                  ? `<button type="button" class="btn btn-secondary" data-sale-action="send">✉️ Marcar como Enviada</button>`
+                  ? `<button type="button" class="btn btn-secondary" data-sale-action="send">Marcar como Enviada</button>`
                   : ''
               }
               ${
                 !isNew && (existing.state === 'draft' || existing.state === 'sent')
-                  ? `<button type="button" class="btn btn-action" data-sale-action="confirm">✓ Confirmar Pedido</button>`
+                  ? `<button type="button" class="btn btn-action" data-sale-action="confirm">Confirmar Pedido</button>`
                   : ''
               }
               ${
                 !isNew && existing.state === 'sale' && existing.invoice_status !== 'invoiced'
-                  ? `<button type="button" class="btn btn-action" data-sale-action="create_invoice">🧾 Crear Factura</button>`
+                  ? `<button type="button" class="btn btn-action" data-sale-action="create_invoice">Crear Factura</button>`
                   : ''
               }
               ${
@@ -1738,7 +1751,7 @@
                 ? `
               <div class="o_button_box">
                 <button type="button" class="o_stat_button" id="btnOpenSaleInvoice">
-                  <span>🧾</span>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
                   <div class="o_stat_info">
                     <span class="o_stat_value">${existing.invoice_ids.length} Factura(s)</span>
                     <span class="o_stat_text">Ver en Contabilidad</span>
@@ -1832,7 +1845,7 @@
                           </select>
                         </td>
                         <td class="text-end"><strong>${formatMoney(sub)}</strong></td>
-                        <td><button type="button" class="btn btn-sm btn-danger btn-remove-line" data-idx="${idx}" title="Quitar línea">✕</button></td>
+                        <td><button type="button" class="btn btn-sm btn-danger btn-remove-line" data-idx="${idx}" title="Quitar línea">Quitar</button></td>
                       </tr>
                     `;
                     })
@@ -1841,7 +1854,7 @@
               </table>
             </div>
 
-            <button type="button" class="btn btn-secondary btn-sm" id="btnAddSaleLine">+ Agregar un producto / línea</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="btnAddSaleLine">Agregar producto / línea</button>
 
             <div class="o_totals_box">
               <div class="o_totals_row">
@@ -2005,82 +2018,327 @@
   }
 
   function renderProductsSubmodule(container) {
-    const products = state.data.products || [];
-    updatePager(products.length, products.length);
+    let products = state.data.products || [];
+    const q = state.searchQuery.trim().toLowerCase();
+    if (q) {
+      products = products.filter(
+        (p) =>
+          (p.name || '').toLowerCase().includes(q) ||
+          (p.default_code || '').toLowerCase().includes(q) ||
+          (p.category || '').toLowerCase().includes(q)
+      );
+    }
+    updatePager(products.length, (state.data.products || []).length);
 
-    container.innerHTML = `
-      <div class="o_form_sheet" style="margin-bottom: 1rem;">
-        <h3 style="margin-bottom: 0.75rem;">➕ Crear / Actualizar Producto o Servicio</h3>
-        <div class="o_group o_prod_add_grid" style="align-items: end; margin-bottom: 0;">
-          <div class="o_field_row">
-            <label for="newProdName">Nombre del Producto / Servicio</label>
-            <input type="text" id="newProdName" class="o_input" placeholder="Ej. Licencia Adicional Usuario ERP" />
-          </div>
-          <div class="o_field_row">
-            <label for="newProdSku">Referencia / SKU</label>
-            <input type="text" id="newProdSku" class="o_input" placeholder="Ej. LIC-001" />
-          </div>
-          <div class="o_field_row">
-            <label for="newProdPrice">Precio Venta</label>
-            <input type="number" id="newProdPrice" class="o_input" value="500000" min="0" />
-          </div>
-          <div class="o_field_row">
-            <label for="newProdTax">IVA (%)</label>
-            <select id="newProdTax" class="o_select">
-              <option value="19">19%</option>
-              <option value="5">5%</option>
-              <option value="0">0%</option>
-            </select>
-          </div>
-          <button type="button" class="btn btn-action" id="btnAddProductCatalog">Guardar Producto</button>
+    const bannerHtml = `
+      <div class="o_dashboard_banner" style="margin-bottom: 1rem;">
+        <div class="o_stat_card">
+          <span class="o_stat_label">Catálogo de Productos</span>
+          <span class="o_stat_value">${(state.data.products || []).length}</span>
+          <span class="o_stat_sub">Servicios y productos registrados</span>
         </div>
-      </div>
-
-      <div tabindex="0" role="region" aria-labelledby="products-table-caption" class="table-wrapper">
-        <table class="o_list_table" style="--label-2: 'SKU'; --label-3: 'Categoría'; --label-4: 'Precio Venta'; --label-5: 'Costo'; --label-6: 'IVA';">
-          <caption id="products-table-caption">Catálogo de productos y servicios</caption>
-          <thead>
-            <tr>
-              <th>Producto / Servicio</th>
-              <th>Referencia SKU</th>
-              <th>Categoría</th>
-              <th class="text-end">Precio de Venta</th>
-              <th class="text-end">Costo Estándar</th>
-              <th>Impuesto</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${products
-              .map(
-                (p) => `
-                <tr>
-                  <th>${esc(p.name)}</th>
-                  <td>${esc(p.default_code)}</td>
-                  <td>${esc(p.category)}</td>
-                  <td class="text-end"><strong>${formatMoney(p.list_price)}</strong></td>
-                  <td class="text-end">${formatMoney(p.standard_price)}</td>
-                  <td><span class="o_badge o_badge_info">IVA ${Number(p.tax_rate)}%</span></td>
-                </tr>
-              `
-              )
-              .join('')}
-          </tbody>
-        </table>
+        <div class="o_stat_card">
+          <span class="o_stat_label">Servicios</span>
+          <span class="o_stat_value">${(state.data.products || []).filter((p) => p.type === 'service' || !p.type).length}</span>
+          <span class="o_stat_sub">Consultoría, licencias y soporte</span>
+        </div>
+        <div class="o_stat_card">
+          <span class="o_stat_label">Almacenables / Consumibles</span>
+          <span class="o_stat_value">${(state.data.products || []).filter((p) => p.type === 'product' || p.type === 'consu').length}</span>
+          <span class="o_stat_sub">Bienes tangibles y suministros</span>
+        </div>
       </div>
     `;
 
-    document.getElementById('btnAddProductCatalog').addEventListener('click', async () => {
+    const topBarHtml = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; gap: 0.5rem; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <button type="button" class="btn btn-primary" id="btnNewProductList">Nuevo Producto</button>
+        </div>
+      </div>
+    `;
+
+    if (state.viewType === 'kanban') {
+      container.innerHTML =
+        bannerHtml +
+        topBarHtml +
+        `
+        <div class="o_kanban_view">
+          ${
+            products.length === 0
+              ? `<div style="grid-column: 1 / -1; padding: 2.5rem; text-align: center; color: var(--o-text-muted);">
+                   No hay productos registrados en el catálogo. Haz clic en <strong>Nuevo Producto</strong> para agregar uno.
+                 </div>`
+              : products
+                  .map(
+                    (p) => `
+                <article class="o_kanban_record" data-product-id="${p.id}" style="cursor: pointer;">
+                  <div class="o_kanban_details">
+                    <div style="display: flex; justify-content: space-between; gap: 0.4rem;">
+                      <span class="o_kanban_title">${esc(p.name)}</span>
+                      <span class="o_badge ${p.type === 'service' ? 'o_badge_info' : 'o_badge_success'}">${p.type === 'service' ? 'Servicio' : 'Producto'}</span>
+                    </div>
+                    <div class="o_kanban_subtitle">SKU: ${esc(p.default_code || '—')} · ${esc(p.category || 'General')}</div>
+                    <div class="o_kanban_subtitle">Precio: <strong>${formatMoney(p.list_price)}</strong> · Costo: ${formatMoney(p.standard_price || 0)}</div>
+                    <div class="o_kanban_footer">
+                      <span class="o_badge o_badge_info">IVA ${Number(p.tax_rate ?? 19)}%</span>
+                      <span class="o_badge ${p.can_be_sold ? 'o_badge_success' : 'o_badge_muted'}">${p.can_be_sold ? 'En Venta' : 'Inactivo'}</span>
+                    </div>
+                  </div>
+                </article>
+              `
+                  )
+                  .join('')
+          }
+        </div>
+      `;
+    } else {
+      container.innerHTML =
+        bannerHtml +
+        topBarHtml +
+        `
+        <div tabindex="0" role="region" aria-labelledby="products-table-caption" class="table-wrapper">
+          <table class="o_list_table" style="--label-2: 'SKU'; --label-3: 'Categoría'; --label-4: 'Tipo'; --label-5: 'Precio Venta'; --label-6: 'Costo'; --label-7: 'IVA'; --label-8: 'Estado';">
+            <caption id="products-table-caption">Catálogo de productos y servicios</caption>
+            <thead>
+              <tr>
+                <th>Producto / Servicio</th>
+                <th>Referencia SKU</th>
+                <th>Categoría</th>
+                <th>Tipo</th>
+                <th class="text-end">Precio de Venta</th>
+                <th class="text-end">Costo Estándar</th>
+                <th>Impuesto</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${
+                products.length === 0
+                  ? `
+                <tr>
+                  <td colspan="8" style="text-align: center; padding: 2.5rem; color: var(--o-text-muted);">
+                    No hay productos registrados en el catálogo. Haz clic en <strong>Nuevo Producto</strong> para agregar uno.
+                  </td>
+                </tr>
+              `
+                  : products
+                      .map(
+                        (p) => `
+                <tr data-product-id="${p.id}" style="cursor: pointer;" title="Haga clic para ver o modificar este producto">
+                  <th>${esc(p.name)}</th>
+                  <td>${esc(p.default_code || '—')}</td>
+                  <td>${esc(p.category || 'General')}</td>
+                  <td>${p.type === 'service' ? 'Servicio' : p.type === 'consu' ? 'Consumible' : 'Almacenable'}</td>
+                  <td class="text-end"><strong>${formatMoney(p.list_price)}</strong></td>
+                  <td class="text-end">${formatMoney(p.standard_price || 0)}</td>
+                  <td><span class="o_badge o_badge_info">IVA ${Number(p.tax_rate ?? 19)}%</span></td>
+                  <td><span class="o_badge ${p.can_be_sold ? 'o_badge_success' : 'o_badge_muted'}">${p.can_be_sold ? 'Vendible' : 'No para venta'}</span></td>
+                </tr>
+              `
+                      )
+                      .join('')
+              }
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    container.querySelectorAll('[data-product-id]').forEach((el) => {
+      el.addEventListener('click', () => {
+        state.activeRecordId = Number(el.getAttribute('data-product-id'));
+        state.viewType = 'form';
+        renderModuleWorkspace();
+      });
+    });
+
+    const newBtn = document.getElementById('btnNewProductList');
+    if (newBtn) {
+      newBtn.addEventListener('click', () => {
+        state.activeRecordId = 'new';
+        state.viewType = 'form';
+        renderModuleWorkspace();
+      });
+    }
+  }
+
+  function renderProductForm(container) {
+    const isNew = state.activeRecordId === 'new';
+    const products = state.data.products || [];
+    const existing = isNew
+      ? {
+          name: '',
+          default_code: '',
+          category: 'General',
+          type: 'service',
+          uom: 'Unidad',
+          list_price: 100000,
+          standard_price: 40000,
+          tax_rate: 19,
+          can_be_sold: true,
+          can_be_expensed: true
+        }
+      : products.find((p) => Number(p.id) === Number(state.activeRecordId));
+
+    if (!existing) {
+      state.activeRecordId = null;
+      state.viewType = 'list';
+      return renderModuleWorkspace();
+    }
+
+    updatePager(0, products.length);
+
+    container.innerHTML = `
+      <div class="o_form_view">
+        <div class="o_form_sheet_bg">
+          <div class="o_form_statusbar">
+            <div class="o_statusbar_buttons">
+              <button type="button" class="btn btn-action" id="btnSaveProductForm">Guardar</button>
+              <button type="button" class="btn btn-secondary" id="btnDiscardProductForm">Descartar</button>
+            </div>
+            <div class="o_statusbar_status">
+              <span class="o_arrow_button is-current">${isNew ? 'Nuevo Producto' : esc(existing.default_code || 'Producto')}</span>
+            </div>
+          </div>
+
+          <form id="productForm" class="o_form_sheet" onsubmit="return false;">
+            <div class="o_button_box">
+              <div class="o_stat_button" style="cursor: default;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+                <div class="o_stat_info">
+                  <span class="o_stat_value">${formatMoney(existing.list_price || 0)}</span>
+                  <span class="o_stat_text">Precio de Venta</span>
+                </div>
+              </div>
+              <div class="o_stat_button" style="cursor: default;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+                <div class="o_stat_info">
+                  <span class="o_stat_value">${formatMoney(existing.standard_price || 0)}</span>
+                  <span class="o_stat_text">Costo Estándar</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="o_form_title_group">
+              <label for="prodName" class="o_form_label_title">Nombre del Producto / Servicio *</label>
+              <input type="text" id="prodName" class="o_input_title" placeholder="Ej. Licencia Corporativa ERP..." value="${esc(existing.name || '')}" required />
+            </div>
+
+            <div class="o_notebook">
+              <div class="o_notebook_headers">
+                <button type="button" class="o_notebook_tab is-active">Información General</button>
+              </div>
+
+              <div class="o_notebook_content" style="padding-top: 1rem;">
+                <div class="o_group o_prod_add_grid" style="align-items: end;">
+                  <div class="o_field_row">
+                    <label for="prodSku">Referencia Interna / SKU</label>
+                    <input type="text" id="prodSku" class="o_input" placeholder="Ej. LIC-001" value="${esc(existing.default_code || '')}" />
+                  </div>
+                  <div class="o_field_row">
+                    <label for="prodCategory">Categoría</label>
+                    <input type="text" id="prodCategory" class="o_input" placeholder="Ej. Servicios, Software, General" value="${esc(existing.category || 'General')}" />
+                  </div>
+                  <div class="o_field_row">
+                    <label for="prodType">Tipo de Producto</label>
+                    <select id="prodType" class="o_select">
+                      <option value="service" ${existing.type === 'service' ? 'selected' : ''}>Servicio</option>
+                      <option value="consu" ${existing.type === 'consu' ? 'selected' : ''}>Consumible</option>
+                      <option value="product" ${existing.type === 'product' ? 'selected' : ''}>Almacenable / Producto</option>
+                    </select>
+                  </div>
+                  <div class="o_field_row">
+                    <label for="prodUom">Unidad de Medida</label>
+                    <select id="prodUom" class="o_select">
+                      <option value="Unidad" ${existing.uom === 'Unidad' ? 'selected' : ''}>Unidad</option>
+                      <option value="Horas" ${existing.uom === 'Horas' ? 'selected' : ''}>Horas</option>
+                      <option value="Mes" ${existing.uom === 'Mes' ? 'selected' : ''}>Mes</option>
+                      <option value="Servicio" ${existing.uom === 'Servicio' ? 'selected' : ''}>Servicio</option>
+                      <option value="Paquete" ${existing.uom === 'Paquete' ? 'selected' : ''}>Paquete</option>
+                    </select>
+                  </div>
+                  <div class="o_field_row">
+                    <label for="prodPrice">Precio de Venta (COP)</label>
+                    <input type="number" id="prodPrice" class="o_input" min="0" step="any" value="${existing.list_price ?? 0}" />
+                  </div>
+                  <div class="o_field_row">
+                    <label for="prodCost">Costo Estándar (COP)</label>
+                    <input type="number" id="prodCost" class="o_input" min="0" step="any" value="${existing.standard_price ?? 0}" />
+                  </div>
+                  <div class="o_field_row">
+                    <label for="prodTax">Impuesto IVA (%)</label>
+                    <select id="prodTax" class="o_select">
+                      <option value="19" ${Number(existing.tax_rate) === 19 ? 'selected' : ''}>IVA 19%</option>
+                      <option value="5" ${Number(existing.tax_rate) === 5 ? 'selected' : ''}>IVA 5%</option>
+                      <option value="0" ${Number(existing.tax_rate) === 0 ? 'selected' : ''}>Exento 0%</option>
+                    </select>
+                  </div>
+                  <div class="o_field_row" style="display: flex; gap: 1.25rem; align-items: center; padding-block: 0.5rem;">
+                    <label style="display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer;">
+                      <input type="checkbox" id="prodCanBeSold" ${existing.can_be_sold !== false ? 'checked' : ''} />
+                      <span>Puede ser vendido</span>
+                    </label>
+                    <label style="display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer;">
+                      <input type="checkbox" id="prodCanBeExpensed" ${existing.can_be_expensed !== false ? 'checked' : ''} />
+                      <span>Puede ser gasto</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('btnSaveProductForm').addEventListener('click', async () => {
       try {
-        const name = document.getElementById('newProdName').value;
-        const default_code = document.getElementById('newProdSku').value;
-        const list_price = Number(document.getElementById('newProdPrice').value || 0);
-        const tax_rate = Number(document.getElementById('newProdTax').value || 19);
-        await apiCall('/api/products', 'POST', { name, default_code, list_price, standard_price: Math.round(list_price * 0.4), tax_rate });
-        showToast('Producto agregado al catálogo.');
+        const name = (document.getElementById('prodName').value || '').trim();
+        if (!name) {
+          showToast('El nombre del producto es obligatorio.', true);
+          return;
+        }
+        const default_code = (document.getElementById('prodSku').value || '').trim();
+        const category = (document.getElementById('prodCategory').value || 'General').trim();
+        const type = document.getElementById('prodType').value;
+        const uom = document.getElementById('prodUom').value;
+        const list_price = Number(document.getElementById('prodPrice').value || 0);
+        const standard_price = Number(document.getElementById('prodCost').value || 0);
+        const tax_rate = Number(document.getElementById('prodTax').value || 19);
+        const can_be_sold = document.getElementById('prodCanBeSold').checked;
+        const can_be_expensed = document.getElementById('prodCanBeExpensed').checked;
+
+        const payload = {
+          name,
+          default_code,
+          category,
+          type,
+          uom,
+          list_price,
+          standard_price,
+          tax_rate,
+          can_be_sold,
+          can_be_expensed
+        };
+        if (!isNew) {
+          payload.id = existing.id;
+        }
+
+        await apiCall('/api/products', 'POST', payload);
+        showToast(isNew ? 'Producto creado en el catálogo.' : 'Producto actualizado exitosamente.');
+        state.activeRecordId = null;
+        state.viewType = 'list';
         renderModuleWorkspace();
       } catch (err) {
         showToast(err.message, true);
       }
+    });
+
+    document.getElementById('btnDiscardProductForm').addEventListener('click', () => {
+      state.activeRecordId = null;
+      state.viewType = 'list';
+      renderModuleWorkspace();
     });
   }
 
@@ -2296,7 +2554,7 @@
       updatePager(accounts.length, accounts.length);
       container.innerHTML = `
         <div class="o_form_sheet" style="margin-bottom: 1rem;">
-          <h3 style="margin-bottom: 0.75rem;">➕ Agregar Cuenta al Plan Único de Cuentas (PUC)</h3>
+          <h3 style="margin-bottom: 0.75rem;">Agregar Cuenta al Plan Único de Cuentas (PUC)</h3>
           <div class="o_group o_acc_add_grid" style="align-items: end; margin-bottom: 0;">
             <div class="o_field_row">
               <label for="newAccCode">Código PUC</label>
@@ -2514,13 +2772,13 @@
             <div class="o_statusbar_buttons">
               ${
                 isEditable
-                  ? `<button type="button" class="btn btn-primary" id="btnSaveDraftMove">💾 Guardar Borrador</button>
-                     <button type="button" class="btn btn-action" id="btnSaveAndPostMove">✓ Confirmar y Publicar</button>`
+                  ? `<button type="button" class="btn btn-primary" id="btnSaveDraftMove">Guardar Borrador</button>
+                     <button type="button" class="btn btn-action" id="btnSaveAndPostMove">Confirmar y Publicar</button>`
                   : ''
               }
               ${
                 !isNew && existing.state === 'posted' && existing.amount_residual > 0
-                  ? `<button type="button" class="btn btn-action" id="btnOpenPaymentModal">💳 Registrar Pago</button>`
+                  ? `<button type="button" class="btn btn-action" id="btnOpenPaymentModal">Registrar Pago</button>`
                   : ''
               }
               ${
@@ -2641,7 +2899,7 @@
                           <td class="text-end"><strong>${formatMoney(sub)}</strong></td>
                           ${
                             isEditable
-                              ? `<td><button type="button" class="btn btn-sm btn-danger btn-remove-move-line" data-idx="${idx}" title="Quitar línea">✕</button></td>`
+                              ? `<td><button type="button" class="btn btn-sm btn-danger btn-remove-move-line" data-idx="${idx}" title="Quitar línea">Quitar</button></td>`
                               : ''
                           }
                         </tr>
@@ -2653,7 +2911,7 @@
               </div>
               ${
                 isEditable
-                  ? `<button type="button" class="btn btn-secondary btn-sm" id="btnAddMoveLine">+ Agregar línea contable</button>`
+                  ? `<button type="button" class="btn btn-secondary btn-sm" id="btnAddMoveLine">Agregar línea contable</button>`
                   : ''
               }
             `
@@ -2839,14 +3097,14 @@
         <div>
           <div class="o_form_statusbar" style="margin-bottom: 1rem;">
             <div class="o_statusbar_buttons">
-              <button type="button" class="btn btn-action" id="btnSaveSettings">💾 Guardar Ajustes</button>
+              <button type="button" class="btn btn-action" id="btnSaveSettings">Guardar Ajustes</button>
               <button type="button" class="btn btn-secondary" id="btnBackHomeFromSettings">Volver al Panel Principal</button>
             </div>
             <span style="font-size: 0.8rem; color: var(--o-text-muted);">Basado en Odoo 20 Enterprise (${esc(state.data.meta.version)})</span>
           </div>
 
           <div class="o_settings_block">
-            <h3>🏢 Datos de la Compañía y Apariencia</h3>
+            <h3>Datos de la Compañía y Apariencia</h3>
             <div class="o_group">
               <div class="o_field_row">
                 <label for="setCompanyName">Razón Social de la Empresa</label>
@@ -2883,7 +3141,7 @@
           </div>
 
           <div class="o_settings_block">
-            <h3>📈 Parámetros de Ventas, Contabilidad y Gastos</h3>
+            <h3>Parámetros de Ventas, Contabilidad y Gastos</h3>
             <div class="o_group">
               <div class="o_field_row">
                 <label for="setValidityDays">Validez predeterminada de cotizaciones (días)</label>
@@ -2907,7 +3165,7 @@
           </div>
 
           <div class="o_settings_block">
-            <h3>👥 Usuarios Activos y Mantenimiento de Base de Datos</h3>
+            <h3>Usuarios Activos y Mantenimiento de Base de Datos</h3>
             <div class="o_group" style="margin-bottom: 0.85rem;">
               <div class="o_field_row">
                 <label for="setActiveUser">Usuario Activo de Sesión</label>
@@ -2925,8 +3183,8 @@
               Usuarios configurados: ${(s.users || []).map((u) => `<strong>${esc(u.name)}</strong> (${esc(u.role)})`).join(' · ')}
             </p>
             <div style="display: flex; gap: 0.65rem; flex-wrap: wrap;">
-              <button type="button" class="btn btn-secondary" id="btnExportDbJson">⬇️ Exportar Respaldo JSON</button>
-              <button type="button" class="btn btn-danger" id="btnResetDemoData">🔄 Restaurar Datos Demo de Fábrica</button>
+              <button type="button" class="btn btn-secondary" id="btnExportDbJson">Exportar Respaldo JSON</button>
+              <button type="button" class="btn btn-danger" id="btnResetDemoData">Restaurar Datos de Fábrica</button>
             </div>
           </div>
         </div>
@@ -2994,7 +3252,7 @@
       return `
         <aside class="o_chatter">
           <div class="o_chatter_header">
-            <span>💬 Historial y Notas (Chatter)</span>
+            <span>Historial y Notas (Chatter)</span>
           </div>
           <p style="font-size: 0.82rem; color: var(--o-text-muted);">Guarda el registro para habilitar el historial de auditoría y notas.</p>
         </aside>
@@ -3004,7 +3262,7 @@
     return `
       <aside class="o_chatter" aria-label="Historial y notas del documento">
         <div class="o_chatter_header">
-          <span>💬 Historial y Auditoría</span>
+          <span>Historial y Auditoría</span>
           <span class="o_badge o_badge_muted">${msgs.length} evento(s)</span>
         </div>
         <div class="o_chatter_composer">
@@ -3099,7 +3357,7 @@
         items.push({
           type: 'Producto',
           label: `[${p.default_code}] ${p.name} (${formatMoney(p.list_price)})`,
-          action: () => openApp('sales', { submenu: 'products', viewType: 'list' })
+          action: () => openApp('sales', { submenu: 'products', viewType: 'form', recordId: p.id })
         });
       }
     });
