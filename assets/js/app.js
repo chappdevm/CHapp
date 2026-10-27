@@ -425,7 +425,7 @@
       facets.innerHTML = `
         <span class="o_search_facet">
           ${esc(state.partnerContextFilter.name)}
-          <button type="button" id="btnClearPartnerFacet" title="Quitar filtro" aria-label="Quitar filtro">&times;</button>
+          <button type="button" id="btnClearPartnerFacet" title="Quitar filtro" aria-label="Quitar filtro"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         </span>
       `;
       const clearBtn = document.getElementById('btnClearPartnerFacet');
@@ -1630,6 +1630,12 @@
     container.querySelectorAll('[data-sale-sub]').forEach((card) => {
       card.addEventListener('click', () => {
         state.submenu = card.getAttribute('data-sale-sub');
+        state.activeRecordId = null;
+        state.statusFilter = 'all';
+        state.partnerContextFilter = null;
+        if (state.viewType === 'form') {
+          state.viewType = 'list';
+        }
         renderSubmenus(APPS.find((a) => a.id === 'sales'));
         renderModuleWorkspace();
       });

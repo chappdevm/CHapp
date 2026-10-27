@@ -538,13 +538,13 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     const prodId = createRes.json.product.id;
     const initialCount = createRes.json.state.products.length;
 
-    // 2. Update existing product via API with its id
+    // 2. Update existing product via API with its id (including decimal pricing)
     const updateRes = await req('/api/products', 'POST', {
       id: prodId,
       name: 'Consultoría Cloud ERP Dedicada (Actualizada)',
       default_code: 'CLOUD-001-REV',
-      list_price: 2800000,
-      standard_price: 1100000,
+      list_price: 2800000.5,
+      standard_price: 1100000.25,
       category: 'Infraestructura Cloud',
       tax_rate: 19,
       type: 'service'
@@ -553,7 +553,8 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.ok(updateRes.json.ok);
     assert.equal(updateRes.json.product.id, prodId);
     assert.equal(updateRes.json.product.name, 'Consultoría Cloud ERP Dedicada (Actualizada)');
-    assert.equal(updateRes.json.product.list_price, 2800000);
+    assert.equal(updateRes.json.product.list_price, 2800000.5);
+    assert.equal(updateRes.json.product.standard_price, 1100000.25);
     assert.equal(updateRes.json.state.products.length, initialCount, 'Updating product in-place must not duplicate record');
 
     // 3. Verify frontend code contracts for Products list view vs detailed form card view
@@ -568,8 +569,8 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.ok(jsText.includes("data-product-id"), 'Products table/cards must have data-product-id to open detailed card on click');
     assert.ok(jsText.includes("btnNewProductList"), 'Must provide New Product button in products catalog');
 
-    // 4. Verify ZERO emojis inside <button> tags across index.html and app.js
-    const emojiRegex = /[\p{Extended_Pictographic}\u2600-\u27BF\u2300-\u23FF\u2B50\u203C\u2049\u2139\u2194-\u21AA\u2702-\u27B0]/u;
+    // 4. Verify ZERO emojis and symbols inside <button> tags across index.html and app.js
+    const emojiRegex = /[\p{Extended_Pictographic}\u2600-\u27BF\u2300-\u23FF\u2B50\u203C\u2049\u2139\u2194-\u21AA\u2702-\u27B0✕✓💾✉➕🔍]/u;
     const btnRegex = /<button[\s\S]*?<\/button>/gi;
 
     [htmlText, jsText].forEach((fileContent, idx) => {
@@ -579,6 +580,10 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
         assert.ok(
           !emojiRegex.test(btnHtml),
           `Button in ${idx === 0 ? 'index.html' : 'app.js'} must not contain emojis: ${btnHtml.replace(/\s+/g, ' ')}`
+        );
+        assert.ok(
+          !btnHtml.includes('&times;'),
+          `Button in ${idx === 0 ? 'index.html' : 'app.js'} must not contain &times; entity: ${btnHtml.replace(/\s+/g, ' ')}`
         );
       }
     });
