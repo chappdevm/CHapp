@@ -851,6 +851,89 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.ok(delOkRes.json.ok);
     assert.equal(delOkRes.json.removed.id, tempId);
   });
+
+  it('Module 3 & 4 (UI Layout & Dinámica Contable): Kanban por etapas, filas vinculadas clickeables, split layout PDF y facturación dinámica en abonos', async () => {
+    const htmlText = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    const cssText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'css', 'odoo20.css'), 'utf8');
+    const jsText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
+
+    // 1. Kanban con columnas por etapas (Cotización, Enviada, Pedido de Venta)
+    assert.ok(cssText.includes('.o_kanban_board'), 'CSS must define .o_kanban_board for stage columns');
+    assert.ok(cssText.includes('.o_kanban_column'), 'CSS must define .o_kanban_column');
+    assert.ok(cssText.includes('.o_kanban_col_header'), 'CSS must define .o_kanban_col_header');
+    assert.ok(jsText.includes("title: 'Cotización'"), 'Sales kanban must have Cotización stage');
+    assert.ok(jsText.includes("title: 'Cotización Enviada'"), 'Sales kanban must have Cotización Enviada stage');
+    assert.ok(jsText.includes("title: 'Pedido de Venta'"), 'Sales kanban must have Pedido de Venta stage');
+
+    // 2. Facturas vinculadas directamente clickeables en la fila
+    assert.ok(cssText.includes('.o_invoice_link_row'), 'CSS must style .o_invoice_link_row for row click navigation');
+    assert.ok(jsText.includes('class="o_invoice_link_row" data-invoice-id="'), 'Linked invoice rows must have data-invoice-id on <tr>');
+    assert.ok(jsText.includes("container.querySelectorAll('.o_linked_invoices_panel tbody tr[data-invoice-id]')"), 'JS must attach click listener directly to linked invoice rows');
+
+    // 3. Layout de Factura: Tarjeta de Historial y Auditoría debajo de la tarjeta de factura, y PDF ocupando el espacio derecho
+    assert.ok(cssText.includes('.o_invoice_left_col'), 'CSS must define .o_invoice_left_col with flex column layout');
+    assert.ok(jsText.includes('<div class="o_invoice_left_col">'), 'Invoice view must stack sheet and chatter vertically in o_invoice_left_col');
+    assert.ok(cssText.includes('minmax(460px, 1.25fr)'), 'CSS must allocate wide flexible space for right-hand invoice PDF panel');
+
+    // 4. Modal de pago con opción de generar automáticamente la factura por saldo restante
+    assert.ok(htmlText.includes('id="chkGenerateResidualInvoice"'), 'Payment dialog must have chkGenerateResidualInvoice checkbox');
+    assert.ok(htmlText.includes('id="payResidualOptionRow"'), 'Payment dialog must have payResidualOptionRow');
+
+    // 5. Flujo Contable Dinámico: Pago parcial genera trazabilidad y siguiente factura por saldo restante
+    const newMoveRes = await req('/api/accounting/moves', 'POST', {
+      move_type: 'out_invoice',
+      partner_id: 1,
+      lines: [
+        { name: 'Carpintería en Aluminio Arquitectónico', quantity: 1, price_unit: 1000000, tax_rate: 19 }
+      ]
+    });
+    assert.equal(newMoveRes.status, 200);
+    const originalMove = newMoveRes.json.move;
+
+    // Confirmar y publicar factura ($1.190.000 total)
+    const postRes = await req(`/api/accounting/moves/${originalMove.id}/action`, 'POST', { action: 'post' });
+    assert.equal(postRes.status, 200);
+    assert.equal(postRes.json.move.state, 'posted');
+    assert.equal(postRes.json.move.amount_residual, 1190000);
+
+    // Registrar abono parcial de $400.000 con generate_residual_invoice: true
+    const payPartRes = await req(`/api/accounting/moves/${originalMove.id}/action`, 'POST', {
+      action: 'register_payment',
+      amount: 400000,
+      journal_code: 'BNK1',
+      date: '2026-10-27',
+      generate_residual_invoice: true
+    });
+    assert.equal(payPartRes.status, 200);
+    const updatedInv = payPartRes.json.move;
+    assert.equal(updatedInv.payment_state, 'partial');
+    assert.equal(updatedInv.amount_residual, 790000);
+    assert.ok(Array.isArray(updatedInv.payments_history));
+    assert.equal(updatedInv.payments_history.length, 1);
+    assert.equal(updatedInv.payments_history[0].amount, 400000);
+    assert.equal(updatedInv.payments_history[0].residual_after, 790000);
+
+    // Siguiente factura por el saldo restante ($790.000) generada automáticamente
+    const nextInvoice = payPartRes.json.next_invoice || updatedInv.next_invoice;
+    assert.ok(nextInvoice, 'Should return generated next_invoice for residual');
+    assert.equal(nextInvoice.amount_total, 790000);
+    assert.equal(nextInvoice.amount_residual, 790000);
+    assert.equal(nextInvoice.state, 'posted');
+    assert.equal(nextInvoice.payment_state, 'not_paid');
+    assert.equal(nextInvoice.prior_invoice_id, updatedInv.id);
+    assert.equal(nextInvoice.prior_payment_amount, 400000);
+
+    // El siguiente pago se realiza sobre la segunda factura por su saldo restante
+    const payNextRes = await req(`/api/accounting/moves/${nextInvoice.id}/action`, 'POST', {
+      action: 'register_payment',
+      amount: 790000,
+      journal_code: 'BNK1',
+      date: '2026-10-28'
+    });
+    assert.equal(payNextRes.status, 200);
+    assert.equal(payNextRes.json.move.payment_state, 'paid');
+    assert.equal(payNextRes.json.move.amount_residual, 0);
+  });
 });
 
 

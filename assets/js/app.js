@@ -1735,29 +1735,61 @@
     `;
 
     if (state.viewType === 'kanban') {
+      const stageCols = [
+        { id: 'draft', title: 'Cotización', color: '#3b82f6', filter: (s) => s.state === 'draft' },
+        { id: 'sent', title: 'Cotización Enviada', color: '#06b6d4', filter: (s) => s.state === 'sent' },
+        { id: 'sale', title: 'Pedido de Venta', color: '#10b981', filter: (s) => s.state === 'sale' || s.state === 'done' }
+      ];
+      if (sales.some((s) => s.state === 'cancel')) {
+        stageCols.push({ id: 'cancel', title: 'Cancelado', color: '#ef4444', filter: (s) => s.state === 'cancel' });
+      }
+
       container.innerHTML =
         bannerHtml +
-        `<div class="o_kanban_view">
-          ${sales
-            .map(
-              (s) => `
-              <article class="o_kanban_record" data-sale-id="${s.id}">
-                <div class="o_kanban_avatar">${esc(s.name.slice(-2))}</div>
-                <div class="o_kanban_details">
-                  <div style="display: flex; justify-content: space-between; gap: 0.4rem;">
-                    <span class="o_kanban_title">${esc(s.name)} — ${esc(s.partner_name)}</span>
-                    ${saleStateBadge(s.state)}
+        `<div class="o_kanban_board">
+          ${stageCols
+            .map((col) => {
+              const colSales = sales.filter(col.filter);
+              const colSum = colSales.reduce((acc, s) => acc + Number(s.amount_total || 0), 0);
+              return `
+              <div class="o_kanban_column" style="--col-accent: ${col.color};">
+                <div class="o_kanban_col_header">
+                  <div class="o_kanban_col_title_wrap">
+                    <span class="o_kanban_col_title">${esc(col.title)}</span>
+                    <span class="o_badge o_badge_muted">${colSales.length}</span>
                   </div>
-                  <div class="o_kanban_subtitle">📅 ${esc(s.date_order)} · Comercial: ${esc(s.salesperson)}</div>
-                  <div class="o_kanban_subtitle">${(s.lines || []).length} línea(s) · Plazo: ${esc(s.payment_term)}</div>
-                  <div class="o_kanban_footer">
-                    ${invoiceStatusBadge(s.invoice_status)}
-                    <strong>${formatMoney(s.amount_total)}</strong>
-                  </div>
+                  <span class="o_kanban_col_sum">${formatMoney(colSum)}</span>
                 </div>
-              </article>
-            `
-            )
+                <div class="o_kanban_col_cards">
+                  ${
+                    colSales.length === 0
+                      ? `<div class="o_kanban_col_empty">Sin órdenes en ${esc(col.title.toLowerCase())}</div>`
+                      : colSales
+                          .map(
+                            (s) => `
+                        <article class="o_kanban_record" data-sale-id="${s.id}" style="cursor: pointer;">
+                          <div class="o_kanban_avatar">${esc(s.name.slice(-2))}</div>
+                          <div class="o_kanban_details">
+                            <div style="display: flex; justify-content: space-between; gap: 0.4rem;">
+                              <span class="o_kanban_title">${esc(s.name)} — ${esc(s.partner_name)}</span>
+                              ${saleStateBadge(s.state)}
+                            </div>
+                            <div class="o_kanban_subtitle">📅 ${esc(s.date_order)} · Comercial: ${esc(s.salesperson)}</div>
+                            <div class="o_kanban_subtitle">${(s.lines || []).length} línea(s) · Plazo: ${esc(s.payment_term)}</div>
+                            <div class="o_kanban_footer">
+                              ${invoiceStatusBadge(s.invoice_status)}
+                              <strong>${formatMoney(s.amount_total)}</strong>
+                            </div>
+                          </div>
+                        </article>
+                      `
+                          )
+                          .join('')
+                  }
+                </div>
+              </div>
+            `;
+            })
             .join('')}
         </div>`;
 
@@ -1915,7 +1947,7 @@
             </thead>
             <tbody>
               ${linkedInvoices.map((inv, idx) => `
-                <tr>
+                <tr class="o_invoice_link_row" data-invoice-id="${inv.id}" style="cursor: pointer;" title="Haz clic en esta línea para ver ${esc(inv.name)} y su PDF">
                   <th>${esc(inv.name)}</th>
                   <td>${esc(inv.invoice_date)}</td>
                   <td><span class="o_badge o_badge_info">${esc(inv.is_installment ? `Abono Cuota #${inv.installment_number || (idx + 1)}` : 'Factura')}</span></td>
@@ -1923,7 +1955,7 @@
                   <td class="text-end">${formatMoney(inv.amount_residual)}</td>
                   <td>${paymentStateBadge(inv.payment_state)}</td>
                   <td class="text-end">
-                    <button type="button" class="btn btn-sm btn-secondary btn-goto-invoice" data-invoice-id="${inv.id}">Ver Factura y PDF</button>
+                    <span class="btn btn-sm btn-secondary" style="pointer-events: none;">Ver Factura y PDF</span>
                   </td>
                 </tr>
               `).join('')}
@@ -2103,6 +2135,47 @@
               <span>Abono en esta Factura: <strong style="color: #059669;">${formatMoney(invoice.amount_total)}</strong></span>
               <span>Saldo Restante Orden: <strong style="color: #d97706;">${formatMoney(invoice.order_residual || 0)}</strong></span>
             </div>
+          </div>
+        ` : ''}
+
+        ${invoice.prior_invoice_name ? `
+          <div class="o_pdf_trace_box" style="background: #f0fdf4; border-color: #22c55e;">
+            <div style="font-weight: 700; color: #15803d; margin-bottom: 4px;">
+              Trazabilidad de Continuidad por Saldo Restante
+            </div>
+            <div style="font-size: 0.8rem; color: #166534;">
+              Factura emitida por saldo restante tras abono previo de <strong>${formatMoney(invoice.prior_payment_amount || 0)}</strong> el <strong>${esc(invoice.prior_payment_date || '')}</strong> sobre la factura <strong>${esc(invoice.prior_invoice_name)}</strong>.
+            </div>
+          </div>
+        ` : ''}
+
+        ${(invoice.payments_history && invoice.payments_history.length > 0) ? `
+          <div class="o_pdf_payments_history_box">
+            <div style="font-weight: 700; color: #065f46; margin-bottom: 4px; font-size: 0.82rem;">
+              Trazabilidad de Abonos y Pagos Aplicados
+            </div>
+            <table class="o_pdf_subtable">
+              <thead>
+                <tr>
+                  <th>Fecha Abono</th>
+                  <th>Recibo / Ref</th>
+                  <th>Medio de Pago</th>
+                  <th style="text-align: right;">Monto Abonado</th>
+                  <th style="text-align: right;">Saldo Restante</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${invoice.payments_history.map(p => `
+                  <tr>
+                    <td>${esc(p.date)}</td>
+                    <td><strong>${esc(p.name)}</strong></td>
+                    <td>${esc(p.journal_name || '')}</td>
+                    <td style="text-align: right; color: #059669;"><strong>${formatMoney(p.amount)}</strong></td>
+                    <td style="text-align: right; color: #d97706;"><strong>${formatMoney(p.residual_after)}</strong></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
           </div>
         ` : ''}
 
@@ -2678,10 +2751,22 @@
       });
     }
 
+    container.querySelectorAll('.o_linked_invoices_panel tbody tr[data-invoice-id]').forEach((row) => {
+      row.addEventListener('click', () => {
+        const moveId = Number(row.getAttribute('data-invoice-id'));
+        if (moveId) {
+          openApp('accounting', { submenu: 'out_invoice', viewType: 'form', recordId: moveId });
+        }
+      });
+    });
+
     container.querySelectorAll('.btn-goto-invoice').forEach((btn) => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
         const moveId = Number(btn.getAttribute('data-invoice-id'));
-        openApp('accounting', { submenu: 'out_invoice', viewType: 'form', recordId: moveId });
+        if (moveId) {
+          openApp('accounting', { submenu: 'out_invoice', viewType: 'form', recordId: moveId });
+        }
       });
     });
   }
@@ -3393,9 +3478,10 @@
       amount_residual: calcResidual
     };
 
+    const hasPriorPayments = Boolean(existing.payments_history && existing.payments_history.length > 0) || Boolean(existing.is_installment);
     container.innerHTML = `
       <div class="o_invoice_split_container">
-        <div class="o_form_view">
+        <div class="o_invoice_left_col">
           <div class="o_form_sheet_bg">
           <div class="o_form_statusbar">
             <div class="o_statusbar_buttons">
@@ -3408,6 +3494,11 @@
               ${
                 !isNew && existing.state === 'posted' && existing.amount_residual > 0
                   ? `<button type="button" class="btn btn-action" id="btnOpenPaymentModal">Registrar Pago</button>`
+                  : ''
+              }
+              ${
+                !isNew && existing.state === 'posted' && existing.amount_residual > 0 && hasPriorPayments
+                  ? `<button type="button" class="btn btn-secondary btn-sm" id="btnGenResidualMove">Generar Siguiente Factura por Saldo</button>`
                   : ''
               }
               ${
@@ -3714,10 +3805,49 @@
         const dialog = document.getElementById('paymentDialog');
         document.getElementById('payMoveId').value = String(existing.id);
         document.getElementById('payJournal').value = '';
-        document.getElementById('payAmount').value = String(existing.amount_residual);
+        const amtInput = document.getElementById('payAmount');
+        amtInput.value = String(existing.amount_residual);
+        amtInput.max = String(existing.amount_residual);
         document.getElementById('payDate').value = new Date().toISOString().slice(0, 10);
         document.getElementById('payRef').value = existing.name;
+
+        const resRow = document.getElementById('payResidualOptionRow');
+        const dispRes = document.getElementById('dispPayResidualAmount');
+        const updateResidualOption = () => {
+          const curVal = Number(amtInput.value || 0);
+          const diff = Number(existing.amount_residual || 0) - curVal;
+          if (resRow) {
+            if (diff > 0) {
+              resRow.style.display = 'block';
+              if (dispRes) dispRes.textContent = formatMoney(diff);
+            } else {
+              resRow.style.display = 'none';
+            }
+          }
+        };
+        amtInput.oninput = updateResidualOption;
+        updateResidualOption();
+
         dialog.showModal();
+      });
+    }
+
+    const btnGenResidualMove = document.getElementById('btnGenResidualMove');
+    if (btnGenResidualMove) {
+      btnGenResidualMove.addEventListener('click', async () => {
+        try {
+          const res = await apiCall('/api/accounting/moves/' + existing.id + '/action', 'POST', {
+            action: 'generate_residual_invoice'
+          });
+          const nextInv = res.next_invoice || (res.move && res.move.next_invoice);
+          showToast('Siguiente factura ' + (nextInv ? nextInv.name : '') + ' generada por el saldo restante.');
+          if (nextInv) {
+            state.activeRecordId = nextInv.id;
+          }
+          renderModuleWorkspace();
+        } catch (err) {
+          showToast(err.message, true);
+        }
       });
     }
 
@@ -4153,15 +4283,24 @@
         const amount = Number(document.getElementById('payAmount').value);
         const date = document.getElementById('payDate').value;
         const ref = document.getElementById('payRef').value;
-        await apiCall(`/api/accounting/moves/${moveId}/action`, 'POST', {
+        const chkGenResidual = document.getElementById('chkGenerateResidualInvoice');
+        const genResidual = Boolean(chkGenResidual && chkGenResidual.checked);
+
+        const res = await apiCall(`/api/accounting/moves/${moveId}/action`, 'POST', {
           action: 'register_payment',
           journal_code,
           amount,
           date,
-          ref
+          ref,
+          generate_residual_invoice: genResidual
         });
         payDialog.close();
-        showToast('Pago registrado y conciliado exitosamente.');
+        const nextInv = res.next_invoice || (res.move && res.move.next_invoice);
+        if (nextInv) {
+          showToast(`Pago registrado y siguiente factura ${nextInv.name} generada por el saldo restante.`);
+        } else {
+          showToast('Pago registrado y conciliado exitosamente.');
+        }
         renderModuleWorkspace();
       } catch (err) {
         showToast(err.message, true);

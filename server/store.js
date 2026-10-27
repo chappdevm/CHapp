@@ -1601,11 +1601,124 @@ class ERPStore {
     return newMove;
   }
 
+  createResidualInstallmentInvoice(move, priorPaymentAmount, paymentDate) {
+    const residualAmount = round2(move.amount_residual);
+    if (residualAmount <= 0) return null;
+
+    const nextSeq = this.nextSeq('move_inv');
+    const nextId = this.data.accounting.moves.reduce((m, x) => Math.max(m, Number(x.id)), 0) + 1;
+    const nextInvName = `INV/2026/${this.padSeq(nextSeq, 4)}`;
+    const nextDate = paymentDate || todayStr();
+    const nextDueDate = addDays(nextDate, 30);
+
+    const taxRatio = (move.amount_total > 0 && move.amount_tax > 0) ? (move.amount_tax / move.amount_total) : (0.19 / 1.19);
+    const nextTax = round2(residualAmount * taxRatio);
+    const nextUntaxed = round2(residualAmount - nextTax);
+
+    const nextInstallmentNum = (move.installment_number || 1) + 1;
+
+    const nextInvoice = {
+      id: nextId,
+      name: nextInvName,
+      move_type: move.move_type || 'out_invoice',
+      journal_id: move.journal_id || 1,
+      journal_code: move.journal_code || 'INV',
+      journal_name: move.journal_name || 'Facturas de Clientes',
+      partner_id: move.partner_id,
+      partner_name: move.partner_name,
+      invoice_date: nextDate,
+      invoice_date_due: nextDueDate,
+      ref: move.name,
+      origin: move.origin || move.name,
+      state: 'posted',
+      payment_state: 'not_paid',
+      lines: [
+        {
+          id: 1,
+          product_id: (move.lines && move.lines[0] && move.lines[0].product_id) || 1,
+          name: `Saldo Restante Cuota #${nextInstallmentNum} (tras Abono de $ ${Number(priorPaymentAmount || 0).toLocaleString('es-CO')} el ${nextDate} a ${move.name})`,
+          account_code: '413501',
+          account_name: 'Ingresos por Servicios de Software y Consultoría',
+          quantity: 1,
+          price_unit: nextUntaxed,
+          tax_rate: nextUntaxed > 0 ? round2((nextTax / nextUntaxed) * 100) : 19,
+          subtotal: nextUntaxed,
+          tax_amount: nextTax,
+          total: residualAmount
+        }
+      ],
+      journal_items: [
+        {
+          account_code: '130505',
+          account_name: 'Clientes Nacionales (Cuentas por Cobrar)',
+          label: `${nextInvName} - ${move.partner_name} (Saldo Cuota #${nextInstallmentNum})`,
+          debit: residualAmount,
+          credit: 0
+        },
+        {
+          account_code: '413501',
+          account_name: 'Ingresos por Servicios de Software y Consultoría',
+          label: `Saldo Restante tras Abono ${move.name}`,
+          debit: 0,
+          credit: nextUntaxed
+        }
+      ],
+      amount_untaxed: nextUntaxed,
+      amount_tax: nextTax,
+      amount_total: residualAmount,
+      amount_residual: residualAmount,
+      order_total: move.order_total || move.amount_total,
+      order_residual: residualAmount,
+      installment_number: nextInstallmentNum,
+      is_installment: true,
+      prior_invoice_id: move.id,
+      prior_invoice_name: move.name,
+      prior_payment_amount: priorPaymentAmount,
+      prior_payment_date: nextDate,
+      payments_history: [],
+      chatter: [
+        {
+          id: Date.now() + 2,
+          author: this.getActiveAuthor(),
+          date: this.formatNowShort(),
+          text: `Factura ${nextInvName} generada automáticamente por saldo restante de $ ${residualAmount.toLocaleString('es-CO')} tras abono de $ ${Number(priorPaymentAmount || 0).toLocaleString('es-CO')} el ${nextDate} a la factura ${move.name}.`
+        }
+      ]
+    };
+
+    if (nextTax > 0) {
+      nextInvoice.journal_items.push({
+        account_code: '240801',
+        account_name: 'IVA Generado en Ventas (19%)',
+        label: `IVA Generado ${nextInvName}`,
+        debit: 0,
+        credit: nextTax
+      });
+    }
+
+    this.data.accounting.moves.unshift(nextInvoice);
+
+    const linkedSale = this.data.sales.find((s) => (s.invoice_ids || []).includes(move.id) || s.name === move.origin || s.name === move.ref);
+    if (linkedSale && !(linkedSale.invoice_ids || []).includes(nextInvoice.id)) {
+      linkedSale.invoice_ids = [...(linkedSale.invoice_ids || []), nextInvoice.id];
+    }
+
+    move.chatter.push({
+      id: Date.now() + 3,
+      author: this.getActiveAuthor(),
+      date: this.formatNowShort(),
+      text: `Siguiente factura por saldo restante emitida: ${nextInvName} ($ ${residualAmount.toLocaleString('es-CO')}).`
+    });
+
+    return nextInvoice;
+  }
+
   async transitionAccountMove(id, action, extra = {}) {
     const move = this.data.accounting.moves.find((m) => Number(m.id) === Number(id));
     if (!move) throw new Error('Documento contable no encontrado.');
 
     let payment = null;
+    let nextInvoice = null;
 
     const reverseLinkedPayments = () => {
       const linked = this.data.accounting.payments.filter((p) => Number(p.move_id) === Number(move.id));
@@ -1670,6 +1783,21 @@ class ERPStore {
       this.data.accounting.payments.unshift(payment);
       this.adjustJournalBalance(journalCode, paymentType === 'inbound' ? payAmount : -payAmount);
 
+      move.payments_history = move.payments_history || [];
+      const paymentItem = {
+        id: payId,
+        payment_id: payId,
+        name: payName,
+        amount: payAmount,
+        date: extra.date || todayStr(),
+        journal_code: journalCode,
+        journal_name: journalName,
+        residual_after: round2(move.amount_residual - payAmount)
+      };
+      move.payments_history.push(paymentItem);
+      move.last_payment_date = extra.date || todayStr();
+      move.last_payment_amount = payAmount;
+
       move.amount_residual = round2(move.amount_residual - payAmount);
       move.payment_state = move.amount_residual === 0 ? 'paid' : 'partial';
       move.chatter.push({
@@ -1678,6 +1806,15 @@ class ERPStore {
         date: this.formatNowShort(),
         text: `Pago ${payName} registrado por $ ${payAmount.toLocaleString('es-CO')} en ${journalName}. Saldo pendiente: $ ${move.amount_residual.toLocaleString('es-CO')}.`
       });
+
+      if (extra.generate_residual_invoice && move.amount_residual > 0 && move.move_type === 'out_invoice') {
+        nextInvoice = this.createResidualInstallmentInvoice(move, payAmount, extra.date || todayStr());
+      }
+    } else if (action === 'generate_residual_invoice') {
+      if (move.amount_residual <= 0) {
+        throw new Error('Esta factura no tiene saldo pendiente por facturar en una nueva cuota.');
+      }
+      nextInvoice = this.createResidualInstallmentInvoice(move, move.last_payment_amount || 0, todayStr());
     } else if (action === 'cancel') {
       reverseLinkedPayments();
       move.state = 'cancel';
@@ -1713,6 +1850,9 @@ class ERPStore {
     this.save();
     if (this.supabase) {
       await this.supabase.saveAccountMove(move);
+      if (nextInvoice) {
+        await this.supabase.saveAccountMove(nextInvoice);
+      }
       if (action === 'register_payment' && payment) {
         await this.supabase.savePayment(payment);
       } else if (action === 'cancel' || action === 'draft') {
@@ -1721,6 +1861,9 @@ class ERPStore {
       if (linkedSale) {
         await this.supabase.saveSaleOrder(linkedSale);
       }
+    }
+    if (nextInvoice) {
+      move.next_invoice = nextInvoice;
     }
     return move;
   }

@@ -2389,15 +2389,135 @@ dialog.o_dialog::backdrop {
    ========================================================================== */
 .o_invoice_split_container {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 480px;
-  gap: 1.25rem;
+  grid-template-columns: minmax(360px, 1fr) minmax(460px, 1.25fr);
+  gap: 1.5rem;
   align-items: start;
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1100px) {
   .o_invoice_split_container {
     grid-template-columns: 1fr;
+    gap: 1rem;
   }
+}
+
+.o_invoice_left_col {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.o_invoice_link_row {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.o_invoice_link_row:hover td,
+.o_invoice_link_row:hover th {
+  background-color: rgba(235, 130, 60, 0.08) !important;
+}
+
+/* ==========================================================================
+   Kanban Stage Columns Board (Columnas por Etapa Odoo 20)
+   ========================================================================== */
+.o_kanban_board {
+  display: flex;
+  gap: 1.15rem;
+  overflow-x: auto;
+  padding: 0.25rem 0.25rem 1rem 0.25rem;
+  align-items: flex-start;
+  min-height: 480px;
+}
+
+.o_kanban_column {
+  flex: 1 1 320px;
+  min-width: 300px;
+  max-width: 420px;
+  background-color: var(--o-kanban-col-bg, #0d1b26);
+  border: 1px solid var(--o-border-color);
+  border-top: 3.5px solid var(--col-accent, var(--o-primary));
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.o_kanban_col_header {
+  padding: 0.85rem 1rem;
+  background-color: var(--o-view-bg);
+  border-bottom: 1px solid var(--o-border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.o_kanban_col_title_wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.o_kanban_col_title {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--o-text-main, #f3f4f6);
+}
+
+.o_kanban_col_sum {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--o-text-muted);
+}
+
+.o_kanban_col_cards {
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex: 1;
+  min-height: 120px;
+}
+
+.o_kanban_col_empty {
+  padding: 1.75rem 1rem;
+  text-align: center;
+  color: var(--o-text-muted);
+  font-size: 0.82rem;
+  border: 1.5px dashed var(--o-border-color);
+  border-radius: 8px;
+  margin: 0.5rem 0;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.o_pdf_payments_history_box {
+  background: #ecfdf5;
+  border: 1.5px solid #10b981;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 12px;
+}
+
+.o_pdf_subtable {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 6px;
+}
+
+.o_pdf_subtable th {
+  background: #047857;
+  color: #fff;
+  padding: 4px 8px;
+  text-align: left;
+  font-size: 11px;
+}
+
+.o_pdf_subtable td {
+  padding: 4px 8px;
+  border-bottom: 1px solid #d1fae5;
+  font-size: 11.5px;
 }
 
 .o_invoice_pdf_panel {

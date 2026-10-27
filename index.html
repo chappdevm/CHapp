@@ -194,6 +194,12 @@
             <label for="payRef">Circular / Referencia (Memo)</label>
             <input type="text" id="payRef" class="o_input" placeholder="Referencia del pago" />
           </div>
+          <div class="o_field_row" id="payResidualOptionRow" style="display: none; background: rgba(59, 130, 246, 0.08); padding: 8px 12px; border-radius: 6px; border: 1px dashed var(--o-info);">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; margin: 0; color: inherit;">
+              <input type="checkbox" id="chkGenerateResidualInvoice" checked />
+              <span><strong>Generar siguiente factura por saldo restante</strong> (<span id="dispPayResidualAmount">$ 0</span>) con trazabilidad</span>
+            </label>
+          </div>
         </div>
         <div class="o_dialog_footer">
           <button type="button" class="btn btn-secondary" id="btnCancelPaymentDialog">Cancelar</button>
