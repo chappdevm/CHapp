@@ -16,3 +16,4 @@ desktop.ini
 .env.local
 tmp/
 *.tmp
+baileys_auth_info/

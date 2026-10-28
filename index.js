@@ -4,6 +4,7 @@ const path = require('path');
 const { ERPStore } = require('./server/store');
 const { isSupabaseConfigured, getSupabaseConfig } = require('./server/supabase');
 const { analyzeInvoiceImage } = require('./server/gemini');
+const { baileysManager } = require('./server/baileys');
 
 const PORT = process.env.PORT || 3000;
 const ROOT_DIR = __dirname;
@@ -228,6 +229,87 @@ function createHandler(store = new ERPStore(undefined, { useSupabase: isSupabase
           const body = await readJsonBody(req);
           const settings = await store.saveSettings(body);
           return sendJson(res, 200, { ok: true, settings, state: store.getBootstrapState() });
+        }
+
+        // WhatsApp Baileys endpoints
+        if (method === 'GET' && pathname === '/api/whatsapp/status') {
+          return sendJson(res, 200, { ok: true, ...baileysManager.getStatus() });
+        }
+
+        if (method === 'POST' && pathname === '/api/whatsapp/connect') {
+          const status = await baileysManager.init();
+          return sendJson(res, 200, { ok: true, ...status });
+        }
+
+        if (method === 'POST' && pathname === '/api/whatsapp/disconnect') {
+          const result = await baileysManager.disconnect();
+          return sendJson(res, 200, { ok: true, ...result });
+        }
+
+        if (method === 'POST' && pathname === '/api/whatsapp/send') {
+          const body = await readJsonBody(req);
+          const { model, id, to, pdfBase64, filename, caption } = body;
+
+          let targetPhone = to;
+          let partnerName = '';
+          let docName = '';
+          let record = null;
+
+          if (model === 'sales') {
+            record = (store.data.sales || []).find((s) => Number(s.id) === Number(id));
+            if (!record) throw new Error('Cotización o pedido no encontrado.');
+            docName = record.name;
+            const partner = (store.data.contacts || []).find((c) => Number(c.id) === Number(record.partner_id));
+            if (partner) {
+              partnerName = partner.name;
+              if (!targetPhone) targetPhone = partner.mobile || partner.phone;
+            }
+          } else if (model === 'accounting' || model === 'account_move') {
+            const moves = (store.data.accounting && store.data.accounting.moves) || [];
+            record = moves.find((m) => Number(m.id) === Number(id));
+            if (!record) throw new Error('Factura no encontrada.');
+            docName = record.name;
+            const partner = (store.data.contacts || []).find((c) => Number(c.id) === Number(record.partner_id));
+            if (partner) {
+              partnerName = partner.name;
+              if (!targetPhone) targetPhone = partner.mobile || partner.phone;
+            }
+          } else {
+            throw new Error('Modelo no soportado para envío por WhatsApp.');
+          }
+
+          if (!targetPhone) {
+            throw new Error('El cliente no tiene un número celular registrado en la aplicación.');
+          }
+
+          if (!pdfBase64) {
+            throw new Error('No se recibió el documento PDF para enviar.');
+          }
+
+          const defaultCaption = caption || (model === 'sales'
+            ? `Hola ${partnerName || ''}, adjuntamos su cotización ${docName} de CH Aluminios. Quedamos a su entera disposición.`
+            : `Hola ${partnerName || ''}, adjuntamos su factura electrónica ${docName} de CH Aluminios. Agradecemos su preferencia.`
+          );
+
+          const sendResult = await baileysManager.sendPdf(targetPhone, pdfBase64, filename || `${docName}.pdf`, defaultCaption);
+
+          const chatterMsg = model === 'sales'
+            ? `Cotización ${docName} enviada por WhatsApp al cliente (+${sendResult.to}).`
+            : `Factura ${docName} enviada por WhatsApp al cliente (+${sendResult.to}).`;
+
+          await store.addChatterNote(model === 'sales' ? 'sales' : 'accounting', id, chatterMsg);
+
+          if (model === 'sales' && record.state === 'draft') {
+            record.state = 'sent';
+            store.save();
+          }
+
+          return sendJson(res, 200, {
+            ok: true,
+            message: `Documento enviado con éxito por WhatsApp al +${sendResult.to}`,
+            sendResult,
+            state: store.getBootstrapState()
+          });
         }
 
         // Chatter notes

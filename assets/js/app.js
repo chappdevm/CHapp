@@ -3782,6 +3782,212 @@
     }
   }
 
+  // ==================== BAILEYS WHATSAPP CLIENT INTEGRATION ====================
+  let waPollInterval = null;
+
+  function closeWhatsAppModal() {
+    if (waPollInterval) {
+      clearInterval(waPollInterval);
+      waPollInterval = null;
+    }
+    const m = document.getElementById('modalWhatsAppBackdrop');
+    if (m) m.remove();
+  }
+
+  async function showWhatsAppQrModal(onConnected) {
+    closeWhatsAppModal();
+
+    const backdrop = document.createElement('div');
+    backdrop.id = 'modalWhatsAppBackdrop';
+    backdrop.className = 'o_modal_backdrop';
+    backdrop.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.65); display: flex; align-items: center; justify-content: center; z-index: 10000; padding: 1rem;';
+
+    backdrop.innerHTML = `
+      <div class="o_modal_dialog" style="background: var(--o-view-bg, #1e293b); color: var(--o-text-color, #f8fafc); border-radius: 12px; width: 100%; max-width: 440px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); border: 1px solid var(--o-border-color, #334155); overflow: hidden;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid var(--o-border-color, #334155);">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="#25D366"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2z"></path></svg>
+            <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600;">Vincular WhatsApp de la Compañía</h3>
+          </div>
+          <button type="button" class="o_dialog_close" id="btnCloseWhatsAppModal" aria-label="Cerrar" style="background: none; border: none; color: var(--o-text-muted); cursor: pointer; display: flex; align-items: center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        </div>
+        <div style="padding: 1.5rem; text-align: center;">
+          <p style="font-size: 0.88rem; color: var(--o-text-muted, #94a3b8); margin-bottom: 1.25rem; line-height: 1.4;">
+            Abre WhatsApp en el celular de la empresa &gt; <strong>Dispositivos vinculados</strong> &gt; <strong>Vincular un dispositivo</strong> y escanea el código QR:
+          </p>
+          <div id="waQrContainer" style="display: flex; justify-content: center; align-items: center; min-height: 230px; background: #ffffff; border-radius: 10px; padding: 1rem; border: 1px solid var(--o-border-color, #334155);">
+            <div style="color: #64748b; font-size: 0.88rem;">Generando código QR seguro...</div>
+          </div>
+          <div id="waStatusText" style="margin-top: 1.25rem; font-size: 0.88rem; font-weight: 600; color: #38bdf8;">
+            Iniciando conexión con WhatsApp...
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(backdrop);
+
+    document.getElementById('btnCloseWhatsAppModal').addEventListener('click', closeWhatsAppModal);
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) closeWhatsAppModal();
+    });
+
+    const updateQrFromStatus = (statusData) => {
+      const container = document.getElementById('waQrContainer');
+      const text = document.getElementById('waStatusText');
+      if (!container || !text) return;
+
+      if (statusData.status === 'CONECTADO') {
+        container.innerHTML = `
+          <div style="color: #10b981; text-align: center;">
+            <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <div style="font-weight: 700; font-size: 1.05rem; margin-top: 0.5rem; color: #1e293b;">¡Dispositivo Vinculado!</div>
+            <div style="font-size: 0.85rem; color: #64748b;">+${statusData.connectedNumber || ''}</div>
+          </div>
+        `;
+        text.textContent = 'WhatsApp conectado con éxito.';
+        text.style.color = '#10b981';
+
+        setTimeout(() => {
+          closeWhatsAppModal();
+          if (typeof onConnected === 'function') onConnected();
+        }, 1200);
+        return;
+      }
+
+      if (statusData.tieneQr && statusData.qrDataUrl) {
+        container.innerHTML = `<img src="${statusData.qrDataUrl}" alt="Código QR WhatsApp" style="width: 220px; height: 220px; display: block; border-radius: 4px;" />`;
+        text.textContent = 'Esperando escaneo desde tu celular...';
+        text.style.color = '#38bdf8';
+      } else if (statusData.status === 'CONECTANDO') {
+        text.textContent = 'Conectando con WhatsApp...';
+      }
+    };
+
+    const checkStatus = async () => {
+      try {
+        const res = await apiCall('/api/whatsapp/status', 'GET');
+        updateQrFromStatus(res);
+        if (res.status === 'CONECTADO') {
+          if (waPollInterval) clearInterval(waPollInterval);
+        }
+      } catch (err) {
+        console.warn('[WhatsApp Poll]', err);
+      }
+    };
+
+    await checkStatus();
+    waPollInterval = setInterval(checkStatus, 2200);
+  }
+
+  async function generateDocumentPdfBase64(type, record, containerSelector, filename) {
+    if (typeof window === 'undefined' || typeof window.html2pdf !== 'function') {
+      throw new Error('La librería html2pdf no está disponible para generar el archivo.');
+    }
+
+    let container = document.querySelector(containerSelector);
+    let targetEl = null;
+
+    if (container) {
+      targetEl = container.cloneNode(true);
+    } else {
+      const offscreen = document.createElement('div');
+      offscreen.style.position = 'fixed';
+      offscreen.style.left = '-9999px';
+      offscreen.style.top = '0';
+      offscreen.style.width = '210mm';
+      offscreen.innerHTML = type === 'sales'
+        ? renderSalePdfSheetHtml(record)
+        : renderInvoicePdfSheetHtml(record);
+      document.body.appendChild(offscreen);
+      targetEl = offscreen.firstElementChild || offscreen;
+    }
+
+    targetEl.style.width = '210mm';
+    targetEl.style.margin = '0 auto';
+    targetEl.style.boxShadow = 'none';
+    targetEl.style.border = 'none';
+    const logoData = getLogoDataUrl();
+    const logoImg = targetEl.querySelector('.o_pdf_company_logo');
+    if (logoImg && logoData && logoData.startsWith('data:')) {
+      logoImg.src = logoData;
+    }
+
+    const opt = {
+      margin: [8, 8, 8, 8],
+      filename: filename || `${record.name}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, logging: false },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    try {
+      const dataUri = await window.html2pdf().set(opt).from(targetEl).output('datauristring');
+      return dataUri;
+    } finally {
+      if (!container && targetEl && targetEl.parentElement === document.body) {
+        document.body.removeChild(targetEl.parentElement);
+      }
+    }
+  }
+
+  async function sendDocumentViaWhatsApp({ model, record, containerSelector, filename, defaultCaption }) {
+    if (!record || !record.id) {
+      showToast('Debe guardar el documento antes de enviarlo por WhatsApp.', true);
+      return;
+    }
+
+    const partner = (state.data.contacts || []).find((c) => Number(c.id) === Number(record.partner_id));
+    const phone = partner ? (partner.mobile || partner.phone) : '';
+
+    if (!phone || !phone.trim()) {
+      showToast(`El cliente "${partner ? partner.name : 'sin contacto'}" no tiene un número celular registrado en la aplicación.`, true);
+      return;
+    }
+
+    try {
+      const st = await apiCall('/api/whatsapp/status', 'GET');
+      if (st.status !== 'CONECTADO') {
+        showToast('WhatsApp no está vinculado. Abriendo código QR...');
+        await apiCall('/api/whatsapp/connect', 'POST').catch(() => {});
+        showWhatsAppQrModal(() => sendDocumentViaWhatsApp({ model, record, containerSelector, filename, defaultCaption }));
+        return;
+      }
+    } catch (err) {
+      showToast('Error verificando estado de WhatsApp: ' + err.message, true);
+      return;
+    }
+
+    showToast(`Generando PDF y enviando por WhatsApp a ${partner.name}...`);
+
+    try {
+      const pdfBase64 = await generateDocumentPdfBase64(model === 'sales' ? 'sales' : 'invoice', record, containerSelector, filename);
+      if (!pdfBase64) {
+        throw new Error('No se pudo generar el documento PDF.');
+      }
+
+      const res = await apiCall('/api/whatsapp/send', 'POST', {
+        model,
+        id: record.id,
+        to: phone,
+        pdfBase64,
+        filename: filename || `${record.name}.pdf`,
+        caption: defaultCaption
+      });
+
+      showToast(res.message || `Documento enviado con éxito por WhatsApp a +${phone}.`);
+
+      const boot = await fetch('/api/bootstrap');
+      if (boot.ok) {
+        const json = await boot.json();
+        state.data = json.data;
+      }
+      renderModuleWorkspace();
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  }
+
   function renderSaleOrderForm(container) {
     const isNew = state.activeRecordId === 'new';
     const defaultProd = (state.data.products || [])[0] || { id: 1, name: 'Servicio', list_price: 1000000, tax_rate: 19 };
@@ -3884,8 +4090,11 @@
                 <div class="o_statusbar_buttons">
                   <button type="button" class="btn btn-primary" id="btnSaveSaleOrder">Guardar</button>
                   ${
-                    !isNew && existing.state === 'draft'
-                      ? `<button type="button" class="btn btn-secondary" data-sale-action="send">Marcar como Enviada</button>`
+                    !isNew && (existing.state === 'draft' || existing.state === 'sent')
+                      ? `<button type="button" class="btn btn-action" id="btnSendSaleWhatsApp" style="background: #25D366; border-color: #25D366; color: #fff; display: inline-flex; align-items: center; gap: 0.35rem;">
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2z"></path></svg>
+                          <span>Enviar por WhatsApp</span>
+                        </button>`
                       : ''
                   }
                   ${
@@ -4225,6 +4434,23 @@
         showToast(err.message, true);
       }
     });
+
+    const btnSendSaleWa = document.getElementById('btnSendSaleWhatsApp');
+    if (btnSendSaleWa) {
+      btnSendSaleWa.addEventListener('click', async () => {
+        try {
+          const savedOrder = await saveOrderNow();
+          await sendDocumentViaWhatsApp({
+            model: 'sales',
+            record: savedOrder || existing,
+            containerSelector: '.o_sale_pdf_preview #salePdfSheet',
+            filename: `Cotizacion_${((savedOrder || existing).name || 'COT').replace(/[\/\\]/g, '_')}.pdf`
+          });
+        } catch (err) {
+          showToast(err.message, true);
+        }
+      });
+    }
 
     container.querySelectorAll('[data-sale-action]').forEach((btn) => {
       btn.addEventListener('click', async () => {
@@ -5379,6 +5605,14 @@
                   : ''
               }
               ${
+                !isNew && existing.move_type === 'out_invoice' && existing.state !== 'cancel'
+                  ? `<button type="button" class="btn btn-action" id="btnSendInvoiceWhatsApp" style="background: #25D366; border-color: #25D366; color: #fff; display: inline-flex; align-items: center; gap: 0.35rem;">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2z"></path></svg>
+                      <span>Enviar por WhatsApp</span>
+                    </button>`
+                  : ''
+              }
+              ${
                 !isNew && existing.state === 'posted' && existing.amount_residual > 0
                   ? `<button type="button" class="btn btn-action" id="btnOpenPaymentModal">Registrar Pago</button>`
                   : ''
@@ -5733,6 +5967,25 @@
     const btnSavePost = document.getElementById('btnSaveAndPostMove');
     if (btnSavePost) btnSavePost.addEventListener('click', () => saveMoveFromForm(true).catch((e) => showToast(e.message, true)));
 
+    const btnSendInvWa = document.getElementById('btnSendInvoiceWhatsApp');
+    if (btnSendInvWa) {
+      btnSendInvWa.addEventListener('click', async () => {
+        try {
+          if (isEditable) {
+            await saveMoveFromForm(false);
+          }
+          await sendDocumentViaWhatsApp({
+            model: 'accounting',
+            record: existing,
+            containerSelector: '.o_pdf_paper_viewport #invoicePdfSheet',
+            filename: `Factura_${(existing.name || 'FAC').replace(/[\/\\]/g, '_')}.pdf`
+          });
+        } catch (err) {
+          showToast(err.message, true);
+        }
+      });
+    }
+
     container.querySelectorAll('[data-move-action]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const action = btn.getAttribute('data-move-action');
@@ -5901,6 +6154,23 @@
                 <option value="dark" ${s.theme === 'dark' ? 'selected' : ''}>Modo Oscuro (Predeterminado)</option>
                 <option value="light" ${s.theme === 'light' ? 'selected' : ''}>Modo Claro</option>
               </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="o_settings_block" data-section="general-whatsapp">
+          <h3>Integración WhatsApp Empresarial (Baileys)</h3>
+          <p style="font-size: 0.84rem; color: var(--o-text-muted); margin-bottom: 0.85rem;">
+            Vinculación del número oficial de la empresa para el envío directo de cotizaciones y facturas en formato PDF a los clientes.
+          </p>
+          <div id="settingsWaStatusBox" style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; background: var(--o-gray-100); padding: 1rem; border-radius: 8px; border: 1px solid var(--o-border-color);">
+            <div>
+              <div style="font-size: 0.78rem; color: var(--o-text-muted); text-transform: uppercase;">Estado de Conexión</div>
+              <div id="settingsWaStatusText" style="font-size: 0.95rem; font-weight: 700; color: var(--o-primary);">Consultando estado...</div>
+            </div>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              <button type="button" class="btn btn-action" id="btnSettingsConnectWa" style="background: #25D366; border-color: #25D366; color: #fff;">Vincular Dispositivo (QR)</button>
+              <button type="button" class="btn btn-secondary btn-sm" id="btnSettingsDisconnectWa">Desvincular</button>
             </div>
           </div>
         </div>
@@ -6203,6 +6473,47 @@
           renderSettingsModule();
         } catch (err) {
           showToast(err.message, true);
+        }
+      });
+    }
+
+    const waStatusText = document.getElementById('settingsWaStatusText');
+    const updateSettingsWaUi = async () => {
+      if (!waStatusText) return;
+      try {
+        const res = await apiCall('/api/whatsapp/status', 'GET');
+        if (res.status === 'CONECTADO') {
+          waStatusText.innerHTML = `<span style="color: #10b981;">Conectado (+ ${res.connectedNumber || 'OK'})</span>`;
+        } else if (res.status === 'ESPERANDO_QR') {
+          waStatusText.innerHTML = `<span style="color: #f59e0b;">Esperando escaneo QR</span>`;
+        } else if (res.status === 'CONECTANDO') {
+          waStatusText.innerHTML = `<span style="color: #38bdf8;">Conectando...</span>`;
+        } else {
+          waStatusText.innerHTML = `<span style="color: #ef4444;">Desconectado</span>`;
+        }
+      } catch (e) {
+        waStatusText.textContent = 'Error consultando estado';
+      }
+    };
+    updateSettingsWaUi();
+
+    const btnSetConnectWa = document.getElementById('btnSettingsConnectWa');
+    if (btnSetConnectWa) {
+      btnSetConnectWa.addEventListener('click', async () => {
+        await apiCall('/api/whatsapp/connect', 'POST').catch(() => {});
+        showWhatsAppQrModal(() => updateSettingsWaUi());
+      });
+    }
+
+    const btnSetDisconnectWa = document.getElementById('btnSettingsDisconnectWa');
+    if (btnSetDisconnectWa) {
+      btnSetDisconnectWa.addEventListener('click', async () => {
+        try {
+          await apiCall('/api/whatsapp/disconnect', 'POST');
+          showToast('WhatsApp desvinculado.');
+          updateSettingsWaUi();
+        } catch (e) {
+          showToast(e.message, true);
         }
       });
     }

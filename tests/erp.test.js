@@ -1559,4 +1559,43 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.ok(!jsText.includes('CHapp ERP Enterprise'), 'Settings must not display Enterprise version label');
     assert.ok(jsText.includes("app.id === 'settings' || !app.submenus || !app.submenus.length"), 'Navbar submenus must be suppressed in Settings');
   });
+
+  it('Module 3, 4 & Baileys: provides "Enviar por WhatsApp" for quotations and invoices with Baileys integration', async () => {
+    const jsText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
+
+    // 1. Verify UI contracts: "Marcar como Enviada" is replaced by "Enviar por WhatsApp"
+    assert.ok(!jsText.includes('>Marcar como Enviada<'), 'Marcar como Enviada button must be replaced');
+    assert.ok(jsText.includes('id="btnSendSaleWhatsApp"'), 'Quotation form must have btnSendSaleWhatsApp');
+    assert.ok(jsText.includes('id="btnSendInvoiceWhatsApp"'), 'Invoice form must have btnSendInvoiceWhatsApp');
+    assert.ok(jsText.includes('showWhatsAppQrModal'), 'Must provide WhatsApp QR modal handler');
+
+    // 2. Test Baileys status endpoint
+    const statusRes = await req('/api/whatsapp/status', 'GET');
+    assert.equal(statusRes.status, 200);
+    assert.ok(statusRes.json.ok);
+    assert.ok(typeof statusRes.json.status === 'string');
+
+    // 3. Test sending validations when client phone is missing
+    const noPhoneContact = await req('/api/contacts', 'POST', { name: 'Cliente Sin Telefono S.A.S.' });
+    assert.equal(noPhoneContact.status, 200);
+
+    const saleNoPhone = await req('/api/sales', 'POST', {
+      partner_id: noPhoneContact.json.contact.id,
+      lines: [{ description: 'Ventana de prueba', quantity: 1, price_unit: 100000, tax_rate: 19 }]
+    });
+    assert.equal(saleNoPhone.status, 200);
+
+    const failSendRes = await req('/api/whatsapp/send', 'POST', {
+      model: 'sales',
+      id: saleNoPhone.json.order.id,
+      pdfBase64: 'data:application/pdf;base64,JVBERi0xLjQK'
+    });
+    assert.equal(failSendRes.status, 400);
+    assert.ok(failSendRes.json.error.includes('número celular'), 'Must reject sending if client has no registered phone number');
+
+    // 4. Test BaileysManager unit methods
+    const { baileysManager } = require('../server/baileys');
+    assert.ok(typeof baileysManager.getStatus === 'function');
+    assert.ok(typeof baileysManager.sendPdf === 'function');
+  });
 });
