@@ -1436,13 +1436,15 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
 
   it('Module 3 (Ventas & Cotizaciones): Representación gráfica profesional en cotización con vista previa PDF en vivo, descargas y marcas de agua de cotización', async () => {
     const jsText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
+    const cssText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'css', 'odoo20.css'), 'utf8');
 
-    // 1. Verificación estática de funciones y layout en app.js
+    // 1. Verificación estática de funciones y layout en app.js y odoo20.css
     assert.ok(jsText.includes('function renderSalePdfSheetHtml(sale)'), 'app.js debe definir renderSalePdfSheetHtml');
     assert.ok(jsText.includes('function downloadSalePdf(sale, autoPrint = false)'), 'app.js debe definir downloadSalePdf');
     assert.ok(jsText.includes('id="btnPrintSalePdf"'), 'Debe existir botón para imprimir cotización');
     assert.ok(jsText.includes('id="btnDownloadSalePdf"'), 'Debe existir botón para descargar cotización');
     assert.ok(jsText.includes('id="salePdfSheet"'), 'Debe existir contenedor salePdfSheet para la hoja');
+    assert.ok(cssText.includes('.o_pdf_resolution_bar.is-quote'), 'odoo20.css debe definir .o_pdf_resolution_bar.is-quote');
 
     // 2. Ejecutar renderSalePdfSheetHtml en contexto VM
     const vm = require('node:vm');
@@ -1495,6 +1497,8 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     };
 
     const draftHtml = renderSalePdfSheetHtml(mockDraftQuote);
+    assert.ok(draftHtml.includes('is-quote'), 'Barra de cotización debe tener clase is-quote');
+    assert.ok(draftHtml.includes('color: #ffffff !important'), 'Barra de cotización debe tener texto blanco explícito para alto contraste');
     assert.ok(draftHtml.includes('COTIZACIÓN'), 'Marca de agua o título debe incluir COTIZACIÓN');
     assert.ok(draftHtml.includes('Cotización'), 'Caja de documento debe decir Cotización');
     assert.ok(draftHtml.includes('COT/2026/0001'), 'Debe mostrar el número de la cotización');

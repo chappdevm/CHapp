@@ -2775,7 +2775,7 @@ dialog.o_dialog::backdrop {
   font-weight: 600;
 }
 
-/* Barra de Resolución DIAN */
+/* Barra de Resolución DIAN / Cotización */
 .o_pdf_resolution_bar {
   position: relative;
   z-index: 2;
@@ -2789,6 +2789,15 @@ dialog.o_dialog::backdrop {
   text-align: center;
   margin-bottom: 0.85rem;
   line-height: 1.35;
+}
+
+.o_pdf_resolution_bar.is-quote {
+  background: linear-gradient(90deg, #074073, #14B5D9) !important;
+  color: #ffffff !important;
+  font-weight: 600;
+  border: none;
+  box-shadow: 0 2px 6px rgba(7, 64, 115, 0.25);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 /* Sección de Cliente / Adquiriente */

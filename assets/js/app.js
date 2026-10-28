@@ -3439,7 +3439,7 @@
           </div>
         </div>
 
-        <div class="o_pdf_resolution_bar" style="background: linear-gradient(90deg, #074073, #14B5D9);">
+        <div class="o_pdf_resolution_bar is-quote" style="background: linear-gradient(90deg, #074073, #14B5D9) !important; color: #ffffff !important; font-weight: 600; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);">
           Propuesta Comercial & Cotización de Bienes y Servicios · CH Aluminios · Validez de la Oferta: ${esc(sale.validity_date ? `Hasta ${sale.validity_date}` : '30 Días')}
         </div>
 
