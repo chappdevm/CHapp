@@ -2854,14 +2854,6 @@
               <span class="label">Total en Letras:</span>
               <span class="words">SON: ${numberToWordsSpanish(totalAmount)}</span>
             </div>
-
-            <div class="o_pdf_bank_info">
-              <strong>Instrucciones de Pago / Consignación:</strong><br/>
-              Bancolombia Cuenta Corriente No. <strong>452-892100-34</strong><br/>
-              Titular: <strong>CH Aluminios</strong> (NIT: ${esc(company.company_vat || '900.876.543-1')})<br/>
-              Favor enviar comprobante a: <em>${esc(company.company_email || 'chappdevm@gmail.com')}</em>
-            </div>
-
           </div>
 
           <div class="o_pdf_totals_section">
@@ -3504,13 +3496,6 @@
               <span class="words">SON: ${numberToWordsSpanish(totalAmount)}</span>
             </div>
 
-            <div class="o_pdf_bank_info">
-              <strong>Instrucciones de Pago / Consignación:</strong><br/>
-              Bancolombia Cuenta Corriente No. <strong>452-892100-34</strong><br/>
-              Titular: <strong>CH Aluminios</strong> (NIT: ${esc(company.company_vat || '900.876.543-1')})<br/>
-              Favor enviar comprobante a: <em>${esc(company.company_email || 'chappdevm@gmail.com')}</em>
-            </div>
-
             ${sale.notes ? `
               <div style="margin-top: 0.65rem; padding: 0.5rem 0.75rem; background: rgba(0,0,0,0.02); border: 1px dashed #cbd5e1; border-radius: 4px; font-size: 0.78rem;">
                 <strong>Observaciones / Términos:</strong><br/>
@@ -4041,6 +4026,7 @@
     }
 
     const draft = state.formDraft;
+    const isEditable = isNew || existing.state === 'draft' || existing.state === 'sent';
     const selectedPartner = (state.data.contacts || []).find((c) => Number(c.id) === Number(draft.partner_id));
     const stages = [
       { id: 'draft', label: 'Cotización' },
@@ -4088,7 +4074,7 @@
           <div class="o_form_sheet_bg">
               <div class="o_form_statusbar">
                 <div class="o_statusbar_buttons">
-                  <button type="button" class="btn btn-primary" id="btnSaveSaleOrder">Guardar</button>
+                  ${isEditable ? `<button type="button" class="btn btn-primary" id="btnSaveSaleOrder">Guardar</button>` : ''}
                   ${
                     !isNew && (existing.state === 'draft' || existing.state === 'sent')
                       ? `<button type="button" class="btn btn-action" id="btnSendSaleWhatsApp" style="background: #25D366; border-color: #25D366; color: #fff; display: inline-flex; align-items: center; gap: 0.35rem;">
@@ -4155,7 +4141,7 @@
                 <div class="o_group">
                   <div class="o_field_row">
                     <label for="fSalePartner">Cliente *</label>
-                    <select id="fSalePartner" class="o_select">
+                    <select id="fSalePartner" class="o_select" ${!isEditable ? 'disabled' : ''}>
                       <option value="" ${!draft.partner_id ? 'selected disabled' : ''}>— Seleccione un cliente —</option>
                       ${(state.data.contacts || [])
                         .map(
@@ -4169,7 +4155,7 @@
                   </div>
                   <div class="o_field_row">
                     <label for="fSalePaymentTerm">Plazos de Pago</label>
-                    <select id="fSalePaymentTerm" class="o_select">
+                    <select id="fSalePaymentTerm" class="o_select" ${!isEditable ? 'disabled' : ''}>
                       <option value="" ${!draft.payment_term ? 'selected disabled' : ''}>— Seleccione plazo de pago —</option>
                       ${['Contado', '15 Días', '30 Días', '45 Días', '60 Días']
                         .map((t) => `<option value="${t}" ${draft.payment_term === t ? 'selected' : ''}>${t}</option>`)
@@ -4178,15 +4164,15 @@
                   </div>
                   <div class="o_field_row">
                     <label for="fSaleDate">Fecha de Orden</label>
-                    <input type="date" id="fSaleDate" class="o_input" value="${esc(draft.date_order)}" />
+                    <input type="date" id="fSaleDate" class="o_input" value="${esc(draft.date_order)}" ${!isEditable ? 'disabled' : ''} />
                   </div>
                   <div class="o_field_row">
                     <label for="fSaleValidity">Fecha de Expiración</label>
-                    <input type="date" id="fSaleValidity" class="o_input" value="${esc(draft.validity_date)}" />
+                    <input type="date" id="fSaleValidity" class="o_input" value="${esc(draft.validity_date)}" ${!isEditable ? 'disabled' : ''} />
                   </div>
                   <div class="o_field_row">
                     <label for="fSalePerson">Comercial Asignado</label>
-                    <input type="text" id="fSalePerson" class="o_input" value="${esc(draft.salesperson)}" />
+                    <input type="text" id="fSalePerson" class="o_input" value="${esc(draft.salesperson)}" ${!isEditable ? 'disabled' : ''} />
                   </div>
                 </div>
 
@@ -4205,7 +4191,7 @@
                         <th style="width: 85px;">Desc.%</th>
                         <th style="width: 95px;">IVA %</th>
                         <th class="text-end">Subtotal</th>
-                        <th style="width: 50px;"></th>
+                        ${isEditable ? `<th style="width: 50px;"></th>` : ''}
                       </tr>
                     </thead>
                     <tbody id="saleLinesTbody">
@@ -4215,7 +4201,7 @@
                           return `
                           <tr data-line-idx="${idx}">
                             <th>
-                              <select class="o_select line-product" data-idx="${idx}">
+                              <select class="o_select line-product" data-idx="${idx}" ${!isEditable ? 'disabled' : ''}>
                                 <option value="" ${!l.product_id ? 'selected disabled' : ''}>— Seleccione producto —</option>
                                 ${(state.data.products || [])
                                   .map(
@@ -4224,12 +4210,12 @@
                                   .join('')}
                               </select>
                             </th>
-                            <td><input type="text" class="o_input line-desc" data-idx="${idx}" value="${esc(l.description || '')}" /></td>
-                            <td><input type="number" class="o_input line-qty" data-idx="${idx}" min="1" step="any" value="${Number(l.quantity || 1)}" /></td>
-                            <td><input type="number" class="o_input line-price" data-idx="${idx}" min="0" step="any" value="${Number(l.price_unit || 0)}" /></td>
-                            <td><input type="number" class="o_input line-disc" data-idx="${idx}" min="0" max="100" step="any" value="${Number(l.discount || 0)}" /></td>
+                            <td><input type="text" class="o_input line-desc" data-idx="${idx}" value="${esc(l.description || '')}" ${!isEditable ? 'readonly' : ''} /></td>
+                            <td><input type="number" class="o_input line-qty" data-idx="${idx}" min="1" step="any" value="${Number(l.quantity || 1)}" ${!isEditable ? 'readonly' : ''} /></td>
+                            <td><input type="number" class="o_input line-price" data-idx="${idx}" min="0" step="any" value="${Number(l.price_unit || 0)}" ${!isEditable ? 'readonly' : ''} /></td>
+                            <td><input type="number" class="o_input line-disc" data-idx="${idx}" min="0" max="100" step="any" value="${Number(l.discount || 0)}" ${!isEditable ? 'readonly' : ''} /></td>
                             <td>
-                              <select class="o_select line-tax" data-idx="${idx}">
+                              <select class="o_select line-tax" data-idx="${idx}" ${!isEditable ? 'disabled' : ''}>
                                 <option value="" ${l.tax_rate === undefined || l.tax_rate === null || l.tax_rate === '' ? 'selected disabled' : ''}>— IVA —</option>
                                 ${[0, 5, 19]
                                   .map((t) => `<option value="${t}" ${l.tax_rate !== '' && Number(l.tax_rate) === t ? 'selected' : ''}>${t}%</option>`)
@@ -4237,7 +4223,7 @@
                               </select>
                             </td>
                             <td class="text-end"><strong>${formatMoney(sub)}</strong></td>
-                            <td><button type="button" class="btn btn-sm btn-danger btn-remove-line" data-idx="${idx}" title="Quitar línea">Quitar</button></td>
+                            ${isEditable ? `<td><button type="button" class="btn btn-sm btn-danger btn-remove-line" data-idx="${idx}" title="Quitar línea">Quitar</button></td>` : ''}
                           </tr>
                         `;
                         })
@@ -4246,7 +4232,7 @@
                   </table>
                 </div>
 
-                <button type="button" class="btn btn-secondary btn-sm" id="btnAddSaleLine">Agregar producto / línea</button>
+                ${isEditable ? `<button type="button" class="btn btn-secondary btn-sm" id="btnAddSaleLine">Agregar producto / línea</button>` : ''}
 
                 <div class="o_totals_box">
                   <div class="o_totals_row">
@@ -4265,7 +4251,7 @@
 
                 <div class="o_field_row" style="margin-top: 1rem;">
                   <label for="fSaleNotes">Términos y Condiciones</label>
-                  <textarea id="fSaleNotes" class="o_textarea" rows="2">${esc(draft.notes || '')}</textarea>
+                  <textarea id="fSaleNotes" class="o_textarea" rows="2" ${!isEditable ? 'readonly' : ''}>${esc(draft.notes || '')}</textarea>
                 </div>
 
                 ${renderOrderLinkedInvoicesHtml(existing)}
@@ -4382,22 +4368,29 @@
       });
     });
 
-    document.getElementById('btnAddSaleLine').addEventListener('click', () => {
-      syncSaleDraft();
-      state.formDraft.lines.push({
-        id: Date.now(),
-        product_id: '',
-        product_name: '',
-        description: '',
-        quantity: 1,
-        price_unit: 0,
-        discount: 0,
-        tax_rate: ''
+    const btnAddLineEl = document.getElementById('btnAddSaleLine');
+    if (btnAddLineEl) {
+      btnAddLineEl.addEventListener('click', () => {
+        syncSaleDraft();
+        state.formDraft.lines.push({
+          id: Date.now(),
+          product_id: '',
+          product_name: '',
+          description: '',
+          quantity: 1,
+          price_unit: 0,
+          discount: 0,
+          tax_rate: ''
+        });
+        renderSaleOrderForm(container);
       });
-      renderSaleOrderForm(container);
-    });
+    }
 
     const saveOrderNow = async () => {
+      if (!isEditable) {
+        showToast('No se puede modificar un pedido de venta confirmado o cancelado.', true);
+        throw new Error('No se puede modificar un pedido de venta confirmado o cancelado.');
+      }
       syncSaleDraft();
       if (!state.formDraft.partner_id) {
         showToast('Debe seleccionar un cliente para la cotización.', true);
@@ -4425,15 +4418,18 @@
       return res.order;
     };
 
-    document.getElementById('btnSaveSaleOrder').addEventListener('click', async () => {
-      try {
-        await saveOrderNow();
-        showToast('Cotización / Pedido guardado.');
-        renderModuleWorkspace();
-      } catch (err) {
-        showToast(err.message, true);
-      }
-    });
+    const btnSaveEl = document.getElementById('btnSaveSaleOrder');
+    if (btnSaveEl) {
+      btnSaveEl.addEventListener('click', async () => {
+        try {
+          await saveOrderNow();
+          showToast('Cotización / Pedido guardado.');
+          renderModuleWorkspace();
+        } catch (err) {
+          showToast(err.message, true);
+        }
+      });
+    }
 
     const btnSendSaleWa = document.getElementById('btnSendSaleWhatsApp');
     if (btnSendSaleWa) {
@@ -4469,7 +4465,9 @@
 
           promptInvoiceCreation(existing, remaining, async (chosenAmount) => {
             try {
-              await saveOrderNow();
+              if (isEditable) {
+                await saveOrderNow();
+              }
               const res = await apiCall(`/api/sales/${state.activeRecordId}/action`, 'POST', {
                 action: 'create_invoice',
                 amount: chosenAmount
@@ -4489,7 +4487,9 @@
         }
 
         try {
-          await saveOrderNow();
+          if (isEditable) {
+            await saveOrderNow();
+          }
           const res = await apiCall(`/api/sales/${state.activeRecordId}/action`, 'POST', { action });
           state.formDraft = null;
           showToast('Estado del pedido actualizado.');

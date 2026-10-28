@@ -1565,6 +1565,41 @@ class ERPStore {
 
   async saveSaleOrder(payload) {
     if (!payload || typeof payload !== 'object') throw new Error('Datos de pedido inválidos.');
+
+    let existing = null;
+    let idx = -1;
+    if (payload.id) {
+      idx = this.data.sales.findIndex((s) => Number(s.id) === Number(payload.id));
+      if (idx === -1) throw new Error('Pedido de venta no encontrado.');
+      existing = this.data.sales[idx];
+      if (existing.state === 'sale' || existing.state === 'cancel') {
+        const isPartnerChanged = payload.partner_id !== undefined && Number(payload.partner_id) !== Number(existing.partner_id);
+        const lines = this.normalizeOrderLines(payload.lines);
+        const existingLinesNorm = (existing.lines || []).map((l) => ({
+          product_id: l.product_id ? Number(l.product_id) : '',
+          name: String(l.name || l.description || '').trim(),
+          description: String(l.description || l.name || '').trim(),
+          quantity: Number(l.quantity || 0),
+          price_unit: Number(l.price_unit || 0),
+          discount: Number(l.discount || 0),
+          tax_rate: l.tax_rate !== '' && l.tax_rate !== undefined && l.tax_rate !== null ? Number(l.tax_rate) : 0
+        }));
+        const newLinesNorm = lines.map((l) => ({
+          product_id: l.product_id ? Number(l.product_id) : '',
+          name: String(l.name || l.description || '').trim(),
+          description: String(l.description || l.name || '').trim(),
+          quantity: Number(l.quantity || 0),
+          price_unit: Number(l.price_unit || 0),
+          discount: Number(l.discount || 0),
+          tax_rate: l.tax_rate !== '' && l.tax_rate !== undefined && l.tax_rate !== null ? Number(l.tax_rate) : 0
+        }));
+        const isLinesChanged = payload.lines !== undefined && JSON.stringify(existingLinesNorm) !== JSON.stringify(newLinesNorm);
+        if (isPartnerChanged || isLinesChanged) {
+          throw new Error('No se puede modificar el cliente ni los productos de un pedido de venta confirmado o cancelado.');
+        }
+      }
+    }
+
     const partner = this.data.contacts.find((c) => Number(c.id) === Number(payload.partner_id));
     if (!partner && !payload.partner_name) {
       throw new Error('Debe seleccionar un cliente para la cotización/pedido.');
@@ -1575,10 +1610,7 @@ class ERPStore {
     const amountTax = round2(lines.reduce((s, l) => s + l.tax_amount, 0));
     const amountTotal = round2(amountUntaxed + amountTax);
 
-    if (payload.id) {
-      const idx = this.data.sales.findIndex((s) => Number(s.id) === Number(payload.id));
-      if (idx === -1) throw new Error('Pedido de venta no encontrado.');
-      const existing = this.data.sales[idx];
+    if (existing) {
       const updated = {
         ...existing,
         partner_id: partner ? partner.id : existing.partner_id,

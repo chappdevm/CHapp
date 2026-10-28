@@ -327,13 +327,29 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.equal(cancelBlocked.status, 400);
     assert.match(cancelBlocked.json.error, /facturas publicadas/i);
 
-    // Amending the confirmed order to add a second unit flips invoice_status back to 'to invoice'
-    const amended = await req('/api/sales', 'POST', {
+    // Attempting to modify customer or lines on a confirmed sale order is strictly rejected
+    const blockedPartner = await req('/api/sales', 'POST', {
+      id: orderId,
+      partner_id: partnerId + 9999,
+      lines: [
+        {
+          description: 'Licencia Inicial',
+          quantity: 1,
+          price_unit: 1000000,
+          discount: 0,
+          tax_rate: 19
+        }
+      ]
+    });
+    assert.equal(blockedPartner.status, 400);
+    assert.match(blockedPartner.json.error, /no se puede modificar/i);
+
+    const blockedLines = await req('/api/sales', 'POST', {
       id: orderId,
       partner_id: partnerId,
       lines: [
         {
-          description: 'Licencia Inicial Ampliada',
+          description: 'Licencia Inicial Modificada',
           quantity: 2,
           price_unit: 1000000,
           discount: 0,
@@ -341,15 +357,8 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
         }
       ]
     });
-    assert.equal(amended.status, 200);
-    assert.equal(amended.json.order.amount_total, 2380000);
-    assert.equal(amended.json.order.invoice_status, 'to invoice');
-
-    // Creating an invoice now bills ONLY the uninvoiced delta (1,190,000)
-    const deltaInv = await req(`/api/sales/${orderId}/action`, 'POST', { action: 'create_invoice' });
-    assert.equal(deltaInv.status, 200);
-    assert.equal(deltaInv.json.order.invoice_status, 'invoiced');
-    assert.equal(deltaInv.json.invoice.amount_total, 1190000);
+    assert.equal(blockedLines.status, 400);
+    assert.match(blockedLines.json.error, /no se puede modificar/i);
   });
 
   it('updates existing draft invoices in-place without duplicating, and rejects editing posted moves', async () => {
@@ -984,7 +993,7 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.ok(!jsText.includes('function renderInvoiceQrSvg'), 'app.js no debe contener generador de código QR');
     assert.ok(jsText.includes('Firma y Sello Emisor Autorizado'), 'app.js debe incluir bloque de firma emisor');
     assert.ok(jsText.includes('Firma y Aceptación de Recibido'), 'app.js debe incluir bloque de aceptación comprador');
-    assert.ok(jsText.includes('Bancolombia Cuenta Corriente'), 'app.js debe proveer datos bancarios de consignación');
+    assert.ok(!jsText.includes('Instrucciones de Pago / Consignación'), 'app.js no debe incluir sección de instrucciones de pago en representaciones gráficas');
 
     // 3. Extracción y prueba funcional de los algoritmos de la factura
     const fnModule = {};
@@ -1059,7 +1068,8 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.ok(paidHtml.includes('901.234.567-8'), 'Debe incluir NIT receptor');
     assert.ok(paidHtml.includes('Metro Lineal'), 'Debe mostrar UoM Metro Lineal');
     assert.ok(paidHtml.includes('SON: UN MILLÓN CIENTO NOVENTA MIL PESOS M/CTE'), 'Debe incluir total en letras');
-    assert.ok(paidHtml.includes('Bancolombia Cuenta Corriente'), 'Debe mostrar datos de pago');
+    assert.ok(!paidHtml.includes('Instrucciones de Pago / Consignación'), 'Factura no debe incluir bloque de instrucciones de pago');
+    assert.ok(!paidHtml.includes('Bancolombia Cuenta Corriente'), 'Factura no debe incluir datos bancarios');
     assert.ok(paidHtml.includes('Firma y Sello Emisor Autorizado'), 'Debe contener firma del emisor');
     assert.ok(paidHtml.includes('Firma y Aceptación de Recibido'), 'Debe contener firma del receptor');
     assert.ok(!paidHtml.includes('CUFE'), 'No debe contener referencias a CUFE');
@@ -1507,6 +1517,7 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.ok(draftHtml.includes('$ 1.071.000'), 'Debe mostrar el total calculado');
     assert.ok(draftHtml.includes('SON: UN MILLÓN SETENTA Y UN MIL PESOS M/CTE'), 'Debe mostrar el total en letras');
     assert.ok(draftHtml.includes('Esta cotización comercial es una propuesta informativa'), 'Debe tener pie legal de cotización');
+    assert.ok(!draftHtml.includes('Instrucciones de Pago / Consignación'), 'Cotización no debe tener bloque de instrucciones de pago');
 
     // 4. Probar renderizado en estado Confirmado (sale)
     const mockConfirmedOrder = {
@@ -1517,6 +1528,7 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     const saleHtml = renderSalePdfSheetHtml(mockConfirmedOrder);
     assert.ok(saleHtml.includes('Pedido de Venta'), 'Debe decir Pedido de Venta cuando está confirmado');
     assert.ok(saleHtml.includes('PEDIDO CONFIRMADO'), 'Marca de agua debe decir PEDIDO CONFIRMADO');
+    assert.ok(!saleHtml.includes('Instrucciones de Pago / Consignación'), 'Pedido de venta no debe tener bloque de instrucciones de pago');
   });
 
   it('Module 5 (Ajustes): displays settings modularly per tab (general, sales, accounting, expenses, users) instead of displaying all at once', async () => {
@@ -1597,5 +1609,51 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     const { baileysManager } = require('../server/baileys');
     assert.ok(typeof baileysManager.getStatus === 'function');
     assert.ok(typeof baileysManager.sendPdf === 'function');
+  });
+
+  it('Module 3 (Ventas): Pedidos de venta confirmados bloquean edición de cliente y productos, y se remueven instrucciones bancarias de representaciones gráficas', async () => {
+    const jsText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
+
+    // 1. Verificación de lógica de bloqueo en frontend (app.js)
+    assert.ok(jsText.includes("const isEditable = isNew || existing.state === 'draft' || existing.state === 'sent';"), 'app.js debe determinar editabilidad solo para borradores o cotizaciones enviadas');
+    assert.ok(jsText.includes('${isEditable ? `<button type="button" class="btn btn-primary" id="btnSaveSaleOrder">Guardar</button>` : \'\'}'), 'app.js debe ocultar botón Guardar si no es editable');
+    assert.ok(jsText.includes('<select id="fSalePartner" class="o_select" ${!isEditable ? \'disabled\' : \'\'}>'), 'app.js debe deshabilitar select de cliente si no es editable');
+    assert.ok(jsText.includes('${isEditable ? `<button type="button" class="btn btn-secondary btn-sm" id="btnAddSaleLine">Agregar producto / línea</button>` : \'\'}'), 'app.js debe ocultar botón agregar línea si no es editable');
+    assert.ok(!jsText.includes('<strong>Instrucciones de Pago / Consignación:</strong>'), 'app.js no debe contener bloque de instrucciones de pago en ninguna representación gráfica');
+
+    // 2. Crear cliente y orden de venta
+    const custRes = await req('/api/contacts', 'POST', { name: 'Cliente Bloqueo Pedidos SAS', vat: '900.111.222-3' });
+    assert.equal(custRes.status, 200);
+    const partnerId = custRes.json.contact.id;
+
+    const saleRes = await req('/api/sales', 'POST', {
+      partner_id: partnerId,
+      lines: [{ description: 'Perfil 744 Aluminio', quantity: 10, price_unit: 80000, tax_rate: 19 }]
+    });
+    assert.equal(saleRes.status, 200);
+    const saleId = saleRes.json.order.id;
+
+    // 3. Confirmar pedido a estado 'sale'
+    const confRes = await req(`/api/sales/${saleId}/action`, 'POST', { action: 'confirm' });
+    assert.equal(confRes.status, 200);
+    assert.equal(confRes.json.order.state, 'sale');
+
+    // 4. Intentar cambiar cliente en pedido confirmado debe ser rechazado
+    const changePartner = await req('/api/sales', 'POST', {
+      id: saleId,
+      partner_id: 1,
+      lines: [{ description: 'Perfil 744 Aluminio', quantity: 10, price_unit: 80000, tax_rate: 19 }]
+    });
+    assert.equal(changePartner.status, 400);
+    assert.match(changePartner.json.error, /no se puede modificar el cliente ni los productos/i);
+
+    // 5. Intentar cambiar productos / líneas en pedido confirmado debe ser rechazado
+    const changeLines = await req('/api/sales', 'POST', {
+      id: saleId,
+      partner_id: partnerId,
+      lines: [{ description: 'Perfil 744 Modificado', quantity: 20, price_unit: 80000, tax_rate: 19 }]
+    });
+    assert.equal(changeLines.status, 400);
+    assert.match(changeLines.json.error, /no se puede modificar el cliente ni los productos/i);
   });
 });
