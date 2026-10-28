@@ -2385,11 +2385,11 @@ dialog.o_dialog::backdrop {
 }
 
 /* ==========================================================================
-   Split View y Previsualización Lateral de Factura PDF / Cotización
+   Split View y Previsualización Lateral de Factura PDF / Cotización (60% Form / 40% PDF)
    ========================================================================== */
 .o_invoice_split_container {
   display: grid;
-  grid-template-columns: minmax(0, 65fr) minmax(0, 35fr);
+  grid-template-columns: minmax(0, 60fr) minmax(0, 40fr);
   gap: 1.5rem;
   align-items: start;
 }
