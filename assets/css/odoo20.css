@@ -3195,3 +3195,89 @@ dialog.o_dialog::backdrop {
   gap: 0.75rem;
   flex-wrap: wrap;
 }
+
+/* Accounting Dashboard Enhancements: Charts, Financial Accounts & Cash Flows */
+.o_financial_grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.o_chart_card {
+  background: var(--o-view-bg);
+  border: 1px solid var(--o-border-color);
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.o_chart_header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--o-border-color);
+}
+
+.o_chart_tabs {
+  display: flex;
+  gap: 0.35rem;
+  background: var(--o-gray-100);
+  padding: 0.25rem;
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+.o_chart_tab {
+  padding: 0.4rem 0.85rem;
+  border: none;
+  background: transparent;
+  color: var(--o-text-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.o_chart_tab.is-active {
+  background: var(--o-action);
+  color: #ffffff;
+}
+
+.o_chart_tab:hover:not(.is-active) {
+  color: var(--o-text-main);
+}
+
+.o_donut_grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+  align-items: center;
+}
+
+@media (max-width: 600px) {
+  .o_financial_grid {
+    grid-template-columns: 1fr;
+  }
+  .o_chart_header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .o_chart_tabs {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .o_chart_tab {
+    flex: 1;
+    text-align: center;
+    font-size: 0.75rem;
+    padding: 0.4rem 0.5rem;
+  }
+}

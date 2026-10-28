@@ -1350,4 +1350,80 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.ok(invRes.json.order.chatter.some((m) => m.text.includes('Factura de cliente')));
     assert.ok(invRes.json.invoice.chatter.some((m) => m.text.includes('creada')));
   });
+
+  it('Module 4 (Contabilidad & Tesorería): Tablero financiero con recaudos reales, gastos, gráficas SVG, desglose por cuenta (Nequi, Daviplata, Efectivo) y gestión de diarios', async () => {
+    // 1. Crear nuevo diario financiero vía API
+    const journalRes = await req('/api/accounting/journals', 'POST', {
+      code: 'DVP2',
+      name: 'Daviplata Negocio Secundario',
+      type: 'bank',
+      balance: 500000
+    });
+    assert.equal(journalRes.status, 200);
+    assert.equal(journalRes.json.journal.code, 'DVP2');
+    assert.equal(journalRes.json.journal.balance, 500000);
+
+    // 2. Verificar que aparezca en el bootstrap
+    const bootRes = await req('/api/bootstrap', 'GET');
+    assert.equal(bootRes.status, 200);
+    const journals = bootRes.json.data.accounting.journals;
+    const foundDvp2 = journals.find((j) => j.code === 'DVP2');
+    assert.ok(foundDvp2, 'El diario DVP2 debe existir en bootstrap');
+
+    // 3. Crear gasto pagado con DVP2
+    const expRes = await req('/api/expenses', 'POST', {
+      name: 'Compra de Perfiles de Aluminio',
+      partner_name: 'Aluminios Pereira SAS',
+      partner_vat: '900888777-1',
+      total_amount: 150000,
+      journal_code: 'DVP2',
+      payment_mode: 'company_account',
+      items: [{ description: 'Perfiles 2x1', quantity: 3, price_unit: 50000, subtotal: 150000 }]
+    });
+    assert.equal(expRes.status, 200);
+    assert.equal(expRes.json.expense.journal_code, 'DVP2');
+
+    // 4. Verificar que se descontó del saldo de DVP2
+    const stateAfterExpense = server.store.getBootstrapState();
+    const dvp2After = stateAfterExpense.accounting.journals.find((j) => j.code === 'DVP2');
+    assert.equal(dvp2After.balance, 350000, 'Saldo de DVP2 debe descontarse de 500.000 a 350.000');
+
+    // 5. Verificar KPIs financieros extendidos
+    const kpis = stateAfterExpense.kpis;
+    assert.ok(typeof kpis.collected_revenue === 'number', 'KPI collected_revenue debe ser numérico');
+    assert.ok(typeof kpis.expenses_paid_total === 'number', 'KPI expenses_paid_total debe ser numérico');
+    assert.ok(typeof kpis.net_cash_balance === 'number', 'KPI net_cash_balance debe ser numérico');
+    assert.equal(kpis.net_cash_balance, Math.round((kpis.collected_revenue - kpis.expenses_paid_total) * 100) / 100);
+
+    assert.ok(Array.isArray(kpis.accounts_summary), 'accounts_summary debe ser un arreglo');
+    const dvpSummary = kpis.accounts_summary.find((a) => a.code === 'DVP2');
+    assert.ok(dvpSummary, 'accounts_summary debe incluir DVP2');
+    assert.equal(dvpSummary.outbound_total, 150000, 'DVP2 outbound_total debe reflejar el gasto');
+
+    assert.ok(kpis.current_month_financials, 'current_month_financials debe existir');
+    assert.ok(Array.isArray(kpis.monthly_financials), 'monthly_financials debe ser un arreglo');
+    assert.equal(kpis.monthly_financials.length, 6, 'monthly_financials debe contener 6 meses');
+    assert.ok(Array.isArray(kpis.inflow_by_account), 'inflow_by_account debe ser un arreglo');
+    assert.ok(Array.isArray(kpis.expense_breakdown), 'expense_breakdown debe ser un arreglo');
+    assert.ok(Array.isArray(kpis.recent_cash_flows), 'recent_cash_flows debe ser un arreglo');
+    assert.ok(kpis.recent_cash_flows.some((f) => f.journal_code === 'DVP2' && f.amount === 150000));
+
+    // 6. Verificación de frontend en app.js y odoo20.css
+    const jsText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
+    const cssText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'css', 'odoo20.css'), 'utf8');
+
+    assert.ok(jsText.includes('generateMonthBalanceSvg'), 'app.js debe definir generateMonthBalanceSvg');
+    assert.ok(jsText.includes('generateTrendSvg'), 'app.js debe definir generateTrendSvg');
+    assert.ok(jsText.includes('generateDonutSvg'), 'app.js debe definir generateDonutSvg');
+    assert.ok(jsText.includes('Total Recaudado (Cobros Reales)'), 'app.js debe tener tarjeta de Total Recaudado');
+    assert.ok(jsText.includes('Total Gastos / Compras'), 'app.js debe tener tarjeta de Total Gastos');
+    assert.ok(jsText.includes('Balance Neto en Cajas y Bancos'), 'app.js debe tener tarjeta de Balance Neto');
+    assert.ok(jsText.includes('o_financial_grid'), 'app.js debe renderizar o_financial_grid');
+    assert.ok(jsText.includes('o_chart_card'), 'app.js debe renderizar o_chart_card');
+    assert.ok(jsText.includes('id="btnAddJournal"'), 'app.js debe tener botón para agregar diarios financieros');
+
+    assert.ok(cssText.includes('.o_financial_grid'), 'odoo20.css debe contener estilos para .o_financial_grid');
+    assert.ok(cssText.includes('.o_chart_card'), 'odoo20.css debe contener estilos para .o_chart_card');
+    assert.ok(cssText.includes('.o_chart_tabs'), 'odoo20.css debe contener estilos para .o_chart_tabs');
+  });
 });

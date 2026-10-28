@@ -116,6 +116,22 @@ function createInitialData() {
       },
       {
         "id": 5,
+        "code": "NEQ",
+        "name": "Nequi",
+        "type": "bank",
+        "default_account": "111010",
+        "balance": 0
+      },
+      {
+        "id": 6,
+        "code": "DVP",
+        "name": "Daviplata",
+        "type": "bank",
+        "default_account": "111015",
+        "balance": 0
+      },
+      {
+        "id": 7,
         "code": "EXJ",
         "name": "Gastos de Empleados",
         "type": "purchase",
@@ -333,6 +349,15 @@ class ERPStore {
       if (fs.existsSync(this.dbPath)) {
         const raw = fs.readFileSync(this.dbPath, 'utf8');
         this.data = JSON.parse(raw);
+        if (this.data && this.data.accounting && Array.isArray(this.data.accounting.journals)) {
+          const jList = this.data.accounting.journals;
+          if (!jList.some((j) => j.code === 'NEQ')) {
+            jList.push({ id: 5, code: 'NEQ', name: 'Nequi', type: 'bank', default_account: '111010', balance: 0, active: true });
+          }
+          if (!jList.some((j) => j.code === 'DVP')) {
+            jList.push({ id: 6, code: 'DVP', name: 'Daviplata', type: 'bank', default_account: '111015', balance: 0, active: true });
+          }
+        }
         this.updateSequencesFromData();
       } else {
         this.data = createInitialData();
@@ -584,8 +609,137 @@ class ERPStore {
     const expensesPosted = this.data.expenses.filter((e) => e.state === 'posted');
     const expensesPaid = this.data.expenses.filter((e) => e.state === 'paid');
 
-    const outInvoices = this.data.accounting.moves.filter((m) => m.move_type === 'out_invoice' && m.state === 'posted');
-    const inInvoices = this.data.accounting.moves.filter((m) => m.move_type === 'in_invoice' && m.state === 'posted');
+    const outInvoices = (this.data.accounting && this.data.accounting.moves || []).filter((m) => m.move_type === 'out_invoice' && m.state === 'posted');
+    const inInvoices = (this.data.accounting && this.data.accounting.moves || []).filter((m) => m.move_type === 'in_invoice' && m.state === 'posted');
+    const payments = (this.data.accounting && this.data.accounting.payments || []);
+    const journals = (this.data.accounting && this.data.accounting.journals || []);
+
+    // 1. Dinero real recaudado (cobros de clientes) y pagado (proveedores/gastos)
+    const collectedRevenue = round2(
+      payments
+        .filter((p) => p.payment_type === 'inbound' && p.state !== 'cancel')
+        .reduce((sum, p) => sum + Number(p.amount || 0), 0)
+    );
+
+    const expensesPaidTotal = round2(
+      payments
+        .filter((p) => p.payment_type === 'outbound' && p.state !== 'cancel')
+        .reduce((sum, p) => sum + Number(p.amount || 0), 0)
+    );
+
+    const netCashBalance = round2(collectedRevenue - expensesPaidTotal);
+
+    // 2. Desglose detallado por Cuenta Financiera / Diario
+    const bankCashJournals = journals.filter((j) => (j.type === 'bank' || j.type === 'cash') && j.active !== false);
+    const accountsSummary = bankCashJournals.map((j) => {
+      const inAmount = round2(
+        payments
+          .filter((p) => p.journal_code === j.code && p.payment_type === 'inbound' && p.state !== 'cancel')
+          .reduce((sum, p) => sum + Number(p.amount || 0), 0)
+      );
+      const outAmount = round2(
+        payments
+          .filter((p) => p.journal_code === j.code && p.payment_type === 'outbound' && p.state !== 'cancel')
+          .reduce((sum, p) => sum + Number(p.amount || 0), 0)
+      );
+      return {
+        id: j.id,
+        code: j.code,
+        name: j.name,
+        type: j.type,
+        balance: Number(j.balance || 0),
+        inbound_total: inAmount,
+        outbound_total: outAmount,
+        net_flow: round2(inAmount - outAmount)
+      };
+    });
+
+    // 3. Gráfica 1: Mes actual (Ingresos recaudados vs Gastos pagados)
+    const currentMonthKey = new Date().toISOString().slice(0, 7);
+    const monthInflow = round2(
+      payments
+        .filter((p) => p.payment_type === 'inbound' && p.state !== 'cancel' && (p.date || '').startsWith(currentMonthKey))
+        .reduce((sum, p) => sum + Number(p.amount || 0), 0)
+    );
+    const monthOutflow = round2(
+      payments
+        .filter((p) => p.payment_type === 'outbound' && p.state !== 'cancel' && (p.date || '').startsWith(currentMonthKey))
+        .reduce((sum, p) => sum + Number(p.amount || 0), 0)
+    );
+    const monthMarginPct = monthInflow > 0 ? Math.round(((monthInflow - monthOutflow) / monthInflow) * 100) : 0;
+
+    // 4. Gráfica 2: Histórico mensual últimos 6 meses
+    const monthlyFinancials = [];
+    const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const key = `${y}-${m}`;
+      const label = `${monthNames[d.getMonth()]} ${String(y).slice(-2)}`;
+
+      const mIn = round2(
+        payments
+          .filter((p) => p.payment_type === 'inbound' && p.state !== 'cancel' && (p.date || '').startsWith(key))
+          .reduce((sum, p) => sum + Number(p.amount || 0), 0)
+      );
+      const mOut = round2(
+        payments
+          .filter((p) => p.payment_type === 'outbound' && p.state !== 'cancel' && (p.date || '').startsWith(key))
+          .reduce((sum, p) => sum + Number(p.amount || 0), 0)
+      );
+      monthlyFinancials.push({
+        key,
+        label,
+        inflow: mIn,
+        outflow: mOut,
+        net: round2(mIn - mOut)
+      });
+    }
+
+    // 5. Gráfica 3: Distribución de ingresos por cuenta y gastos por proveedor/categoría
+    const inflowByAccount = accountsSummary
+      .filter((a) => a.inbound_total > 0)
+      .map((a) => ({
+        code: a.code,
+        name: a.name,
+        amount: a.inbound_total,
+        percentage: collectedRevenue > 0 ? Math.round((a.inbound_total / collectedRevenue) * 100) : 0
+      }));
+
+    // Desglose de gastos por proveedor
+    const supplierExpensesMap = {};
+    (this.data.expenses || []).forEach((e) => {
+      const supp = e.partner_name || 'Proveedor General';
+      supplierExpensesMap[supp] = (supplierExpensesMap[supp] || 0) + Number(e.total_amount || 0);
+    });
+    const totalExpAll = Object.values(supplierExpensesMap).reduce((a, b) => a + b, 0);
+    const expenseBreakdown = Object.entries(supplierExpensesMap)
+      .map(([name, amount]) => ({
+        name,
+        amount: round2(amount),
+        percentage: totalExpAll > 0 ? Math.round((amount / totalExpAll) * 100) : 0
+      }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 6);
+
+    // 6. Últimos movimientos de caja/bancos
+    const recentCashFlows = [...payments]
+      .filter((p) => p.state !== 'cancel')
+      .sort((a, b) => (b.date || '').localeCompare(a.date || '') || Number(b.id) - Number(a.id))
+      .slice(0, 8)
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        date: p.date,
+        type: p.payment_type, // 'inbound' | 'outbound'
+        partner_name: p.partner_name || (p.payment_type === 'inbound' ? 'Cliente' : 'Proveedor'),
+        ref: p.ref || '',
+        journal_code: p.journal_code,
+        journal_name: p.journal_name,
+        amount: Number(p.amount || 0)
+      }));
 
     return {
       contacts_total: this.data.contacts.length,
@@ -601,10 +755,23 @@ class ERPStore {
       expenses_submitted_total: round2(expensesSubmitted.reduce((s, e) => s + Number(e.total_amount || 0), 0)),
       expenses_approved_total: round2(expensesApproved.reduce((s, e) => s + Number(e.total_amount || 0), 0)),
       expenses_reimburse_total: round2(expensesPosted.reduce((s, e) => s + Number(e.total_amount || 0), 0)),
-      expenses_paid_total: round2(expensesPaid.reduce((s, e) => s + Number(e.total_amount || 0), 0)),
+      expenses_paid_total: expensesPaidTotal || round2(expensesPaid.reduce((s, e) => s + Number(e.total_amount || 0), 0)),
+      collected_revenue: collectedRevenue,
+      net_cash_balance: netCashBalance,
       receivables_residual: round2(outInvoices.reduce((s, m) => s + Number(m.amount_residual || 0), 0)),
       invoiced_revenue: round2(outInvoices.reduce((s, m) => s + Number(m.amount_total || 0), 0)),
-      payables_residual: round2(inInvoices.reduce((s, m) => s + Number(m.amount_residual || 0), 0))
+      payables_residual: round2(inInvoices.reduce((s, m) => s + Number(m.amount_residual || 0), 0)),
+      accounts_summary: accountsSummary,
+      current_month_financials: {
+        inflow: monthInflow,
+        outflow: monthOutflow,
+        net: round2(monthInflow - monthOutflow),
+        margin_pct: monthMarginPct
+      },
+      monthly_financials: monthlyFinancials,
+      inflow_by_account: inflowByAccount,
+      expense_breakdown: expenseBreakdown,
+      recent_cash_flows: recentCashFlows
     };
   }
 
@@ -1001,6 +1168,7 @@ class ERPStore {
         product_id: product ? product.id : existing.product_id,
         product_name: product ? product.name : String(payload.product_name || existing.product_name),
         date: payload.date || existing.date,
+        journal_code: payload.journal_code ? String(payload.journal_code).trim() : (existing.journal_code || 'CSH1'),
         payment_mode: payload.payment_mode || existing.payment_mode,
         quantity,
         price_unit: priceUnit,
@@ -1059,6 +1227,7 @@ class ERPStore {
       product_id: product ? product.id : (payload.product_id ? Number(payload.product_id) : null),
       product_name: product ? product.name : String(payload.product_name || 'Viáticos y Alojamiento Corporativo'),
       date: payload.date || todayStr(),
+      journal_code: String(payload.journal_code || payload.payment_journal_code || 'CSH1').trim(),
       payment_mode: payload.payment_mode || 'own_account',
       quantity,
       price_unit: priceUnit,
@@ -1115,9 +1284,9 @@ class ERPStore {
         try {
           await this.transitionAccountMove(vendorBill.id, 'register_payment', {
             amount: vendorBill.amount_total,
-            journal_code: 'BNK1',
+            journal_code: newExpense.journal_code || 'CSH1',
             date: newExpense.date,
-            ref: `Pago automático gasto ${newExpense.reference}`
+            ref: `Pago compra/gasto ${newExpense.reference}`
           });
         } catch (payErr) {
           // Log pero sin bloquear
@@ -2106,7 +2275,8 @@ class ERPStore {
       const payId = this.data.accounting.payments.reduce((m, p) => Math.max(m, Number(p.id)), 0) + 1;
       const payName = `PAY/2026/${this.padSeq(paySeq, 4)}`;
       const journalCode = extra.journal_code || 'BNK1';
-      const journalName = journalCode === 'CSH1' ? 'Caja General Efectivo' : 'Banco Bancolombia Cta Cte';
+      const jObj = (this.data.accounting.journals || []).find((j) => j.code === journalCode);
+      const journalName = jObj ? jObj.name : (journalCode === 'CSH1' ? 'Caja General Efectivo' : (journalCode === 'NEQ' ? 'Nequi' : (journalCode === 'DVP' ? 'Daviplata' : 'Banco Bancolombia Cta Cte')));
       const paymentType = move.move_type === 'out_invoice' ? 'inbound' : 'outbound';
 
       payment = {
@@ -2263,6 +2433,49 @@ class ERPStore {
       }
     }
     return this.data.settings;
+  }
+
+  saveJournal(payload) {
+    if (!payload || typeof payload !== 'object') throw new Error('Datos de cuenta inválidos.');
+    const name = String(payload.name || '').trim();
+    if (!name) throw new Error('El nombre de la cuenta o diario es obligatorio.');
+    const code = String(payload.code || '').trim().toUpperCase();
+    if (!code) throw new Error('El código de la cuenta es obligatorio.');
+    const type = payload.type || 'bank';
+    const balance = round2(payload.balance ?? 0);
+    const default_account = String(payload.default_account || (type === 'cash' ? '110505' : '111005')).trim();
+
+    this.data.accounting = this.data.accounting || {};
+    this.data.accounting.journals = this.data.accounting.journals || [];
+
+    const existingIdx = this.data.accounting.journals.findIndex((j) => (payload.id && Number(j.id) === Number(payload.id)) || j.code === code);
+    if (existingIdx !== -1) {
+      this.data.accounting.journals[existingIdx] = {
+        ...this.data.accounting.journals[existingIdx],
+        name,
+        code,
+        type,
+        default_account,
+        balance: payload.balance !== undefined ? balance : this.data.accounting.journals[existingIdx].balance,
+        active: payload.active !== false
+      };
+      this.save();
+      return this.data.accounting.journals[existingIdx];
+    }
+
+    const nextId = this.data.accounting.journals.reduce((max, j) => Math.max(max, Number(j.id) || 0), 0) + 1;
+    const newJournal = {
+      id: nextId,
+      code,
+      name,
+      type,
+      default_account,
+      balance,
+      active: true
+    };
+    this.data.accounting.journals.push(newJournal);
+    this.save();
+    return newJournal;
   }
 
   addChatterNote(model, id, text) {

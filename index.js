@@ -216,6 +216,13 @@ function createHandler(store = new ERPStore(undefined, { useSupabase: isSupabase
           return sendJson(res, 200, { ok: true, account, state: store.getBootstrapState() });
         }
 
+        // Accounting Financial Journals / Accounts
+        if (method === 'POST' && pathname === '/api/accounting/journals') {
+          const body = await readJsonBody(req);
+          const journal = await store.saveJournal(body);
+          return sendJson(res, 200, { ok: true, journal, state: store.getBootstrapState() });
+        }
+
         // Settings
         if (method === 'POST' && pathname === '/api/settings') {
           const body = await readJsonBody(req);
