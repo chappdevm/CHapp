@@ -4018,8 +4018,17 @@
     if (m) m.remove();
   }
 
-  async function showWhatsAppQrModal(onConnected) {
+  async function showWhatsAppQrModal(onConnected, options = {}) {
     closeWhatsAppModal();
+
+    const directPhone = options.directPhone || '';
+    const directText = options.directText || '';
+    let preloadedStatus = options.preloadedStatus || null;
+
+    let cleanPhone = String(directPhone).replace(/\D/g, '');
+    if (cleanPhone.length === 10 && cleanPhone.startsWith('3')) {
+      cleanPhone = '57' + cleanPhone;
+    }
 
     const backdrop = document.createElement('div');
     backdrop.id = 'modalWhatsAppBackdrop';
@@ -4039,11 +4048,34 @@
           <p style="font-size: 0.88rem; color: var(--o-text-muted, #94a3b8); margin-bottom: 1.25rem; line-height: 1.4;">
             Abre WhatsApp en el celular de la empresa &gt; <strong>Dispositivos vinculados</strong> &gt; <strong>Vincular un dispositivo</strong> y escanea el código QR:
           </p>
-          <div id="waQrContainer" style="display: flex; justify-content: center; align-items: center; min-height: 230px; background: #ffffff; border-radius: 10px; padding: 1rem; border: 1px solid var(--o-border-color, #334155);">
-            <div style="color: #64748b; font-size: 0.88rem;">Generando código QR seguro...</div>
+          <div id="waQrContainer" style="display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 230px; background: #ffffff; border-radius: 10px; padding: 1rem; border: 1px solid var(--o-border-color, #334155); position: relative;">
+            <div style="color: #64748b; font-size: 0.88rem; display: flex; flex-direction: column; align-items: center; gap: 0.75rem;">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" style="animation: spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
+              <span>Generando código QR seguro...</span>
+            </div>
           </div>
-          <div id="waStatusText" style="margin-top: 1.25rem; font-size: 0.88rem; font-weight: 600; color: #38bdf8;">
+          <div id="waStatusText" style="margin-top: 1rem; font-size: 0.88rem; font-weight: 600; color: #38bdf8;">
             Iniciando conexión con WhatsApp...
+          </div>
+          <div style="margin-top: 1.25rem; display: flex; flex-direction: column; gap: 0.5rem;">
+            <button type="button" class="btn btn-sm btn-secondary" id="btnRefreshWaQr" style="align-self: center; font-size: 0.82rem;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px; margin-right: 4px;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+              Regenerar Código QR
+            </button>
+            ${
+              cleanPhone
+                ? `
+              <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed var(--o-border-color, #334155); font-size: 0.8rem; color: var(--o-text-muted);">
+                <span>¿Prefieres abrir directamente en WhatsApp Web o en tu celular?</span>
+                <div style="margin-top: 0.5rem;">
+                  <a href="https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(directText || 'Hola, adjunto el documento.')}" target="_blank" rel="noopener noreferrer" class="btn btn-sm" style="background: #25D366; color: #fff; text-decoration: none; display: inline-flex; align-items: center; gap: 0.35rem; font-weight: 600;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2z"></path></svg>
+                    Abrir Chat en WhatsApp (+${cleanPhone})
+                  </a>
+                </div>
+              </div>`
+                : ''
+            }
           </div>
         </div>
       </div>
@@ -4059,7 +4091,7 @@
     const updateQrFromStatus = (statusData) => {
       const container = document.getElementById('waQrContainer');
       const text = document.getElementById('waStatusText');
-      if (!container || !text) return;
+      if (!container || !text || !statusData) return;
 
       if (statusData.status === 'CONECTADO') {
         container.innerHTML = `
@@ -4080,13 +4112,60 @@
       }
 
       if (statusData.tieneQr && statusData.qrDataUrl) {
-        container.innerHTML = `<img src="${statusData.qrDataUrl}" alt="Código QR WhatsApp" style="width: 220px; height: 220px; display: block; border-radius: 4px;" />`;
+        container.innerHTML = `
+          <img src="${statusData.qrDataUrl}" alt="Código QR WhatsApp" style="width: 220px; height: 220px; display: block; border-radius: 4px;" />
+          <div style="margin-top: 0.5rem; font-size: 0.75rem; color: #64748b;">Válido durante 30 segundos</div>
+        `;
         text.textContent = 'Esperando escaneo desde tu celular...';
         text.style.color = '#38bdf8';
       } else if (statusData.status === 'CONECTANDO') {
         text.textContent = 'Conectando con WhatsApp...';
+        text.style.color = '#38bdf8';
+      } else if (statusData.status === 'DESCONECTADO') {
+        text.textContent = 'WhatsApp desconectado. Pulsa "Regenerar Código QR".';
+        text.style.color = '#f59e0b';
       }
     };
+
+    const triggerConnect = async () => {
+      try {
+        const text = document.getElementById('waStatusText');
+        if (text) {
+          text.textContent = 'Generando nuevo código QR...';
+          text.style.color = '#38bdf8';
+        }
+        const res = await apiCall('/api/whatsapp/connect', 'POST');
+        updateQrFromStatus(res);
+      } catch (err) {
+        const text = document.getElementById('waStatusText');
+        if (text) {
+          text.textContent = 'Error generando QR: ' + (err.message || 'Intente nuevamente.');
+          text.style.color = '#ef4444';
+        }
+      }
+    };
+
+    const btnRefresh = document.getElementById('btnRefreshWaQr');
+    if (btnRefresh) {
+      btnRefresh.addEventListener('click', () => {
+        const container = document.getElementById('waQrContainer');
+        if (container) {
+          container.innerHTML = `
+            <div style="color: #64748b; font-size: 0.88rem; display: flex; flex-direction: column; align-items: center; gap: 0.75rem;">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" style="animation: spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
+              <span>Generando código QR seguro...</span>
+            </div>
+          `;
+        }
+        triggerConnect();
+      });
+    }
+
+    if (preloadedStatus && preloadedStatus.tieneQr) {
+      updateQrFromStatus(preloadedStatus);
+    } else {
+      triggerConnect();
+    }
 
     const checkStatus = async () => {
       try {
@@ -4095,15 +4174,11 @@
         if (res.status === 'CONECTADO') {
           if (waPollInterval) clearInterval(waPollInterval);
         }
-      } catch (err) {
-        console.warn('[WhatsApp Poll]', err);
-      }
+      } catch (err) {}
     };
 
-    await checkStatus();
-    waPollInterval = setInterval(checkStatus, 2200);
+    waPollInterval = setInterval(checkStatus, 2500);
   }
-
   async function generateDocumentPdfBase64(type, record, containerSelector, filename) {
     if (typeof window === 'undefined' || typeof window.html2pdf !== 'function') {
       throw new Error('La librería html2pdf no está disponible para generar el archivo.');
@@ -4175,9 +4250,12 @@
     try {
       const st = await apiCall('/api/whatsapp/status', 'GET');
       if (st.status !== 'CONECTADO') {
-        showToast('WhatsApp no está vinculado. Abriendo código QR...');
-        await apiCall('/api/whatsapp/connect', 'POST').catch(() => {});
-        showWhatsAppQrModal(() => sendDocumentViaWhatsApp({ model, record, containerSelector, filename, defaultCaption }));
+        const docLabel = model === 'sales' ? (record.name || 'Cotización') : (record.name || 'Factura');
+        const directText = `Hola ${partner ? partner.name : ''}, adjuntamos tu ${docLabel}.`;
+        showWhatsAppQrModal(
+          () => sendDocumentViaWhatsApp({ model, record, containerSelector, filename, defaultCaption }),
+          { directPhone: phone, directText, preloadedStatus: st }
+        );
         return;
       }
     } catch (err) {
@@ -6751,7 +6829,6 @@
     const btnSetConnectWa = document.getElementById('btnSettingsConnectWa');
     if (btnSetConnectWa) {
       btnSetConnectWa.addEventListener('click', async () => {
-        await apiCall('/api/whatsapp/connect', 'POST').catch(() => {});
         showWhatsAppQrModal(() => updateSettingsWaUi());
       });
     }

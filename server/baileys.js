@@ -1,5 +1,6 @@
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const QRCode = require('qrcode');
 const pino = require('pino');
 
@@ -23,7 +24,26 @@ class BaileysManager {
     this.connectedNumber = null;
     this.isStarting = false;
     this.reconnectTimeout = null;
-    this.authDir = path.join(process.cwd(), 'baileys_auth_info');
+    this.authDir = this.resolveAuthDir();
+  }
+
+  resolveAuthDir() {
+    const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT);
+    const baseDir = isServerless ? os.tmpdir() : process.cwd();
+    let authDir = path.join(baseDir, 'baileys_auth_info');
+    try {
+      if (!fs.existsSync(authDir)) {
+        fs.mkdirSync(authDir, { recursive: true });
+      }
+    } catch (e) {
+      authDir = path.join(os.tmpdir(), 'baileys_auth_info');
+      try {
+        if (!fs.existsSync(authDir)) {
+          fs.mkdirSync(authDir, { recursive: true });
+        }
+      } catch (e2) {}
+    }
+    return authDir;
   }
 
   getStatus() {
@@ -35,19 +55,20 @@ class BaileysManager {
     };
   }
 
-  async init() {
+  async init(waitForQrMs = 8000) {
     if (!makeWASocket || !useMultiFileAuthState) {
-      throw new Error('La librería Baileys no está instalada.');
+      throw new Error('La librería Baileys no está instalada en el servidor.');
     }
 
-    if (this.isStarting) {
-      return this.getStatus();
-    }
     if (this.status === 'CONECTADO' && this.socket) {
       return this.getStatus();
     }
+    if (this.status === 'ESPERANDO_QR' && this.qrDataUrl && this.socket) {
+      return this.getStatus();
+    }
 
-    this.isStarting = true;
+    this.authDir = this.resolveAuthDir();
+
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
@@ -62,93 +83,108 @@ class BaileysManager {
       this.socket = null;
     }
 
-    try {
-      if (!fs.existsSync(this.authDir)) {
-        fs.mkdirSync(this.authDir, { recursive: true });
-      }
+    this.isStarting = true;
+    this.status = 'CONECTANDO';
 
-      const { state, saveCreds } = await useMultiFileAuthState(this.authDir);
-
-      this.status = 'CONECTANDO';
-
-      const sock = makeWASocket({
-        auth: state,
-        logger: pino({ level: 'silent' }),
-        browser: Browsers ? Browsers.windows('Desktop') : ['CHapp ERP', 'Desktop', '1.0.0'],
-        syncFullHistory: false,
-        shouldSyncHistoryMessage: () => false,
-        markOnlineOnConnect: false,
-        generateHighQualityLinkPreview: false,
-        defaultQueryTimeoutMs: 60000,
-        keepAliveIntervalMs: 25000,
-        emitOwnEvents: false,
-        retryRequestDelayMs: 250
-      });
-
-      this.socket = sock;
-
-      sock.ev.on('creds.update', async () => {
-        try {
-          await saveCreds();
-        } catch (err) {
-          console.error('[Baileys] Error guardando credenciales:', err.message);
+    return new Promise(async (resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (!settled) {
+          settled = true;
+          this.isStarting = false;
+          resolve(this.getStatus());
         }
-      });
+      };
 
-      sock.ev.on('connection.update', async (update) => {
-        const { connection, lastDisconnect, qr } = update;
+      const timer = setTimeout(() => {
+        finish();
+      }, waitForQrMs);
 
-        if (qr) {
-          this.qrRaw = qr;
+      try {
+        const { state, saveCreds } = await useMultiFileAuthState(this.authDir);
+
+        const sock = makeWASocket({
+          auth: state,
+          logger: pino({ level: 'silent' }),
+          browser: Browsers ? Browsers.windows('Desktop') : ['CHapp ERP', 'Desktop', '1.0.0'],
+          syncFullHistory: false,
+          shouldSyncHistoryMessage: () => false,
+          markOnlineOnConnect: false,
+          generateHighQualityLinkPreview: false,
+          defaultQueryTimeoutMs: 60000,
+          keepAliveIntervalMs: 25000,
+          emitOwnEvents: false,
+          retryRequestDelayMs: 250
+        });
+
+        this.socket = sock;
+
+        sock.ev.on('creds.update', async () => {
           try {
-            this.qrDataUrl = await QRCode.toDataURL(qr, { margin: 2, scale: 6 });
-            this.status = 'ESPERANDO_QR';
-            console.log('[Baileys] 📱 Nuevo código QR generado para vinculación.');
-          } catch (qrErr) {
-            console.error('[Baileys] Error renderizando QR en base64:', qrErr);
+            await saveCreds();
+          } catch (err) {
+            console.error('[Baileys] Error guardando credenciales:', err.message);
           }
-        }
+        });
 
-        if (connection === 'close') {
-          const statusCode = lastDisconnect?.error?.output?.statusCode;
-          const shouldReconnect = statusCode !== DisconnectReason?.loggedOut;
-          console.log(`[Baileys] 🔌 Conexión cerrada (código: ${statusCode}). Reintentar: ${shouldReconnect}`);
+        sock.ev.on('connection.update', async (update) => {
+          const { connection, lastDisconnect, qr } = update;
 
-          this.socket = null;
-          this.qrRaw = null;
-          this.qrDataUrl = null;
-
-          if (shouldReconnect) {
-            this.status = 'CONECTANDO';
-            this.reconnectTimeout = setTimeout(() => {
-              this.isStarting = false;
-              this.init().catch((e) => console.error('[Baileys] Error reintentando conexión:', e));
-            }, 3500);
-          } else {
-            this.status = 'DESCONECTADO';
-            this.connectedNumber = null;
+          if (qr) {
+            this.qrRaw = qr;
             try {
-              fs.rmSync(this.authDir, { recursive: true, force: true });
-            } catch (rmErr) {}
+              this.qrDataUrl = await QRCode.toDataURL(qr, { margin: 2, scale: 6 });
+              this.status = 'ESPERANDO_QR';
+              console.log('[Baileys] 📱 Nuevo código QR generado para vinculación.');
+              clearTimeout(timer);
+              finish();
+            } catch (qrErr) {
+              console.error('[Baileys] Error renderizando QR en base64:', qrErr);
+            }
           }
-        } else if (connection === 'open') {
-          this.status = 'CONECTADO';
-          this.qrRaw = null;
-          this.qrDataUrl = null;
-          const userJid = sock.user?.id || '';
-          this.connectedNumber = userJid.split(':')[0].replace(/\D/g, '');
-          console.log(`[Baileys] ✅ WhatsApp conectado exitosamente como: +${this.connectedNumber}`);
-        }
-      });
 
-      this.isStarting = false;
-      return this.getStatus();
-    } catch (err) {
-      this.isStarting = false;
-      this.status = 'DESCONECTADO';
-      console.error('[Baileys] Error inicializando socket:', err);
-      throw err;
-    }
+          if (connection === 'open') {
+            this.status = 'CONECTADO';
+            this.qrRaw = null;
+            this.qrDataUrl = null;
+            const userJid = sock.user?.id || '';
+            this.connectedNumber = userJid.split(':')[0].replace(/\D/g, '');
+            console.log(`[Baileys] ✅ WhatsApp conectado exitosamente como: +${this.connectedNumber}`);
+            clearTimeout(timer);
+            finish();
+          }
+
+          if (connection === 'close') {
+            const statusCode = lastDisconnect?.error?.output?.statusCode;
+            const shouldReconnect = statusCode !== DisconnectReason?.loggedOut;
+            console.log(`[Baileys] 🔌 Conexión cerrada (código: ${statusCode}). Reintentar: ${shouldReconnect}`);
+
+            this.socket = null;
+            this.qrRaw = null;
+            this.qrDataUrl = null;
+
+            if (shouldReconnect) {
+              this.status = 'CONECTANDO';
+              this.reconnectTimeout = setTimeout(() => {
+                this.isStarting = false;
+                this.init(5000).catch((e) => console.error('[Baileys] Error reintentando conexión:', e));
+              }, 3500);
+            } else {
+              this.status = 'DESCONECTADO';
+              this.connectedNumber = null;
+              try {
+                fs.rmSync(this.authDir, { recursive: true, force: true });
+              } catch (rmErr) {}
+            }
+          }
+        });
+      } catch (err) {
+        clearTimeout(timer);
+        this.status = 'DESCONECTADO';
+        console.error('[Baileys] Error inicializando socket:', err);
+        finish();
+      }
+    });
   }
 
   async disconnect() {
@@ -202,7 +238,6 @@ class BaileysManager {
     }
 
     try {
-      // Simular breve presencia de envío
       try {
         await this.socket.sendPresenceUpdate('composing', jid);
       } catch (e) {}
