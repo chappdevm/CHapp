@@ -535,14 +535,9 @@
       if (state.viewType === 'form') {
         actionBtns.innerHTML = `
           <button type="button" class="btn btn-secondary" id="btnCpBackToList">Volver</button>
-          <button type="button" class="btn btn-primary" id="btnCpNewRecord">Nuevo Gasto Manual</button>
-          <button type="button" class="btn btn-action" id="btnCpScanExpenseAi" style="display: inline-flex; align-items: center; gap: 0.4rem; background: linear-gradient(135deg, #1e3a8a, #2563eb); color: white; font-weight: 500;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg> Escanear Factura</button>
         `;
       } else {
-        actionBtns.innerHTML = `
-          <button type="button" class="btn btn-primary" id="btnCpNewRecord">Nuevo Gasto Manual</button>
-          <button type="button" class="btn btn-action" id="btnCpScanExpenseAi" style="display: inline-flex; align-items: center; gap: 0.45rem; background: linear-gradient(135deg, #1e3a8a, #2563eb); color: white; font-weight: 600;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg> Escanear Factura</button>
-        `;
+        actionBtns.innerHTML = '';
       }
     } else if (state.viewType === 'form') {
       actionBtns.innerHTML = `

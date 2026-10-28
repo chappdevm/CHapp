@@ -1133,7 +1133,7 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.ok(htmlText.includes('id="btnCapturePhoto"'), 'Camera modal must have capture button');
     assert.ok(htmlText.includes('id="cameraFileInput"'), 'Camera modal must have file upload fallback');
     assert.ok(jsText.includes('openExpenseCameraDialog'), 'JS must define openExpenseCameraDialog');
-    assert.ok(jsText.includes('btnCpScanExpenseAi'), 'Control panel must include AI camera scan button');
+    assert.ok(jsText.includes('btnExpensesBannerNew'), 'Expenses banner must include New Manual Expense button');
     assert.ok(jsText.includes('btnExpensesBannerScan'), 'Expenses banner must include AI camera scan button');
   });
 });
