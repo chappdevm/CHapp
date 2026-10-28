@@ -43,7 +43,7 @@ function createInitialData() {
     }
   },
   "settings": {
-    "company_name": "GH Aluminios",
+    "company_name": "CH Aluminios",
     "company_vat": "",
     "company_email": "chappdevm@gmail.com",
     "company_phone": "",

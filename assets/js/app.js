@@ -195,7 +195,7 @@
     }
 
     const compEl = document.getElementById('systrayCompanyName');
-    if (compEl) compEl.textContent = settings.company_name || 'GH Aluminios';
+    if (compEl) compEl.textContent = settings.company_name || 'CH Aluminios';
 
     const user = settings.active_user || { name: 'Administrador CHapp' };
     const userEl = document.getElementById('systrayUserName');
@@ -2580,8 +2580,8 @@
 
         <div class="o_pdf_brand_header">
           <div class="o_pdf_company_info">
-            <img src="/assets/icons/logo.png" alt="GH Aluminios" class="o_pdf_company_logo" onerror="this.style.display='none'" />
-            <h2>${esc(company.company_name || 'GH Aluminios')}</h2>
+            <img src="/assets/icons/logo.png" alt="CH Aluminios" class="o_pdf_company_logo" onerror="this.style.display='none'" />
+            <h2>${esc(company.company_name || 'CH Aluminios')}</h2>
             <p><strong>NIT:</strong> ${esc(company.company_vat || '900.876.543-1')} · <span>${esc(company.fiscal_regime || 'Responsable de IVA - Régimen Ordinario')}</span></p>
             <p>${esc(company.company_address || 'Cra. 7 #18-45')} · ${esc(company.company_city || 'Pereira')}, ${esc(company.company_country || 'Colombia')}</p>
             <p>Email: ${esc(company.company_email || 'chappdevm@gmail.com')} · PBX: (606) 315-0000</p>
@@ -2719,7 +2719,7 @@
             <div class="o_pdf_bank_info">
               <strong>Instrucciones de Pago / Consignación:</strong><br/>
               Bancolombia Cuenta Corriente No. <strong>452-892100-34</strong><br/>
-              Titular: <strong>GH Aluminios</strong> (NIT: ${esc(company.company_vat || '900.876.543-1')})<br/>
+              Titular: <strong>CH Aluminios</strong> (NIT: ${esc(company.company_vat || '900.876.543-1')})<br/>
               Favor enviar comprobante a: <em>${esc(company.company_email || 'chappdevm@gmail.com')}</em>
             </div>
 
@@ -2773,7 +2773,7 @@
         <div class="o_pdf_signatures_section">
           <div class="o_pdf_sign_box">
             <div class="sign_line"></div>
-            <div class="sign_name">${esc(company.company_name || 'GH Aluminios')}</div>
+            <div class="sign_name">${esc(company.company_name || 'CH Aluminios')}</div>
             <div class="sign_title">Firma y Sello Emisor Autorizado</div>
             <div class="sign_sub">NIT: ${esc(company.company_vat || '900.876.543-1')}</div>
           </div>
@@ -2788,7 +2788,7 @@
         <div class="o_pdf_legal_footer">
           Esta factura de venta es título valor conforme al Código de Comercio colombiano (Arts. 772, 773 y 774) y Ley 1231 de 2008.<br/>
           La firma o constancia de recibido implica la aceptación plena de las mercancías y servicios descritos.<br/>
-          Generado automáticamente por <strong>GH Aluminios</strong> — CHapp ERP Odoo 20 Edition.
+          Generado automáticamente por <strong>CH Aluminios</strong> — CHapp ERP Odoo 20 Edition.
         </div>
       </div>
     `;
@@ -2804,7 +2804,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Factura ${esc(invoice.name)} - ${esc(company.company_name || 'GH Aluminios')}</title>
+  <title>Factura ${esc(invoice.name)} - ${esc(company.company_name || 'CH Aluminios')}</title>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -5057,7 +5057,7 @@
     });
 
     document.getElementById('btnUserSettings').addEventListener('click', () => openApp('settings'));
-    document.getElementById('btnPendingActivities').addEventListener('click', () => openApp('expenses', { submenu: 'to_approve' }));
+    document.getElementById('btnPendingActivities')?.addEventListener('click', () => openApp('expenses', { submenu: 'to_approve' }));
     document.getElementById('btnCommandPalette').addEventListener('click', openCommandPalette);
 
     // Search inputs

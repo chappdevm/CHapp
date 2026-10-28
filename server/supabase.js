@@ -620,7 +620,7 @@ function deserializePayment(r) {
 function serializeSettings(s) {
   return {
     id: 1,
-    company_name: String(s.company_name || 'GH Aluminios').trim(),
+    company_name: String(s.company_name || 'CH Aluminios').trim(),
     company_vat: s.company_vat ? String(s.company_vat).trim() : null,
     company_email: s.company_email ? String(s.company_email).trim() : 'chappdevm@gmail.com',
     company_phone: s.company_phone ? String(s.company_phone).trim() : null,
@@ -648,7 +648,7 @@ function serializeSettings(s) {
 function deserializeSettings(r, fallbackSettings = {}) {
   return {
     ...fallbackSettings,
-    company_name: r.company_name || fallbackSettings.company_name || 'GH Aluminios',
+    company_name: r.company_name || fallbackSettings.company_name || 'CH Aluminios',
     company_vat: r.company_vat || '',
     company_email: r.company_email || 'chappdevm@gmail.com',
     company_phone: r.company_phone || '',

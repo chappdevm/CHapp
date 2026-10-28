@@ -612,7 +612,7 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.ok(!jsText.includes('id="fContactWebsite"'), 'Contact form must not include Sitio Web field');
     assert.ok(!jsText.includes('id="fCustomerRank"'), 'Contact form must not include numeric Clasificación Cliente field');
     assert.ok(!jsText.includes('id="fSupplierRank"'), 'Contact form must not include numeric Clasificación Proveedor field');
-    assert.ok(htmlText.includes('<title>GH Aluminios ERP</title>'), 'Browser tab title must be GH Aluminios ERP without Odoo 20');
+    assert.ok(htmlText.includes('<title>CH Aluminios ERP</title>'), 'Browser tab title must be CH Aluminios ERP without Odoo 20');
     assert.ok(!htmlText.includes('ERP — Odoo 20'), 'HTML title must not contain Odoo 20');
     assert.ok(jsText.includes("state.activeRecordId = null;\n          state.viewType = 'list';"), 'Creating new contact must redirect back to main list view');
 
@@ -760,7 +760,7 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.ok(appJsContent.includes('Cédula / NIT'), 'app.js partner details must include Cédula / NIT');
     assert.ok(appJsContent.includes('Celular / Teléfono'), 'app.js partner details must include Celular / Teléfono');
     assert.ok(appJsContent.includes('renderInvoicePdfSheetHtml'), 'app.js must provide invoice PDF rendering helper');
-    assert.ok(appJsContent.includes('GH Aluminios'), 'app.js PDF helper must include GH Aluminios branding');
+    assert.ok(appJsContent.includes('CH Aluminios'), 'app.js PDF helper must include CH Aluminios branding');
     assert.ok(appJsContent.includes('downloadInvoicePdf'), 'app.js must provide download / print invoice PDF function');
     assert.ok(appJsContent.includes('Metro Lineal'), 'app.js must offer Metro Lineal UoM');
 
@@ -984,7 +984,7 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
       const state = {
         data: {
           settings: {
-            company_name: 'GH Aluminios',
+            company_name: 'CH Aluminios',
             company_vat: '900.876.543-1',
             fiscal_regime: 'Responsable de IVA - Régimen Ordinario',
             company_address: 'Cra. 7 #18-45',
@@ -1045,7 +1045,7 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.ok(paidHtml.includes('class="o_pdf_watermark is-paid">PAGADA</div>'), 'Debe incluir marca de agua PAGADA');
     assert.ok(paidHtml.includes('class="o_pdf_stamp is-paid"'), 'Debe incluir sello oficial PAGADA');
     assert.ok(paidHtml.includes('src="/assets/icons/logo.png"'), 'Debe mostrar el logo empresarial');
-    assert.ok(paidHtml.includes('GH Aluminios'), 'Debe incluir el nombre de la empresa');
+    assert.ok(paidHtml.includes('CH Aluminios'), 'Debe incluir el nombre de la empresa');
     assert.ok(paidHtml.includes('900.876.543-1'), 'Debe incluir NIT emisor');
     assert.ok(paidHtml.includes('Arquitectura y Vidrios SAS'), 'Debe incluir nombre del cliente');
     assert.ok(paidHtml.includes('901.234.567-8'), 'Debe incluir NIT receptor');
