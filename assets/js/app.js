@@ -3077,21 +3077,6 @@
           </div>
         </div>
 
-        <div class="o_pdf_signatures_section">
-          <div class="o_pdf_sign_box">
-            <div class="sign_line"></div>
-            <div class="sign_name">${esc(company.company_name || 'CH Aluminios')}</div>
-            <div class="sign_title">Firma y Sello Emisor Autorizado</div>
-            <div class="sign_sub">NIT: ${esc(company.company_vat || '900.876.543-1')}</div>
-          </div>
-          <div class="o_pdf_sign_box">
-            <div class="sign_line"></div>
-            <div class="sign_name">${esc(partner.name || 'Adquiriente')}</div>
-            <div class="sign_title">Firma y Aceptación de Recibido</div>
-            <div class="sign_sub">C.C. / NIT: ____________________ Fecha: ____/____/2026</div>
-          </div>
-        </div>
-
         <div class="o_pdf_legal_footer">
           Esta factura de venta es título valor conforme al Código de Comercio colombiano (Arts. 772, 773 y 774) y Ley 1231 de 2008.<br/>
           La firma o constancia de recibido implica la aceptación plena de las mercancías y servicios descritos.<br/>
@@ -3749,21 +3734,6 @@
                 <td style="text-align: right;">${formatMoney(totalAmount)}</td>
               </tr>
             </table>
-          </div>
-        </div>
-
-        <div class="o_pdf_signatures_section">
-          <div class="o_pdf_sign_box">
-            <div class="sign_line"></div>
-            <div class="sign_name">${esc(company.company_name || 'CH Aluminios')}</div>
-            <div class="sign_title">Asesor Comercial: ${esc(sale.salesperson || 'Laura Gómez')}</div>
-            <div class="sign_sub">NIT: ${esc(company.company_vat || '900.876.543-1')}</div>
-          </div>
-          <div class="o_pdf_sign_box">
-            <div class="sign_line"></div>
-            <div class="sign_name">${esc(partner.name || 'Cliente')}</div>
-            <div class="sign_title">Firma de Aprobación y Aceptación de la Oferta</div>
-            <div class="sign_sub">C.C. / NIT: ____________________ Fecha: ____/____/2026</div>
           </div>
         </div>
 

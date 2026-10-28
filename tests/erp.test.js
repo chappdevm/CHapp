@@ -992,8 +992,8 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.ok(jsText.includes('function numberToWordsSpanish'), 'app.js debe implementar conversión de cifras a letras en español');
     assert.ok(!jsText.includes('function generateInvoiceCufe'), 'app.js no debe contener generador de CUFE');
     assert.ok(!jsText.includes('function renderInvoiceQrSvg'), 'app.js no debe contener generador de código QR');
-    assert.ok(jsText.includes('Firma y Sello Emisor Autorizado'), 'app.js debe incluir bloque de firma emisor');
-    assert.ok(jsText.includes('Firma y Aceptación de Recibido'), 'app.js debe incluir bloque de aceptación comprador');
+    assert.ok(!jsText.includes('Firma y Sello Emisor Autorizado'), 'app.js no debe incluir bloque de firmas en representaciones gráficas');
+    assert.ok(!jsText.includes('Firma y Aceptación de Recibido'), 'app.js no debe incluir bloque de firmas en representaciones gráficas');
     assert.ok(!jsText.includes('Instrucciones de Pago / Consignación'), 'app.js no debe incluir sección de instrucciones de pago en representaciones gráficas');
 
     // 3. Extracción y prueba funcional de los algoritmos de la factura
@@ -1074,8 +1074,8 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.ok(paidHtml.includes('SON: UN MILLÓN CIENTO NOVENTA MIL PESOS M/CTE'), 'Debe incluir total en letras');
     assert.ok(!paidHtml.includes('Instrucciones de Pago / Consignación'), 'Factura no debe incluir bloque de instrucciones de pago');
     assert.ok(!paidHtml.includes('Bancolombia Cuenta Corriente'), 'Factura no debe incluir datos bancarios');
-    assert.ok(paidHtml.includes('Firma y Sello Emisor Autorizado'), 'Debe contener firma del emisor');
-    assert.ok(paidHtml.includes('Firma y Aceptación de Recibido'), 'Debe contener firma del receptor');
+    assert.ok(!paidHtml.includes('Firma y Sello Emisor Autorizado'), 'No debe contener firma del emisor');
+    assert.ok(!paidHtml.includes('Firma y Aceptación de Recibido'), 'No debe contener firma del receptor');
     assert.ok(!paidHtml.includes('CUFE'), 'No debe contener referencias a CUFE');
     assert.ok(!paidHtml.includes('o_pdf_qr_box'), 'No debe contener caja de código QR');
 
