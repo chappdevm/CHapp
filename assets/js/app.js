@@ -4093,7 +4093,6 @@
         </aside>
       </div>
     `;
-    `;
 
     wireChatterEvents('sales', existing.id);
 

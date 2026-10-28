@@ -52,6 +52,13 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
       assert.equal(buf[0], 0x89, `Icon ${icon} should be a valid PNG`);
       assert.equal(buf[1], 0x50);
     }
+
+    // Verify frontend JavaScript files have zero syntax errors
+    const vm = require('vm');
+    const appJsContent = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
+    assert.doesNotThrow(() => {
+      new vm.Script(appJsContent);
+    }, 'assets/js/app.js must not contain any JavaScript syntax errors');
   });
 
   it('bootstraps clean state with all 5 modules initialized', async () => {
