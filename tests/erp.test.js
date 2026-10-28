@@ -1261,4 +1261,70 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.ok(jsText.includes('state.navStack'), 'Must support state.navStack for returning to originating module');
     assert.ok(jsText.includes('btnGoToOriginDoc'), 'Must support jumping to origin document');
   });
+  it('Persistencia y Trazabilidad del Chatter: los eventos se acumulan sin sobreescribirse ni borrarse tras sincronización y no hay botón Volver redundante en Gastos', async () => {
+    // 1. Verificar que el botón "Volver" redundante al lado de Eliminar Gasto fue eliminado
+    const jsText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
+    assert.ok(!jsText.includes('id="btnCancelExpense"'), 'El botón Volver redundante en el formulario de gastos debe ser eliminado');
+
+    // 2. Crear una cotización de venta
+    const partnerRes = await req('/api/contacts', 'POST', { name: 'Cliente Chatter Trazabilidad S.A.S.' });
+    assert.equal(partnerRes.status, 200);
+    const partnerId = partnerRes.json.contact.id;
+
+    const saleRes = await req('/api/sales', 'POST', {
+      partner_id: partnerId,
+      lines: [{ description: 'Ventana Corrediza Aluminio', quantity: 2, price_unit: 150000, tax_rate: 19 }]
+    });
+    assert.equal(saleRes.status, 200);
+    const saleId = saleRes.json.order.id;
+    const saleName = saleRes.json.order.name;
+
+    // Verificar mensaje inicial de creación
+    assert.ok(saleRes.json.order.chatter.length >= 1, 'Debe registrar mensaje de creación');
+    assert.ok(saleRes.json.order.chatter.some((m) => m.text.includes('creada')), 'Debe incluir texto de cotización creada');
+
+    // 3. Marcar como enviada
+    const sendRes = await req(`/api/sales/${saleId}/action`, 'POST', { action: 'send' });
+    assert.equal(sendRes.status, 200);
+    assert.ok(sendRes.json.order.chatter.length >= 2, 'Chatter debe conservar mensaje de creación y de envío');
+    assert.ok(sendRes.json.order.chatter.some((m) => m.text.includes('creada')));
+    assert.ok(sendRes.json.order.chatter.some((m) => m.text.includes('enviada')));
+
+    // 4. Confirmar pedido (la acción crucial mencionada por el usuario)
+    const confirmRes = await req(`/api/sales/${saleId}/action`, 'POST', { action: 'confirm' });
+    assert.equal(confirmRes.status, 200);
+    assert.ok(confirmRes.json.order.chatter.length >= 3, 'Chatter NO debe sobreescribirse al confirmar pedido');
+    assert.ok(confirmRes.json.order.chatter.some((m) => m.text.includes('creada')));
+    assert.ok(confirmRes.json.order.chatter.some((m) => m.text.includes('enviada')));
+    assert.ok(confirmRes.json.order.chatter.some((m) => m.text.includes('confirmada')));
+
+    // 5. Agregar una nota manual de seguimiento
+    const noteRes = await req('/api/chatter', 'POST', {
+      model: 'sales',
+      id: saleId,
+      text: 'Cliente solicitó entrega para el próximo viernes.'
+    });
+    assert.equal(noteRes.status, 200);
+    assert.ok(noteRes.json.record.chatter.some((m) => m.text.includes('próximo viernes')));
+    const chatterCountBeforeSync = noteRes.json.record.chatter.length;
+    assert.ok(chatterCountBeforeSync >= 4, 'Chatter debe acumular la nota manual');
+
+    // 6. Ejecutar sincronización (ensureSynced(0)) y verificar que el chatter persista sin borrarse
+    if (server.store && server.store.ensureSynced) {
+      await server.store.ensureSynced(0);
+    }
+    const stateAfterSync = server.store.getBootstrapState();
+    const syncedSale = stateAfterSync.sales.find((s) => Number(s.id) === Number(saleId));
+    assert.ok(syncedSale, 'El pedido debe existir en el estado sincronizado');
+    assert.equal(syncedSale.chatter.length, chatterCountBeforeSync, 'El chatter debe persistir y no ser borrado a [] tras la sincronización');
+    assert.ok(syncedSale.chatter.some((m) => m.text.includes('próximo viernes')));
+    assert.ok(syncedSale.chatter.some((m) => m.text.includes('confirmada')));
+    assert.ok(syncedSale.chatter.some((m) => m.text.includes('creada')));
+
+    // 7. Crear factura desde el pedido y verificar trazabilidad en el pedido y en la factura
+    const invRes = await req(`/api/sales/${saleId}/action`, 'POST', { action: 'create_invoice', amount: 357000 });
+    assert.equal(invRes.status, 200);
+    assert.ok(invRes.json.order.chatter.some((m) => m.text.includes('Factura de cliente')));
+    assert.ok(invRes.json.invoice.chatter.some((m) => m.text.includes('creada')));
+  });
 });

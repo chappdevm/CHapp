@@ -1660,7 +1660,7 @@
                   ? `<button type="button" class="btn btn-danger" id="btnDeleteFormExpense">Eliminar Gasto</button>`
                   : ''
               }
-              <button type="button" class="btn btn-secondary" id="btnCancelExpense">Volver</button>
+
             </div>
             <div style="font-weight: 600; color: var(--o-muted); font-size: 0.9rem; display: flex; align-items: center; gap: 8px;">
               <span>${isNew ? 'Registro de Gasto' : esc(existing.reference)}</span>

@@ -281,7 +281,9 @@ function createAppServer(dbPath, options) {
   const defaultOpts = isTestPath ? {} : { useSupabase: isSupabaseConfigured() };
   const store = new ERPStore(dbPath, options || defaultOpts);
   const handler = createHandler(store);
-  return http.createServer(handler);
+  const server = http.createServer(handler);
+  server.store = store;
+  return server;
 }
 
 if (require.main === module) {

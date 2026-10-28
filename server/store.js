@@ -382,20 +382,44 @@ class ERPStore {
           return false;
         };
 
+        const preserveLocalChatter = (remoteArr, localArr) => {
+          if (!Array.isArray(remoteArr) || !Array.isArray(localArr)) return;
+          for (const rem of remoteArr) {
+            const loc = localArr.find((x) => Number(x.id) === Number(rem.id));
+            if (loc && Array.isArray(loc.chatter) && loc.chatter.length > 0) {
+              if (!Array.isArray(rem.chatter) || rem.chatter.length === 0) {
+                rem.chatter = [...loc.chatter];
+              } else {
+                const existingKeys = new Set(rem.chatter.map((m) => `${m.id || ''}_${m.text || ''}`));
+                for (const msg of loc.chatter) {
+                  const key = `${msg.id || ''}_${msg.text || ''}`;
+                  if (!existingKeys.has(key)) {
+                    rem.chatter.push(msg);
+                  }
+                }
+              }
+            }
+          }
+        };
+
         if (Array.isArray(remote.contacts) && !shouldPreserveLocal(remote.contacts, this.data.contacts)) {
+          preserveLocalChatter(remote.contacts, this.data.contacts);
           this.data.contacts = remote.contacts;
         }
         if (Array.isArray(remote.products) && !shouldPreserveLocal(remote.products, this.data.products)) {
           this.data.products = remote.products;
         }
         if (Array.isArray(remote.expenses) && !shouldPreserveLocal(remote.expenses, this.data.expenses)) {
+          preserveLocalChatter(remote.expenses, this.data.expenses);
           this.data.expenses = remote.expenses;
         }
         if (Array.isArray(remote.sales) && !shouldPreserveLocal(remote.sales, this.data.sales)) {
+          preserveLocalChatter(remote.sales, this.data.sales);
           this.data.sales = remote.sales;
         }
         if (this.data.accounting) {
           if (Array.isArray(remote.moves) && !shouldPreserveLocal(remote.moves, this.data.accounting.moves)) {
+            preserveLocalChatter(remote.moves, this.data.accounting.moves);
             this.data.accounting.moves = remote.moves;
           }
           if (Array.isArray(remote.payments) && !shouldPreserveLocal(remote.payments, this.data.accounting.payments)) {
@@ -523,6 +547,11 @@ class ERPStore {
     return d.toISOString().slice(0, 16).replace('T', ' ');
   }
 
+  nextChatterId() {
+    this._chatterSeq = (this._chatterSeq || 0) + 1;
+    return Date.now() * 1000 + (this._chatterSeq % 1000);
+  }
+
   getActiveAuthor() {
     return (this.data.settings && this.data.settings.active_user && this.data.settings.active_user.name) || 'Administrador CHapp';
   }
@@ -636,10 +665,24 @@ class ERPStore {
         payment_term: payload.payment_term !== undefined ? String(payload.payment_term).trim() : existing.payment_term,
         notes: payload.notes !== undefined ? String(payload.notes).trim() : existing.notes
       };
-      updated.chatter = [
-        ...(existing.chatter || []),
-        { id: Date.now(), author: this.getActiveAuthor(), date: this.formatNowShort(), text: 'Ficha de contacto actualizada.' }
-      ];
+      const isContactChanged =
+        name !== existing.name ||
+        isCompanyVal !== existing.is_company ||
+        (payload.company_name !== undefined && String(payload.company_name).trim() !== String(existing.company_name || '').trim()) ||
+        (payload.vat !== undefined && String(payload.vat).trim() !== String(existing.vat || '').trim()) ||
+        (payload.email !== undefined && String(payload.email).trim() !== String(existing.email || '').trim()) ||
+        (payload.phone !== undefined && String(payload.phone).trim() !== String(existing.phone || '').trim()) ||
+        (payload.payment_term !== undefined && String(payload.payment_term).trim() !== String(existing.payment_term || '').trim()) ||
+        (payload.notes !== undefined && String(payload.notes).trim() !== String(existing.notes || '').trim());
+      updated.chatter = [...(existing.chatter || [])];
+      if (isContactChanged) {
+        updated.chatter.push({
+          id: this.nextChatterId(),
+          author: this.getActiveAuthor(),
+          date: this.formatNowShort(),
+          text: 'Ficha de contacto actualizada.'
+        });
+      }
       this.data.contacts[idx] = updated;
       this.save();
       if (this.supabase) {
@@ -681,7 +724,7 @@ class ERPStore {
       active: true,
       created_at: nowISO(),
       chatter: [
-        { id: Date.now(), author: this.getActiveAuthor(), date: this.formatNowShort(), text: 'Contacto creado en el directorio.' }
+        { id: this.nextChatterId(), author: this.getActiveAuthor(), date: this.formatNowShort(), text: 'Contacto creado en el directorio.' }
       ]
     };
     this.data.contacts.unshift(newContact);
@@ -973,10 +1016,23 @@ class ERPStore {
         notes: String(payload.notes ?? existing.notes).trim(),
         items
       };
-      updated.chatter = [
-        ...(existing.chatter || []),
-        { id: Date.now(), author: this.getActiveAuthor(), date: this.formatNowShort(), text: `Gasto actualizado ($ ${totalAmount.toLocaleString('es-CO')}).` }
-      ];
+      const isItemsChanged = JSON.stringify(items) !== JSON.stringify(existing.items || []);
+      const isExpenseChanged =
+        (partner && Number(partner.id) !== Number(existing.partner_id)) ||
+        (name && name !== existing.name) ||
+        (payload.date && payload.date !== existing.date) ||
+        (payload.receipt_ref && payload.receipt_ref !== existing.receipt_ref) ||
+        (payload.notes !== undefined && String(payload.notes).trim() !== String(existing.notes || '').trim()) ||
+        totalAmount !== existing.total_amount;
+      updated.chatter = [...(existing.chatter || [])];
+      if (isItemsChanged || isExpenseChanged) {
+        updated.chatter.push({
+          id: this.nextChatterId(),
+          author: this.getActiveAuthor(),
+          date: this.formatNowShort(),
+          text: `Gasto actualizado ($ ${totalAmount.toLocaleString('es-CO')}).`
+        });
+      }
       const oldExpense = { ...existing };
       this.data.expenses[idx] = updated;
       this.save();
@@ -1025,7 +1081,7 @@ class ERPStore {
       payment_id: null,
       items,
       chatter: [
-        { id: Date.now(), author: this.getActiveAuthor(), date: this.formatNowShort(), text: `Gasto ${reference} creado en estado Borrador.` }
+        { id: this.nextChatterId(), author: this.getActiveAuthor(), date: this.formatNowShort(), text: `Gasto ${reference} creado en estado Borrador.` }
       ]
     };
 
@@ -1070,7 +1126,7 @@ class ERPStore {
         newExpense.bill_id = vendorBill.id;
         newExpense.bill_name = vendorBill.name;
         newExpense.chatter.push({
-          id: Date.now() + 1,
+          id: this.nextChatterId(),
           author: this.getActiveAuthor(),
           date: this.formatNowShort(),
           text: `Factura de proveedor asociada ${vendorBill.name} generada y pagada automáticamente.`
@@ -1108,12 +1164,13 @@ class ERPStore {
   async transitionExpense(id, action, extra = {}) {
     const exp = this.data.expenses.find((e) => Number(e.id) === Number(id));
     if (!exp) throw new Error('Gasto no encontrado.');
+    exp.chatter = Array.isArray(exp.chatter) ? exp.chatter : [];
 
     if (action === 'submit') {
       if (exp.state !== 'draft') throw new Error('Solo los gastos en borrador pueden enviarse.');
       exp.state = 'submitted';
       exp.chatter.push({
-        id: Date.now(),
+        id: this.nextChatterId(),
         author: this.getActiveAuthor(),
         date: this.formatNowShort(),
         text: 'Reporte de gasto enviado a aprobación.'
@@ -1124,7 +1181,7 @@ class ERPStore {
       }
       exp.state = 'approved';
       exp.chatter.push({
-        id: Date.now(),
+        id: this.nextChatterId(),
         author: this.getActiveAuthor(),
         date: this.formatNowShort(),
         text: 'Gasto aprobado por gerencia.'
@@ -1202,7 +1259,7 @@ class ERPStore {
         amount_total: exp.total_amount,
         amount_residual: exp.payment_mode === 'company_account' ? 0 : exp.total_amount,
         chatter: [
-          { id: Date.now(), author: this.getActiveAuthor(), date: this.formatNowShort(), text: `Asiento contable generado desde Gasto ${exp.reference}.` }
+          { id: this.nextChatterId(), author: this.getActiveAuthor(), date: this.formatNowShort(), text: `Asiento contable generado desde Gasto ${exp.reference}.` }
         ]
       };
       this.data.accounting.moves.unshift(move);
@@ -1214,7 +1271,7 @@ class ERPStore {
         exp.state = 'posted';
       }
       exp.chatter.push({
-        id: Date.now() + 1,
+        id: this.nextChatterId(),
         author: this.getActiveAuthor(),
         date: this.formatNowShort(),
         text: `Asiento contable ${moveName} publicado en Contabilidad.`
@@ -1254,7 +1311,7 @@ class ERPStore {
       exp.payment_id = payment.id;
       exp.state = 'paid';
       exp.chatter.push({
-        id: Date.now(),
+        id: this.nextChatterId(),
         author: this.getActiveAuthor(),
         date: this.formatNowShort(),
         text: `Reembolso pagado mediante comprobante ${payName}.`
@@ -1263,7 +1320,7 @@ class ERPStore {
       exp.state = 'refused';
       exp.refuse_reason = String(extra.reason || 'Rechazado por políticas de gasto').trim();
       exp.chatter.push({
-        id: Date.now(),
+        id: this.nextChatterId(),
         author: this.getActiveAuthor(),
         date: this.formatNowShort(),
         text: `Gasto rechazado. Motivo: ${exp.refuse_reason}`
@@ -1272,7 +1329,7 @@ class ERPStore {
       exp.state = 'draft';
       exp.refuse_reason = '';
       exp.chatter.push({
-        id: Date.now(),
+        id: this.nextChatterId(),
         author: this.getActiveAuthor(),
         date: this.formatNowShort(),
         text: 'Gasto restablecido a Borrador.'
@@ -1368,10 +1425,24 @@ class ERPStore {
         notes: String(payload.notes ?? existing.notes).trim()
       };
       this.recomputeSaleOrderInvoiceStatus(updated);
-      updated.chatter = [
-        ...(existing.chatter || []),
-        { id: Date.now(), author: this.getActiveAuthor(), date: this.formatNowShort(), text: `Orden actualizada. Total: $ ${amountTotal.toLocaleString('es-CO')}.` }
-      ];
+      const isLinesChanged = JSON.stringify(lines) !== JSON.stringify(existing.lines || []);
+      const isSaleChanged =
+        (partner && Number(partner.id) !== Number(existing.partner_id)) ||
+        (payload.date_order && payload.date_order !== existing.date_order) ||
+        (payload.validity_date && payload.validity_date !== existing.validity_date) ||
+        (payload.payment_term && payload.payment_term !== existing.payment_term) ||
+        (payload.salesperson && payload.salesperson !== existing.salesperson) ||
+        (payload.notes !== undefined && String(payload.notes).trim() !== String(existing.notes || '').trim()) ||
+        amountTotal !== existing.amount_total;
+      updated.chatter = [...(existing.chatter || [])];
+      if (isLinesChanged || isSaleChanged) {
+        updated.chatter.push({
+          id: this.nextChatterId(),
+          author: this.getActiveAuthor(),
+          date: this.formatNowShort(),
+          text: `Orden actualizada. Total: $ ${amountTotal.toLocaleString('es-CO')}.`
+        });
+      }
       const oldOrder = { ...existing };
       this.data.sales[idx] = updated;
       this.save();
@@ -1409,7 +1480,7 @@ class ERPStore {
       notes: String(payload.notes || this.data.settings.sale_terms || '').trim(),
       invoice_ids: [],
       chatter: [
-        { id: Date.now(), author: this.getActiveAuthor(), date: this.formatNowShort(), text: `Cotización ${name} creada.` }
+        { id: this.nextChatterId(), author: this.getActiveAuthor(), date: this.formatNowShort(), text: `Cotización ${name} creada.` }
       ]
     };
     this.data.sales.unshift(newOrder);
@@ -1429,6 +1500,7 @@ class ERPStore {
   async transitionSaleOrder(id, action, params = {}) {
     const order = this.data.sales.find((s) => Number(s.id) === Number(id));
     if (!order) throw new Error('Pedido de venta no encontrado.');
+    order.chatter = Array.isArray(order.chatter) ? order.chatter : [];
     const oldOrderSnapshot = JSON.parse(JSON.stringify(order));
     const oldMovesSnapshot = this.data.accounting ? [...this.data.accounting.moves] : [];
     let invoice = null;
@@ -1437,7 +1509,7 @@ class ERPStore {
       if (order.state !== 'draft') throw new Error('Solo las cotizaciones en borrador se marcan como enviadas.');
       order.state = 'sent';
       order.chatter.push({
-        id: Date.now(),
+        id: this.nextChatterId(),
         author: this.getActiveAuthor(),
         date: this.formatNowShort(),
         text: 'Cotización enviada por correo electrónico al cliente.'
@@ -1449,7 +1521,7 @@ class ERPStore {
       order.state = 'sale';
       this.recomputeSaleOrderInvoiceStatus(order);
       order.chatter.push({
-        id: Date.now(),
+        id: this.nextChatterId(),
         author: this.getActiveAuthor(),
         date: this.formatNowShort(),
         text: `Cotización confirmada -> Pedido de Venta ${order.name}.`
@@ -1603,7 +1675,7 @@ class ERPStore {
         is_installment: isAbono,
         chatter: [
           {
-            id: Date.now(),
+            id: this.nextChatterId(),
             author: this.getActiveAuthor(),
             date: this.formatNowShort(),
             text: isAbono
@@ -1618,7 +1690,7 @@ class ERPStore {
       const newInvoicedTotal = round2(invoicedTotal + billTotal);
       order.invoice_status = newInvoicedTotal >= round2(order.amount_total) ? 'invoiced' : 'to invoice';
       order.chatter.push({
-        id: Date.now() + 1,
+        id: this.nextChatterId(),
         author: this.getActiveAuthor(),
         date: this.formatNowShort(),
         text: isAbono
@@ -1636,7 +1708,7 @@ class ERPStore {
       order.state = 'cancel';
       order.invoice_status = 'no';
       order.chatter.push({
-        id: Date.now(),
+        id: this.nextChatterId(),
         author: this.getActiveAuthor(),
         date: this.formatNowShort(),
         text: 'Orden cancelada.'
@@ -1645,7 +1717,7 @@ class ERPStore {
       order.state = 'draft';
       order.invoice_status = 'no';
       order.chatter.push({
-        id: Date.now(),
+        id: this.nextChatterId(),
         author: this.getActiveAuthor(),
         date: this.formatNowShort(),
         text: 'Orden restablecida a Cotización Borrador.'
@@ -1771,11 +1843,23 @@ class ERPStore {
         amount_tax: amountTax,
         amount_total: amountTotal,
         amount_residual: amountTotal,
-        chatter: [
-          ...(existing.chatter || []),
-          { id: Date.now(), author: this.getActiveAuthor(), date: this.formatNowShort(), text: `Borrador actualizado ($ ${amountTotal.toLocaleString('es-CO')}).` }
-        ]
+        chatter: [...(existing.chatter || [])]
       };
+      const isMoveLinesChanged = JSON.stringify(lines) !== JSON.stringify(existing.lines || []);
+      const isMoveChanged =
+        (partner && Number(partner.id) !== Number(existing.partner_id)) ||
+        (invDate && invDate !== existing.invoice_date) ||
+        (dueDate && dueDate !== existing.invoice_date_due) ||
+        (payload.ref !== undefined && String(payload.ref).trim() !== String(existing.ref || '').trim()) ||
+        amountTotal !== existing.amount_total;
+      if (isMoveLinesChanged || isMoveChanged) {
+        updatedMove.chatter.push({
+          id: this.nextChatterId(),
+          author: this.getActiveAuthor(),
+          date: this.formatNowShort(),
+          text: `Borrador actualizado ($ ${amountTotal.toLocaleString('es-CO')}).`
+        });
+      }
       const oldMove = { ...existing };
       this.data.accounting.moves[existingIdx] = updatedMove;
       if (payload.auto_post) {
@@ -1818,7 +1902,7 @@ class ERPStore {
       amount_total: amountTotal,
       amount_residual: amountTotal,
       chatter: [
-        { id: Date.now(), author: this.getActiveAuthor(), date: this.formatNowShort(), text: 'Documento contable creado en estado Borrador.' }
+        { id: this.nextChatterId(), author: this.getActiveAuthor(), date: this.formatNowShort(), text: 'Documento contable creado en estado Borrador.' }
       ]
     };
 
@@ -1916,7 +2000,7 @@ class ERPStore {
       payments_history: [],
       chatter: [
         {
-          id: Date.now() + 2,
+          id: this.nextChatterId(),
           author: this.getActiveAuthor(),
           date: this.formatNowShort(),
           text: `Factura ${nextInvName} generada automáticamente por saldo restante de $ ${residualAmount.toLocaleString('es-CO')} tras abono de $ ${Number(priorPaymentAmount || 0).toLocaleString('es-CO')} el ${nextDate} a la factura ${move.name}.`
@@ -1942,7 +2026,7 @@ class ERPStore {
     }
 
     move.chatter.push({
-      id: Date.now() + 3,
+      id: this.nextChatterId(),
       author: this.getActiveAuthor(),
       date: this.formatNowShort(),
       text: `Siguiente factura por saldo restante emitida: ${nextInvName} ($ ${residualAmount.toLocaleString('es-CO')}).`
@@ -1982,7 +2066,7 @@ class ERPStore {
       move.amount_residual = move.amount_total;
       move.payment_state = 'not_paid';
       move.chatter.push({
-        id: Date.now(),
+        id: this.nextChatterId(),
         author: this.getActiveAuthor(),
         date: this.formatNowShort(),
         text: `Asiento confirmado y publicado con consecutivo ${move.name}.`
@@ -2039,7 +2123,7 @@ class ERPStore {
       move.amount_residual = round2(move.amount_residual - payAmount);
       move.payment_state = move.amount_residual === 0 ? 'paid' : 'partial';
       move.chatter.push({
-        id: Date.now(),
+        id: this.nextChatterId(),
         author: this.getActiveAuthor(),
         date: this.formatNowShort(),
         text: `Pago ${payName} registrado por $ ${payAmount.toLocaleString('es-CO')} en ${journalName}. Saldo pendiente: $ ${move.amount_residual.toLocaleString('es-CO')}.`
@@ -2059,7 +2143,7 @@ class ERPStore {
       move.payment_state = 'not_paid';
       move.amount_residual = 0;
       move.chatter.push({
-        id: Date.now(),
+        id: this.nextChatterId(),
         author: this.getActiveAuthor(),
         date: this.formatNowShort(),
         text: 'Documento contable cancelado.'
@@ -2070,7 +2154,7 @@ class ERPStore {
       move.payment_state = 'not_paid';
       move.amount_residual = move.amount_total;
       move.chatter.push({
-        id: Date.now(),
+        id: this.nextChatterId(),
         author: this.getActiveAuthor(),
         date: this.formatNowShort(),
         text: 'Restablecido a Borrador.'
@@ -2167,14 +2251,15 @@ class ERPStore {
     if (model === 'contacts') collection = this.data.contacts;
     else if (model === 'expenses') collection = this.data.expenses;
     else if (model === 'sales') collection = this.data.sales;
-    else if (model === 'moves') collection = this.data.accounting.moves;
+    else if (model === 'moves' || model === 'account_move') collection = this.data.accounting ? this.data.accounting.moves : null;
+    else if (model === 'products') collection = this.data.products;
     if (!collection) throw new Error('Modelo no válido para notas.');
 
     const record = collection.find((r) => Number(r.id) === Number(id));
     if (!record) throw new Error('Registro no encontrado.');
-    record.chatter = record.chatter || [];
+    record.chatter = Array.isArray(record.chatter) ? record.chatter : [];
     const note = {
-      id: Date.now(),
+      id: this.nextChatterId(),
       author: this.getActiveAuthor(),
       date: this.formatNowShort(),
       text: clean

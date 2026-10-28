@@ -734,7 +734,43 @@ class SupabasePersistence {
           console.warn('[Supabase] Lectura remota vacía [] con clave anon/no-servicio. Conservando datos locales para evitar borrado por RLS.');
           return localList;
         }
-        return res.data.map(deserializer);
+        return res.data.map((item) => {
+          const deserialized = deserializer(item);
+          const existingRec = Array.isArray(localList)
+            ? localList.find((x) => Number(x.id) === Number(item.id))
+            : null;
+          if (existingRec) {
+            // CRITICAL: Preserve chatter history from local data
+            if (Array.isArray(existingRec.chatter) && existingRec.chatter.length > 0) {
+              deserialized.chatter = [...existingRec.chatter];
+            }
+            if (existingRec.payment_id && !deserialized.payment_id) {
+              deserialized.payment_id = existingRec.payment_id;
+            }
+            if (existingRec.bill_id && !deserialized.bill_id) {
+              deserialized.bill_id = existingRec.bill_id;
+            }
+            if (existingRec.bill_name && !deserialized.bill_name) {
+              deserialized.bill_name = existingRec.bill_name;
+            }
+            if (existingRec.move_id && !deserialized.move_id) {
+              deserialized.move_id = existingRec.move_id;
+            }
+            if (Array.isArray(existingRec.items) && existingRec.items.length > 0 && (!deserialized.items || deserialized.items.length === 0)) {
+              deserialized.items = existingRec.items;
+            }
+            if (existingRec.supplier_vat && !deserialized.supplier_vat) {
+              deserialized.supplier_vat = existingRec.supplier_vat;
+            }
+            if (Array.isArray(existingRec.lines) && existingRec.lines.length > 0 && (!deserialized.lines || deserialized.lines.length === 0)) {
+              deserialized.lines = existingRec.lines;
+            }
+            if (Array.isArray(existingRec.journal_items) && existingRec.journal_items.length > 0 && (!deserialized.journal_items || deserialized.journal_items.length === 0)) {
+              deserialized.journal_items = existingRec.journal_items;
+            }
+          }
+          return deserialized;
+        });
       };
 
       const contacts = extractSafe(partnersRes, deserializePartner, existingData ? existingData.contacts : []);
