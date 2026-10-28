@@ -1,6 +1,16 @@
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
+
+// Static require to ensure Vercel NFT bundles Baileys & auxiliary dependencies
+try {
+  require('@whiskeysockets/baileys');
+  require('qrcode');
+  require('pino');
+} catch (e) {
+  // Ignored on static analysis / dynamic fallback
+}
+
 const { createHandler } = require('../index');
 const { ERPStore } = require('../server/store');
 const { isSupabaseConfigured, getSupabaseConfig } = require('../server/supabase');

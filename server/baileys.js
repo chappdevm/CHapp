@@ -5,15 +5,49 @@ const QRCode = require('qrcode');
 const pino = require('pino');
 
 let makeWASocket, DisconnectReason, useMultiFileAuthState, Browsers;
+let baileysLoadError = null;
+
+async function loadBaileys() {
+  if (makeWASocket && useMultiFileAuthState) {
+    return true;
+  }
+  try {
+    const baileys = await import('@whiskeysockets/baileys');
+    makeWASocket = baileys.default || baileys.makeWASocket;
+    DisconnectReason = baileys.DisconnectReason;
+    useMultiFileAuthState = baileys.useMultiFileAuthState;
+    Browsers = baileys.Browsers;
+    baileysLoadError = null;
+    return true;
+  } catch (err1) {
+    try {
+      const baileys = require('@whiskeysockets/baileys');
+      makeWASocket = baileys.default || baileys.makeWASocket;
+      DisconnectReason = baileys.DisconnectReason;
+      useMultiFileAuthState = baileys.useMultiFileAuthState;
+      Browsers = baileys.Browsers;
+      baileysLoadError = null;
+      return true;
+    } catch (err2) {
+      baileysLoadError = err1 || err2;
+      console.warn('[Baileys] Error cargando @whiskeysockets/baileys:', (err1 && err1.message) || (err2 && err2.message));
+      return false;
+    }
+  }
+}
+
+// Intentar carga síncrona inmediata si el entorno lo soporta
 try {
   const baileys = require('@whiskeysockets/baileys');
   makeWASocket = baileys.default || baileys.makeWASocket;
   DisconnectReason = baileys.DisconnectReason;
   useMultiFileAuthState = baileys.useMultiFileAuthState;
   Browsers = baileys.Browsers;
-} catch (err) {
-  console.warn('[Baileys] Módulo @whiskeysockets/baileys no disponible:', err.message);
+} catch (e) {
+  // ESM en Node requiere dynamic import(), se resuelve con loadBaileys()
 }
+
+loadBaileys().catch(() => {});
 
 class BaileysManager {
   constructor() {
@@ -51,13 +85,17 @@ class BaileysManager {
       status: this.status,
       connectedNumber: this.connectedNumber,
       tieneQr: Boolean(this.qrDataUrl),
-      qrDataUrl: this.qrDataUrl
+      qrDataUrl: this.qrDataUrl,
+      baileysAvailable: Boolean(makeWASocket && useMultiFileAuthState),
+      loadError: baileysLoadError ? baileysLoadError.message : null
     };
   }
 
   async init(waitForQrMs = 8000) {
+    await loadBaileys();
     if (!makeWASocket || !useMultiFileAuthState) {
-      throw new Error('La librería Baileys no está instalada en el servidor.');
+      const detail = baileysLoadError ? `: ${baileysLoadError.message}` : '';
+      throw new Error(`La librería Baileys no está disponible en este servidor${detail}.`);
     }
 
     if (this.status === 'CONECTADO' && this.socket) {
@@ -211,6 +249,7 @@ class BaileysManager {
   }
 
   async sendPdf(phone, pdfInput, filename = 'documento.pdf', caption = '') {
+    await loadBaileys();
     if (!this.socket || this.status !== 'CONECTADO') {
       throw new Error('WhatsApp de la compañía no está conectado. Por favor vincule el dispositivo escaneando el código QR.');
     }
