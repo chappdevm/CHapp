@@ -13,7 +13,7 @@
       icon: '/assets/icons/contacts.png',
       xmlid: 'contacts.menu_contacts',
       defaultSubmenu: 'all',
-      defaultView: 'kanban',
+      defaultView: 'list',
       submenus: [
         { id: 'all', label: 'Contactos' },
         { id: 'customers', label: 'Clientes' },
@@ -1058,7 +1058,7 @@
       : (state.data.contacts || []).find((c) => Number(c.id) === Number(state.activeRecordId));
 
     if (!existing) {
-      state.viewType = 'kanban';
+      state.viewType = 'list';
       return renderModuleWorkspace();
     }
 
@@ -1270,7 +1270,7 @@
         const res = await apiCall('/api/contacts', 'POST', payload);
         if (isNew) {
           state.activeRecordId = null;
-          state.viewType = 'kanban';
+          state.viewType = 'list';
         } else {
           state.activeRecordId = res.contact.id;
         }
@@ -1296,7 +1296,7 @@
           await apiCall(`/api/contacts/${existing.id}`, 'DELETE');
           showToast('Contacto eliminado.');
           state.activeRecordId = null;
-          state.viewType = 'kanban';
+          state.viewType = 'list';
           renderModuleWorkspace();
         } catch (err) {
           showToast(err.message, true);
