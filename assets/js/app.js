@@ -534,14 +534,14 @@
     if (state.currentApp === 'expenses') {
       if (state.viewType === 'form') {
         actionBtns.innerHTML = `
-          <button type="button" class="btn btn-secondary" id="btnCpBackToList">Volver a Gastos</button>
+          <button type="button" class="btn btn-secondary" id="btnCpBackToList">Volver</button>
           <button type="button" class="btn btn-primary" id="btnCpNewRecord">Nuevo Gasto Manual</button>
-          <button type="button" class="btn btn-action" id="btnCpScanExpenseAi" style="display: inline-flex; align-items: center; gap: 0.4rem; background: linear-gradient(135deg, #1e3a8a, #2563eb); color: white; font-weight: 500;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg> Escanear Factura con IA</button>
+          <button type="button" class="btn btn-action" id="btnCpScanExpenseAi" style="display: inline-flex; align-items: center; gap: 0.4rem; background: linear-gradient(135deg, #1e3a8a, #2563eb); color: white; font-weight: 500;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg> Escanear Factura</button>
         `;
       } else {
         actionBtns.innerHTML = `
           <button type="button" class="btn btn-primary" id="btnCpNewRecord">Nuevo Gasto Manual</button>
-          <button type="button" class="btn btn-action" id="btnCpScanExpenseAi" style="display: inline-flex; align-items: center; gap: 0.45rem; background: linear-gradient(135deg, #1e3a8a, #2563eb); color: white; font-weight: 600;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg> Escanear Factura con IA (Foto)</button>
+          <button type="button" class="btn btn-action" id="btnCpScanExpenseAi" style="display: inline-flex; align-items: center; gap: 0.45rem; background: linear-gradient(135deg, #1e3a8a, #2563eb); color: white; font-weight: 600;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg> Escanear Factura</button>
         `;
       }
     } else if (state.viewType === 'form') {
@@ -563,9 +563,12 @@
     }
 
     // Breadcrumbs
-    let crumbHtml = `<span class="o_breadcrumb_link" id="crumbRoot">${esc(app.name)}</span>`;
-    if (sub) {
-      crumbHtml += ` <span>/</span> <span class="${state.viewType === 'form' ? 'o_breadcrumb_link' : ''}" id="crumbSub">${esc(sub.label)}</span>`;
+    let crumbHtml = '';
+    if (state.currentApp !== 'expenses') {
+      crumbHtml = `<span class="o_breadcrumb_link" id="crumbRoot">${esc(app.name)}</span>`;
+      if (sub) {
+        crumbHtml += ` <span>/</span> <span class="${state.viewType === 'form' ? 'o_breadcrumb_link' : ''}" id="crumbSub">${esc(sub.label)}</span>`;
+      }
     }
     if (state.viewType === 'form') {
       let recLabel = state.activeRecordId === 'new' ? 'Nuevo' : `#${state.activeRecordId}`;
@@ -573,7 +576,7 @@
         const prod = (state.data.products || []).find((p) => Number(p.id) === Number(state.activeRecordId));
         if (prod && prod.name) recLabel = prod.name;
       }
-      crumbHtml += ` <span>/</span> <span>${esc(recLabel)}</span>`;
+      crumbHtml += (crumbHtml ? ` <span>/</span> ` : '') + `<span>${esc(recLabel)}</span>`;
     }
     breadcrumbs.innerHTML = crumbHtml;
 
@@ -1419,7 +1422,7 @@
           </button>
           <button type="button" class="btn btn-primary" id="btnExpensesBannerScan" style="background: linear-gradient(135deg, #1e3a8a, #2563eb); font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
-            Tomar Foto / Escanear Factura con IA
+            Escanear Factura
           </button>
         </div>
       </div>
@@ -1454,7 +1457,7 @@
           <tbody>
             ${
               expenses.length === 0
-                ? `<tr><td colspan="7" style="text-align: center; padding: 2.5rem; color: var(--o-muted);">No hay gastos registrados todavía. Pulsa <strong>Nuevo Gasto Manual</strong> o <strong>Tomar Foto / Escanear Factura con IA</strong> para comenzar.</td></tr>`
+                ? `<tr><td colspan="7" style="text-align: center; padding: 2.5rem; color: var(--o-muted);">No hay gastos registrados todavía. Pulsa <strong>Nuevo Gasto Manual</strong> o <strong>Escanear Factura</strong> para comenzar.</td></tr>`
                 : expenses
                     .map(
                       (e) => `
@@ -1582,14 +1585,14 @@
               <button type="button" class="btn btn-primary" id="btnSaveExpense">Guardar Gasto</button>
               <button type="button" class="btn btn-action" id="btnFormScanAi" style="background: linear-gradient(135deg, #1e3a8a, #2563eb); color: white; display: inline-flex; align-items: center; gap: 0.4rem;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
-                Tomar Foto / Escanear con IA
+                Escanear Factura
               </button>
               ${
                 !isNew
                   ? `<button type="button" class="btn btn-danger" id="btnDeleteFormExpense">Eliminar Gasto</button>`
                   : ''
               }
-              <button type="button" class="btn btn-secondary" id="btnCancelExpense">Volver a Gastos</button>
+              <button type="button" class="btn btn-secondary" id="btnCancelExpense">Volver</button>
             </div>
             <div style="font-weight: 600; color: var(--o-muted); font-size: 0.9rem;">
               ${isNew ? 'Registro de Gasto' : esc(existing.reference)}
@@ -1675,7 +1678,7 @@
                 <span>Foto de la Factura / Comprobante</span>
                 <button type="button" class="btn btn-sm btn-secondary" id="btnFormCameraTrigger">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
-                  ${existing.receipt_image ? 'Cambiar Foto / Escanear de Nuevo' : 'Tomar Foto / Escanear'}
+                  ${existing.receipt_image ? 'Cambiar Foto / Escanear Factura' : 'Escanear Factura'}
                 </button>
               </div>
               <div id="formReceiptPreviewWrap">
