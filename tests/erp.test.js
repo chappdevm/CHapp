@@ -971,6 +971,7 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.ok(cssText.includes('#14B5D9'), 'CSS debe utilizar el color acento de la app (#14B5D9)');
 
     // 2. Verificación de helpers técnicos en app.js y ausencia estricta de CUFE y QR
+    assert.ok(jsText.includes('function round2'), 'app.js debe implementar helper de redondeo financiero round2');
     assert.ok(jsText.includes('function numberToWordsSpanish'), 'app.js debe implementar conversión de cifras a letras en español');
     assert.ok(!jsText.includes('function generateInvoiceCufe'), 'app.js no debe contener generador de CUFE');
     assert.ok(!jsText.includes('function renderInvoiceQrSvg'), 'app.js no debe contener generador de código QR');

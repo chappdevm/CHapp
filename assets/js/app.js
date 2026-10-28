@@ -101,6 +101,11 @@
       .replace(/'/g, '&#39;');
   }
 
+  function round2(val) {
+    const num = Number(val);
+    return Number.isFinite(num) ? Math.round(num * 100) / 100 : 0;
+  }
+
   function formatMoney(amount) {
     const sym = (state.data && state.data.settings && state.data.settings.currency_symbol) || '$';
     const num = Number(amount || 0);
