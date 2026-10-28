@@ -1426,4 +1426,85 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.ok(cssText.includes('.o_chart_card'), 'odoo20.css debe contener estilos para .o_chart_card');
     assert.ok(cssText.includes('.o_chart_tabs'), 'odoo20.css debe contener estilos para .o_chart_tabs');
   });
+
+  it('Module 3 (Ventas & Cotizaciones): Representación gráfica profesional en cotización con vista previa PDF en vivo, descargas y marcas de agua de cotización', async () => {
+    const jsText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
+
+    // 1. Verificación estática de funciones y layout en app.js
+    assert.ok(jsText.includes('function renderSalePdfSheetHtml(sale)'), 'app.js debe definir renderSalePdfSheetHtml');
+    assert.ok(jsText.includes('function downloadSalePdf(sale, autoPrint = false)'), 'app.js debe definir downloadSalePdf');
+    assert.ok(jsText.includes('id="btnPrintSalePdf"'), 'Debe existir botón para imprimir cotización');
+    assert.ok(jsText.includes('id="btnDownloadSalePdf"'), 'Debe existir botón para descargar cotización');
+    assert.ok(jsText.includes('id="salePdfSheet"'), 'Debe existir contenedor salePdfSheet para la hoja');
+
+    // 2. Ejecutar renderSalePdfSheetHtml en contexto VM
+    const vm = require('node:vm');
+    const fnModule = { exports: {} };
+    const evalEnv = `
+      const state = {
+        data: {
+          settings: {
+            company_name: 'CH Aluminios',
+            company_vat: '900.876.543-1',
+            company_address: 'Cra. 7 #18-45',
+            company_city: 'Pereira',
+            company_country: 'Colombia',
+            company_email: 'chappdevm@gmail.com',
+            currency_symbol: '$'
+          },
+          contacts: [
+            { id: 25, name: 'Constructora Risaralda SAS', doc_type: 'NIT', vat: '900.555.444-3', street: 'Av. Circunvalar #12-30', city: 'Pereira', state_name: 'Risaralda', mobile: '3109998877', phone: '3334455', email: 'compras@constructorarisaralda.com', payment_term: '30 Días' }
+          ]
+        }
+      };
+      function esc(str) { return String(str == null ? '' : str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+      function formatMoney(amount, currency = '$') { const num = Number(amount) || 0; return currency + ' ' + num.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
+      
+      ${jsText.substring(jsText.indexOf('function numberToWordsSpanish'), jsText.indexOf('function renderSaleOrderForm'))}
+      
+      module.exports = { numberToWordsSpanish, renderSalePdfSheetHtml };
+    `;
+    const script = new vm.Script(evalEnv);
+    const context = vm.createContext({ module: fnModule, console, Math, Array, String, Number, Boolean, encodeURIComponent });
+    script.runInContext(context);
+    const { renderSalePdfSheetHtml } = fnModule.exports;
+
+    // 3. Probar renderizado en estado Cotización (draft)
+    const mockDraftQuote = {
+      id: 50,
+      name: 'COT/2026/0001',
+      partner_id: 25,
+      date_order: '2026-10-28',
+      validity_date: '2026-11-28',
+      salesperson: 'Laura Gómez',
+      payment_term: '30 Días',
+      state: 'draft',
+      lines: [
+        { name: 'Ventana Corrediza Serie 744', description: 'Aluminio blanco con vidrio 4mm', quantity: 2, price_unit: 450000, discount: 0, tax_rate: 19, subtotal: 900000 }
+      ],
+      amount_untaxed: 900000,
+      amount_tax: 171000,
+      amount_total: 1071000
+    };
+
+    const draftHtml = renderSalePdfSheetHtml(mockDraftQuote);
+    assert.ok(draftHtml.includes('COTIZACIÓN'), 'Marca de agua o título debe incluir COTIZACIÓN');
+    assert.ok(draftHtml.includes('Cotización'), 'Caja de documento debe decir Cotización');
+    assert.ok(draftHtml.includes('COT/2026/0001'), 'Debe mostrar el número de la cotización');
+    assert.ok(draftHtml.includes('Constructora Risaralda SAS'), 'Debe mostrar el cliente');
+    assert.ok(draftHtml.includes('Ventana Corrediza Serie 744'), 'Debe mostrar el producto');
+    assert.ok(draftHtml.includes('$ 1.071.000'), 'Debe mostrar el total calculado');
+    assert.ok(draftHtml.includes('SON: UN MILLÓN SETENTA Y UN MIL PESOS M/CTE'), 'Debe mostrar el total en letras');
+    assert.ok(draftHtml.includes('Esta cotización comercial es una propuesta informativa'), 'Debe tener pie legal de cotización');
+
+    // 4. Probar renderizado en estado Confirmado (sale)
+    const mockConfirmedOrder = {
+      ...mockDraftQuote,
+      name: 'SO-00042',
+      state: 'sale'
+    };
+    const saleHtml = renderSalePdfSheetHtml(mockConfirmedOrder);
+    assert.ok(saleHtml.includes('Pedido de Venta'), 'Debe decir Pedido de Venta cuando está confirmado');
+    assert.ok(saleHtml.includes('PEDIDO CONFIRMADO'), 'Marca de agua debe decir PEDIDO CONFIRMADO');
+  });
 });

@@ -3344,6 +3344,446 @@
     }
   }
 
+  function renderSalePdfSheetHtml(sale) {
+    const company = (state.data && state.data.settings) || {};
+    const partner = ((state.data && state.data.contacts) || []).find((c) => Number(c.id) === Number(sale.partner_id)) || {
+      name: sale.partner_name || 'Cliente por Definir',
+      vat: sale.partner_vat || '222222222',
+      doc_type: 'NIT',
+      street: '',
+      city: 'Pereira',
+      state_name: 'Risaralda',
+      mobile: '',
+      phone: '',
+      email: ''
+    };
+
+    const lines = sale.lines && sale.lines.length > 0 ? sale.lines : [
+      { name: 'Venta de Bienes / Servicios', description: '', quantity: 1, uom: 'Und', price_unit: Number(sale.amount_untaxed || sale.amount_total || 0), discount: 0, tax_rate: 19, subtotal: Number(sale.amount_untaxed || sale.amount_total || 0) }
+    ];
+
+    const isCancel = sale.state === 'cancel';
+    const isSale = sale.state === 'sale';
+    const isSent = sale.state === 'sent';
+    const isDraft = !isCancel && !isSale && !isSent;
+
+    let watermarkHtml = '';
+    if (isCancel) {
+      watermarkHtml = '<div class="o_pdf_watermark is-cancel">CANCELADA</div>';
+    } else if (isSale) {
+      watermarkHtml = '<div class="o_pdf_watermark is-paid">PEDIDO CONFIRMADO</div>';
+    } else {
+      watermarkHtml = '<div class="o_pdf_watermark is-draft">COTIZACIÓN</div>';
+    }
+
+    let stampHtml = '';
+    if (isCancel) {
+      stampHtml = '<div class="o_pdf_stamp is-cancel"><span class="stamp-inner">✕ CANCELADA</span><span class="stamp-sub">PROPUESTA ANULADA</span></div>';
+    } else if (isSale) {
+      stampHtml = '<div class="o_pdf_stamp is-paid"><span class="stamp-inner">✓ CONFIRMADO</span><span class="stamp-sub">PEDIDO DE VENTA</span></div>';
+    } else if (isSent) {
+      stampHtml = '<div class="o_pdf_stamp is-posted"><span class="stamp-inner">✉ ENVIADA</span><span class="stamp-sub">OFERTA AL CLIENTE</span></div>';
+    } else {
+      stampHtml = '<div class="o_pdf_stamp is-draft"><span class="stamp-inner">✎ COTIZACIÓN</span><span class="stamp-sub">PROPUESTA COMERCIAL</span></div>';
+    }
+
+    const docTitle = isSale ? 'Pedido de Venta' : 'Cotización';
+    const docNumber = esc(sale.name || 'Nueva Cotización');
+    const paymentTerm = sale.payment_term || partner.payment_term || 'Contado';
+
+    const calcUntaxed = lines.reduce((acc, l) => {
+      const qty = Number(l.quantity || 0);
+      const pr = Number(l.price_unit || 0);
+      const disc = Number(l.discount || 0);
+      return acc + (qty * pr * (1 - disc / 100));
+    }, 0);
+
+    const calcTax = lines.reduce((acc, l) => {
+      const qty = Number(l.quantity || 0);
+      const pr = Number(l.price_unit || 0);
+      const disc = Number(l.discount || 0);
+      const rate = l.tax_rate !== undefined && l.tax_rate !== null && l.tax_rate !== '' ? Number(l.tax_rate) : 19;
+      return acc + (qty * pr * (1 - disc / 100) * (rate / 100));
+    }, 0);
+
+    const totalUntaxed = sale.amount_untaxed !== undefined ? Number(sale.amount_untaxed) : calcUntaxed;
+    const totalTax = sale.amount_tax !== undefined ? Number(sale.amount_tax) : calcTax;
+    const totalAmount = sale.amount_total !== undefined ? Number(sale.amount_total) : (totalUntaxed + totalTax);
+
+    const hasDiscounts = lines.some((l) => Number(l.discount || 0) > 0);
+    const totalDiscount = lines.reduce((sum, l) => {
+      const gross = Number(l.quantity || 1) * Number(l.price_unit || 0);
+      return sum + (gross * (Number(l.discount || 0) / 100));
+    }, 0);
+
+    return `
+      <div class="o_pdf_sheet" id="salePdfSheet">
+        ${watermarkHtml}
+
+        <div class="o_pdf_brand_header">
+          <div class="o_pdf_company_info">
+            <img src="/assets/icons/logo.png" alt="CH Aluminios" class="o_pdf_company_logo" onerror="this.style.display='none'" />
+            <h2>${esc(company.company_name || 'CH Aluminios')}</h2>
+            <p><strong>NIT:</strong> ${esc(company.company_vat || '900.876.543-1')} · <span>${esc(company.fiscal_regime || 'Responsable de IVA - Régimen Ordinario')}</span></p>
+            <p>${esc(company.company_address || 'Cra. 7 #18-45')} · ${esc(company.company_city || 'Pereira')}, ${esc(company.company_country || 'Colombia')}</p>
+            <p>Email: ${esc(company.company_email || 'chappdevm@gmail.com')} · PBX: (606) 315-0000</p>
+          </div>
+          <div class="o_pdf_doc_box">
+            <div class="doc_type_title">${esc(docTitle)}</div>
+            <div class="doc_number">${docNumber}</div>
+            <div class="o_pdf_doc_meta">
+              <div class="o_pdf_doc_meta_row"><span>Emisión:</span><strong>${esc(sale.date_order || '')}</strong></div>
+              <div class="o_pdf_doc_meta_row"><span>Validez:</span><strong>${esc(sale.validity_date || '30 Días')}</strong></div>
+              <div class="o_pdf_doc_meta_row"><span>Asesor:</span><strong style="color: #1e40af;">${esc(sale.salesperson || 'Laura Gómez')}</strong></div>
+              <div class="o_pdf_doc_meta_row"><span>Forma de Pago:</span><strong>${esc(paymentTerm)}</strong></div>
+            </div>
+            ${stampHtml}
+          </div>
+        </div>
+
+        <div class="o_pdf_resolution_bar" style="background: linear-gradient(90deg, #074073, #14B5D9);">
+          Propuesta Comercial & Cotización de Bienes y Servicios · CH Aluminios · Validez de la Oferta: ${esc(sale.validity_date ? `Hasta ${sale.validity_date}` : '30 Días')}
+        </div>
+
+        <div class="o_pdf_client_section">
+          <div class="o_pdf_client_col">
+            <div class="o_pdf_col_title">Cliente / Destinatario</div>
+            <p style="font-size: 0.95rem; font-weight: 700; color: #0f172a; margin-bottom: 0.35rem;">${esc(partner.name)}</p>
+            <p><strong>Cédula / NIT:</strong> ${esc(partner.doc_type || (partner.is_company ? 'NIT' : 'CC'))} ${esc(partner.vat || 'No registrado')}</p>
+            <p><strong>Dirección:</strong> ${esc([partner.street, partner.city, partner.state_name].filter(Boolean).join(', ') || 'Pereira, Risaralda')}</p>
+            <p><strong>Ciudad / País:</strong> ${esc(partner.city || 'Pereira')}, ${esc(partner.state_name || 'Risaralda')} - Colombia</p>
+          </div>
+          <div class="o_pdf_client_col">
+            <div class="o_pdf_col_title">Condiciones Comerciales de la Oferta</div>
+            <p><strong>Celular / Teléfono:</strong> ${esc([partner.mobile, partner.phone].filter(Boolean).join(' / ') || 'No registrado')}</p>
+            <p><strong>Correo Electrónico:</strong> ${esc(partner.email || 'No registrado')}</p>
+            <p><strong>Plazo de Pago Propuesto:</strong> ${esc(paymentTerm)}</p>
+            <p><strong>Tiempo de Entrega Estimado:</strong> Inmediato / Según disponibilidad</p>
+          </div>
+        </div>
+
+        <table class="o_pdf_items_table">
+          <thead>
+            <tr>
+              <th style="width: 32px; text-align: center;">#</th>
+              <th>Concepto / Producto</th>
+              <th style="width: 75px; text-align: center;">Unidad</th>
+              <th style="width: 55px; text-align: center;">Cant.</th>
+              <th style="width: 105px; text-align: right;">Vr. Unitario</th>
+              ${hasDiscounts ? '<th style="width: 60px; text-align: center;">Dcto.</th>' : ''}
+              <th style="width: 65px; text-align: center;">IVA</th>
+              <th style="width: 110px; text-align: right;">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${lines.map((l, idx) => {
+              const qty = Number(l.quantity || 1);
+              const price = Number(l.price_unit || 0);
+              const disc = Number(l.discount || 0);
+              const calcSub = l.subtotal !== undefined && l.subtotal !== null ? Number(l.subtotal) : (qty * price * (1 - disc / 100));
+              const prodName = l.product_name || l.name || 'Producto / Servicio';
+              const prodDesc = l.description && l.description !== prodName ? `<div style="font-size: 0.75rem; color: #64748b; font-weight: normal; margin-top: 2px;">${esc(l.description)}</div>` : '';
+              return `
+                <tr>
+                  <td class="text-center" style="color: #64748b;">${idx + 1}</td>
+                  <td><strong>${esc(prodName)}</strong>${prodDesc}</td>
+                  <td class="text-center" style="color: #64748b;">${esc(l.uom || (prodName && prodName.toLowerCase().includes('perfil') ? 'Metro Lineal' : 'Und'))}</td>
+                  <td class="text-center">${qty}</td>
+                  <td class="text-end">${formatMoney(price)}</td>
+                  ${hasDiscounts ? `<td class="text-center" style="color: ${disc > 0 ? '#b91c1c' : '#64748b'};">${disc > 0 ? `-${disc}%` : '0%'}</td>` : ''}
+                  <td class="text-center">${l.tax_rate ?? 19}%</td>
+                  <td class="text-end"><strong>${formatMoney(calcSub)}</strong></td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+
+        <div class="o_pdf_bottom_grid">
+          <div class="o_pdf_bottom_left">
+            <div class="o_pdf_amount_words">
+              <span class="label">Total en Letras:</span>
+              <span class="words">SON: ${numberToWordsSpanish(totalAmount)}</span>
+            </div>
+
+            <div class="o_pdf_bank_info">
+              <strong>Instrucciones de Pago / Consignación:</strong><br/>
+              Bancolombia Cuenta Corriente No. <strong>452-892100-34</strong><br/>
+              Titular: <strong>CH Aluminios</strong> (NIT: ${esc(company.company_vat || '900.876.543-1')})<br/>
+              Favor enviar comprobante a: <em>${esc(company.company_email || 'chappdevm@gmail.com')}</em>
+            </div>
+
+            ${sale.notes ? `
+              <div style="margin-top: 0.65rem; padding: 0.5rem 0.75rem; background: rgba(0,0,0,0.02); border: 1px dashed #cbd5e1; border-radius: 4px; font-size: 0.78rem;">
+                <strong>Observaciones / Términos:</strong><br/>
+                ${esc(sale.notes)}
+              </div>
+            ` : ''}
+          </div>
+
+          <div class="o_pdf_totals_section">
+            <table class="o_pdf_totals_table">
+              <tr>
+                <td>Subtotal:</td>
+                <td style="text-align: right;"><strong>${formatMoney(totalUntaxed)}</strong></td>
+              </tr>
+              ${totalDiscount > 0 ? `
+                <tr style="color: #b91c1c; font-size: 0.76rem;">
+                  <td>Descuento Comercial:</td>
+                  <td style="text-align: right;">- ${formatMoney(totalDiscount)}</td>
+                </tr>
+              ` : ''}
+              <tr>
+                <td>Base Gravable:</td>
+                <td style="text-align: right;">${formatMoney(totalUntaxed)}</td>
+              </tr>
+              <tr>
+                <td>IVA:</td>
+                <td style="text-align: right;"><strong>${formatMoney(totalTax)}</strong></td>
+              </tr>
+              <tr class="is-grand-total">
+                <td>TOTAL PROPUESTA:</td>
+                <td style="text-align: right;">${formatMoney(totalAmount)}</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+
+        <div class="o_pdf_signatures_section">
+          <div class="o_pdf_sign_box">
+            <div class="sign_line"></div>
+            <div class="sign_name">${esc(company.company_name || 'CH Aluminios')}</div>
+            <div class="sign_title">Asesor Comercial: ${esc(sale.salesperson || 'Laura Gómez')}</div>
+            <div class="sign_sub">NIT: ${esc(company.company_vat || '900.876.543-1')}</div>
+          </div>
+          <div class="o_pdf_sign_box">
+            <div class="sign_line"></div>
+            <div class="sign_name">${esc(partner.name || 'Cliente')}</div>
+            <div class="sign_title">Firma de Aprobación y Aceptación de la Oferta</div>
+            <div class="sign_sub">C.C. / NIT: ____________________ Fecha: ____/____/2026</div>
+          </div>
+        </div>
+
+        <div class="o_pdf_legal_footer">
+          Esta cotización comercial es una propuesta informativa y no constituye una factura de venta electrónica.<br/>
+          Los precios y disponibilidad están sujetos a las condiciones comerciales descritas durante la vigencia de la oferta.<br/>
+          Generado automáticamente por <strong>CH Aluminios</strong> — CHapp ERP.
+        </div>
+      </div>
+    `;
+  }
+
+  function downloadSalePdf(sale, autoPrint = false) {
+    const company = (state.data && state.data.settings) || {};
+    const isQuotation = sale.state !== 'sale';
+    const filename = `${isQuotation ? 'Cotizacion' : 'Pedido'}_${(sale.name || 'documento').replace(/[/\\]/g, '_')}.pdf`;
+
+    // Direct PDF file export via html2pdf when clicking Download (!autoPrint)
+    if (!autoPrint && typeof window !== 'undefined' && typeof window.html2pdf === 'function') {
+      const container = document.querySelector('.o_pdf_paper_viewport #salePdfSheet') || document.getElementById('salePdfSheet');
+      const targetEl = container ? container.cloneNode(true) : null;
+      if (targetEl) {
+        targetEl.style.width = '210mm';
+        targetEl.style.margin = '0 auto';
+        targetEl.style.boxShadow = 'none';
+        targetEl.style.border = 'none';
+        const logoData = getLogoDataUrl();
+        const logoImg = targetEl.querySelector('.o_pdf_company_logo');
+        if (logoImg && logoData && logoData.startsWith('data:')) {
+          logoImg.src = logoData;
+        }
+
+        const opt = {
+          margin: [8, 8, 8, 8],
+          filename: filename,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, logging: false },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        if (typeof showToast === 'function') showToast('Generando archivo PDF...');
+        window.html2pdf().set(opt).from(targetEl).save().then(() => {
+          if (typeof showToast === 'function') showToast(`PDF descargado: ${filename}`);
+        }).catch((err) => {
+          console.warn('Error exportando con html2pdf, abriendo diálogo de impresión:', err);
+          downloadSalePdf(sale, true);
+        });
+        return;
+      }
+    }
+
+    let sheetHtml = renderSalePdfSheetHtml(sale);
+    const logoData = getLogoDataUrl();
+    if (logoData && logoData.startsWith('data:')) {
+      sheetHtml = sheetHtml.replace('src="/assets/icons/logo.png"', 'src="' + logoData + '"');
+      sheetHtml = sheetHtml.replace('onerror="this.style.display=\'none\'"', '');
+    } else if (typeof window !== 'undefined' && window.location && window.location.origin) {
+      sheetHtml = sheetHtml.replace('src="/assets/icons/logo.png"', 'src="' + window.location.origin + '/assets/icons/logo.png"');
+    }
+    const printScript = autoPrint ? '<script>window.addEventListener("load", function() { var imgs = Array.from(document.images); Promise.all(imgs.map(function(img) { if (img.complete) return Promise.resolve(); return new Promise(function(res) { img.onload = img.onerror = res; }); })).then(function() { setTimeout(function() { window.print(); }, 250); }); });</script>' : '';
+
+    const fullHtml = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${isQuotation ? 'Cotización' : 'Pedido de Venta'} ${esc(sale.name)} - ${esc(company.company_name || 'CH Aluminios')}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #031626;
+      color: #1e293b;
+    }
+    .o_pdf_sheet {
+      position: relative;
+      overflow: hidden;
+      max-width: 840px;
+      margin: 0 auto;
+      padding: 2.2rem 2rem;
+      background: #ffffff;
+      border: 1px solid #cbe0f1;
+      border-radius: 6px;
+      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3);
+      font-size: 0.82rem;
+      line-height: 1.45;
+    }
+    .o_pdf_watermark {
+      position: absolute;
+      top: 48%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-30deg);
+      font-size: clamp(3rem, 7vw, 5.5rem);
+      font-weight: 900;
+      letter-spacing: 0.15em;
+      opacity: 0.06;
+      pointer-events: none;
+      user-select: none;
+      white-space: nowrap;
+      z-index: 1;
+    }
+    .o_pdf_watermark.is-draft { color: #14B5D9; }
+    .o_pdf_watermark.is-paid { color: #059669; }
+    .o_pdf_watermark.is-cancel { color: #cb2f2f; }
+    .o_pdf_brand_header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1.5rem;
+      margin-bottom: 1.25rem;
+      position: relative;
+      z-index: 2;
+    }
+    .o_pdf_company_info { flex: 1; }
+    .o_pdf_company_logo { max-height: 52px; max-width: 170px; object-fit: contain; margin-bottom: 0.5rem; display: block; }
+    .o_pdf_company_info h2 { margin: 0 0 0.25rem 0; font-size: 1.3rem; font-weight: 800; color: #074073; }
+    .o_pdf_company_info p { margin: 0 0 0.2rem 0; font-size: 0.78rem; color: #475569; }
+    .o_pdf_doc_box {
+      border: 2px solid #074073;
+      border-radius: 8px;
+      padding: 0.85rem 1.15rem;
+      min-width: 220px;
+      text-align: center;
+      background: #f0f7fc;
+      position: relative;
+      z-index: 2;
+    }
+    .o_pdf_doc_box .doc_type_title { font-size: 0.95rem; font-weight: 800; color: #074073; text-transform: uppercase; letter-spacing: 0.04em; }
+    .o_pdf_doc_box .doc_number { font-size: 1.25rem; font-weight: 900; color: #14B5D9; margin: 0.25rem 0 0.5rem 0; }
+    .o_pdf_doc_meta { border-top: 1px solid #cbe0f1; padding-top: 0.45rem; font-size: 0.74rem; text-align: left; }
+    .o_pdf_doc_meta_row { display: flex; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.2rem; }
+    .o_pdf_doc_meta_row span { color: #64748b; }
+    .o_pdf_stamp {
+      display: inline-block;
+      margin-top: 0.5rem;
+      padding: 0.25rem 0.65rem;
+      border: 2px dashed;
+      border-radius: 6px;
+      font-weight: 800;
+      text-transform: uppercase;
+      font-size: 0.72rem;
+      line-height: 1.15;
+    }
+    .o_pdf_stamp.is-draft { border-color: #14B5D9; color: #074073; background: #e0f4fb; }
+    .o_pdf_stamp.is-paid { border-color: #059669; color: #059669; background: #ecfdf5; }
+    .o_pdf_stamp.is-posted { border-color: #0ea5e9; color: #0284c7; background: #f0f9ff; }
+    .o_pdf_stamp.is-cancel { border-color: #cb2f2f; color: #cb2f2f; background: #fef2f2; }
+    .o_pdf_resolution_bar {
+      color: #ffffff;
+      padding: 0.45rem 0.85rem;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      text-align: center;
+      margin-bottom: 1.25rem;
+      font-weight: 600;
+    }
+    .o_pdf_client_section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      padding: 1rem;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      margin-bottom: 1.25rem;
+    }
+    .o_pdf_col_title { font-size: 0.74rem; font-weight: 800; text-transform: uppercase; color: #074073; margin-bottom: 0.4rem; letter-spacing: 0.04em; }
+    .o_pdf_client_col p { margin: 0 0 0.2rem 0; font-size: 0.78rem; color: #334155; }
+    .o_pdf_items_table { width: 100%; border-collapse: collapse; margin-bottom: 1.25rem; font-size: 0.78rem; }
+    .o_pdf_items_table th { background: #074073; color: #ffffff; padding: 0.55rem 0.65rem; text-align: left; font-weight: 700; font-size: 0.74rem; text-transform: uppercase; }
+    .o_pdf_items_table td { padding: 0.55rem 0.65rem; border-bottom: 1px solid #e2e8f0; color: #1e293b; }
+    .o_pdf_bottom_grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+    .o_pdf_amount_words { background: #f0f7fc; border-left: 3px solid #14B5D9; padding: 0.65rem 0.85rem; font-size: 0.76rem; margin-bottom: 0.75rem; border-radius: 0 4px 4px 0; }
+    .o_pdf_amount_words .label { font-weight: 700; color: #074073; display: block; margin-bottom: 0.15rem; }
+    .o_pdf_amount_words .words { color: #0f172a; font-weight: 600; }
+    .o_pdf_bank_info { font-size: 0.75rem; line-height: 1.4; color: #475569; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px; padding: 0.65rem 0.85rem; }
+    .o_pdf_totals_section { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.75rem 0.95rem; }
+    .o_pdf_totals_table { width: 100%; font-size: 0.78rem; }
+    .o_pdf_totals_table td { padding: 0.35rem 0; color: #475569; }
+    .o_pdf_totals_table tr.is-grand-total td { font-size: 1.05rem; font-weight: 900; color: #074073; border-top: 2px solid #074073; padding-top: 0.55rem; }
+    .o_pdf_signatures_section { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; margin-top: 2.2rem; margin-bottom: 1.25rem; }
+    .o_pdf_sign_box { text-align: center; }
+    .o_pdf_sign_box .sign_line { border-bottom: 1px solid #94a3b8; margin-bottom: 0.5rem; height: 40px; }
+    .o_pdf_sign_box .sign_name { font-weight: 700; color: #0f172a; font-size: 0.82rem; }
+    .o_pdf_sign_box .sign_title { font-size: 0.72rem; color: #475569; }
+    .o_pdf_sign_box .sign_sub { font-size: 0.68rem; color: #94a3b8; margin-top: 0.2rem; }
+    .o_pdf_legal_footer { font-size: 0.68rem; color: #64748b; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 0.85rem; line-height: 1.4; }
+    @media print {
+      body { background: #ffffff !important; padding: 0 !important; }
+      .o_pdf_sheet { border: none !important; box-shadow: none !important; padding: 0 !important; max-width: 100% !important; }
+    }
+  </style>
+</head>
+<body>
+  ${sheetHtml}
+  ${printScript}
+</body>
+</html>`;
+
+    if (autoPrint) {
+      const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, '_blank');
+      if (!win) {
+        window.print();
+      }
+    } else {
+      const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${isQuotation ? 'Cotizacion' : 'Pedido'}_${(sale.name || 'documento').replace(/[\/\\]/g, '_')}.html`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        if (a.parentNode) a.parentNode.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 1000);
+    }
+  }
+
   function renderSaleOrderForm(container) {
     const isNew = state.activeRecordId === 'new';
     const defaultProd = (state.data.products || [])[0] || { id: 1, name: 'Servicio', list_price: 1000000, tax_rate: 19 };
@@ -3415,194 +3855,244 @@
     }, 0);
     const calcTotal = calcUntaxed + calcTax;
 
+    const previewData = {
+      ...existing,
+      name: isNew ? 'Nueva Cotización' : (existing.name || 'Cotización'),
+      partner_id: draft.partner_id || existing.partner_id,
+      date_order: draft.date_order || existing.date_order,
+      validity_date: draft.validity_date || existing.validity_date,
+      salesperson: draft.salesperson || existing.salesperson,
+      payment_term: draft.payment_term || existing.payment_term,
+      notes: draft.notes !== undefined ? draft.notes : existing.notes,
+      lines: draftLines.map((l) => ({
+        ...l,
+        name: l.product_name || l.description || 'Producto / Servicio',
+        quantity: Number(l.quantity || 1),
+        price_unit: Number(l.price_unit || 0),
+        discount: Number(l.discount || 0),
+        tax_rate: l.tax_rate !== '' && l.tax_rate !== undefined && l.tax_rate !== null ? Number(l.tax_rate) : 19,
+        subtotal: Number(l.quantity || 0) * Number(l.price_unit || 0) * (1 - Number(l.discount || 0) / 100)
+      })),
+      amount_untaxed: calcUntaxed,
+      amount_tax: calcTax,
+      amount_total: calcTotal
+    };
+
     container.innerHTML = `
-      <div class="o_form_view">
-        <div class="o_form_sheet_bg">
-          <div class="o_form_statusbar">
-            <div class="o_statusbar_buttons">
-              <button type="button" class="btn btn-primary" id="btnSaveSaleOrder">Guardar</button>
-              ${
-                !isNew && existing.state === 'draft'
-                  ? `<button type="button" class="btn btn-secondary" data-sale-action="send">Marcar como Enviada</button>`
-                  : ''
-              }
-              ${
-                !isNew && (existing.state === 'draft' || existing.state === 'sent')
-                  ? `<button type="button" class="btn btn-action" data-sale-action="confirm">Confirmar Pedido</button>`
-                  : ''
-              }
-              ${
-                !isNew && existing.state === 'sale' && existing.invoice_status !== 'invoiced'
-                  ? `<button type="button" class="btn btn-action" data-sale-action="create_invoice">Crear Factura</button>`
-                  : ''
-              }
-              ${
-                !isNew && existing.state !== 'cancel'
-                  ? `<button type="button" class="btn btn-danger btn-sm" data-sale-action="cancel">Cancelar</button>`
-                  : ''
-              }
-              ${
-                !isNew && existing.state === 'cancel'
-                  ? `<button type="button" class="btn btn-secondary" data-sale-action="draft">Restablecer a Cotización</button>`
-                  : ''
-              }
-            </div>
-            <div class="o_statusbar_status">
-              ${stages
-                .map((s) => `<span class="o_arrow_button ${existing.state === s.id ? 'is-current' : ''}">${s.label}</span>`)
-                .join('')}
-            </div>
-          </div>
+      <div class="o_invoice_split_container">
+        <div class="o_invoice_left_col">
+          <div class="o_form_view">
+            <div class="o_form_sheet_bg">
+              <div class="o_form_statusbar">
+                <div class="o_statusbar_buttons">
+                  <button type="button" class="btn btn-primary" id="btnSaveSaleOrder">Guardar</button>
+                  ${
+                    !isNew && existing.state === 'draft'
+                      ? `<button type="button" class="btn btn-secondary" data-sale-action="send">Marcar como Enviada</button>`
+                      : ''
+                  }
+                  ${
+                    !isNew && (existing.state === 'draft' || existing.state === 'sent')
+                      ? `<button type="button" class="btn btn-action" data-sale-action="confirm">Confirmar Pedido</button>`
+                      : ''
+                  }
+                  ${
+                    !isNew && existing.state === 'sale' && existing.invoice_status !== 'invoiced'
+                      ? `<button type="button" class="btn btn-action" data-sale-action="create_invoice">Crear Factura</button>`
+                      : ''
+                  }
+                  ${
+                    !isNew && existing.state !== 'cancel'
+                      ? `<button type="button" class="btn btn-danger btn-sm" data-sale-action="cancel">Cancelar</button>`
+                      : ''
+                  }
+                  ${
+                    !isNew && existing.state === 'cancel'
+                      ? `<button type="button" class="btn btn-secondary" data-sale-action="draft">Restablecer a Cotización</button>`
+                      : ''
+                  }
+                </div>
+                <div class="o_statusbar_status">
+                  ${stages
+                    .map((s) => `<span class="o_arrow_button ${existing.state === s.id ? 'is-current' : ''}">${s.label}</span>`)
+                    .join('')}
+                </div>
+              </div>
 
-          <div class="o_form_sheet">
-            ${
-              !isNew && existing.invoice_ids && existing.invoice_ids.length > 0
-                ? (() => {
-                    const moves = (state.data.accounting && state.data.accounting.moves) || [];
-                    const orderMoves = moves.filter((m) => (existing.invoice_ids || []).includes(m.id) && m.state !== 'cancel');
-                    const totalInvSum = orderMoves.reduce((s, m) => s + Number(m.amount_total || 0), 0);
-                    return `
-              <div class="o_button_box">
-                <button type="button" class="o_stat_button oe_stat_button" id="btnOpenSaleInvoice" title="Ver facturas generadas">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-                  <div class="o_stat_info">
-                    <span class="o_stat_value">${existing.invoice_ids.length} Factura(s)</span>
-                    <span class="o_stat_text">Total: ${formatMoney(totalInvSum)}</span>
+              <div class="o_form_sheet">
+                ${
+                  !isNew && existing.invoice_ids && existing.invoice_ids.length > 0
+                    ? (() => {
+                        const moves = (state.data.accounting && state.data.accounting.moves) || [];
+                        const orderMoves = moves.filter((m) => (existing.invoice_ids || []).includes(m.id) && m.state !== 'cancel');
+                        const totalInvSum = orderMoves.reduce((s, m) => s + Number(m.amount_total || 0), 0);
+                        return `
+                  <div class="o_button_box">
+                    <button type="button" class="o_stat_button oe_stat_button" id="btnOpenSaleInvoice" title="Ver facturas generadas">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                      <div class="o_stat_info">
+                        <span class="o_stat_value">${existing.invoice_ids.length} Factura(s)</span>
+                        <span class="o_stat_text">Total: ${formatMoney(totalInvSum)}</span>
+                      </div>
+                    </button>
                   </div>
-                </button>
-              </div>
-            `;
-                  })()
-                : ''
-            }
+                `;
+                      })()
+                    : ''
+                }
 
-            <div class="o_form_title_group">
-              <label>Documento de Venta</label>
-              <div style="font-size: 1.5rem; font-weight: 700;">${esc(existing.name)}</div>
-            </div>
+                <div class="o_form_title_group">
+                  <label>Documento de Venta</label>
+                  <div style="font-size: 1.5rem; font-weight: 700;">${esc(existing.name)}</div>
+                </div>
 
-            <div class="o_group">
-              <div class="o_field_row">
-                <label for="fSalePartner">Cliente *</label>
-                <select id="fSalePartner" class="o_select">
-                  <option value="" ${!draft.partner_id ? 'selected disabled' : ''}>— Seleccione un cliente —</option>
-                  ${(state.data.contacts || [])
-                    .map(
-                      (c) => `<option value="${c.id}" ${Number(draft.partner_id) === Number(c.id) ? 'selected' : ''}>${esc(c.name)} (${esc(c.vat || 'Sin NIT')})</option>`
-                    )
-                    .join('')}
-                </select>
-              </div>
-              <div id="salePartnerDetailsCard" class="o_partner_details_card ${!selectedPartner ? 'is-empty' : ''}">
-                ${renderSalePartnerDetailsHtml(selectedPartner)}
-              </div>
-              <div class="o_field_row">
-                <label for="fSalePaymentTerm">Plazos de Pago</label>
-                <select id="fSalePaymentTerm" class="o_select">
-                  <option value="" ${!draft.payment_term ? 'selected disabled' : ''}>— Seleccione plazo de pago —</option>
-                  ${['Contado', '15 Días', '30 Días', '45 Días', '60 Días']
-                    .map((t) => `<option value="${t}" ${draft.payment_term === t ? 'selected' : ''}>${t}</option>`)
-                    .join('')}
-                </select>
-              </div>
-              <div class="o_field_row">
-                <label for="fSaleDate">Fecha de Orden</label>
-                <input type="date" id="fSaleDate" class="o_input" value="${esc(draft.date_order)}" />
-              </div>
-              <div class="o_field_row">
-                <label for="fSaleValidity">Fecha de Expiración</label>
-                <input type="date" id="fSaleValidity" class="o_input" value="${esc(draft.validity_date)}" />
-              </div>
-              <div class="o_field_row">
-                <label for="fSalePerson">Comercial Asignado</label>
-                <input type="text" id="fSalePerson" class="o_input" value="${esc(draft.salesperson)}" />
-              </div>
-            </div>
+                <div class="o_group">
+                  <div class="o_field_row">
+                    <label for="fSalePartner">Cliente *</label>
+                    <select id="fSalePartner" class="o_select">
+                      <option value="" ${!draft.partner_id ? 'selected disabled' : ''}>— Seleccione un cliente —</option>
+                      ${(state.data.contacts || [])
+                        .map(
+                          (c) => `<option value="${c.id}" ${Number(draft.partner_id) === Number(c.id) ? 'selected' : ''}>${esc(c.name)} (${esc(c.vat || 'Sin NIT')})</option>`
+                        )
+                        .join('')}
+                    </select>
+                  </div>
+                  <div id="salePartnerDetailsCard" class="o_partner_details_card ${!selectedPartner ? 'is-empty' : ''}">
+                    ${renderSalePartnerDetailsHtml(selectedPartner)}
+                  </div>
+                  <div class="o_field_row">
+                    <label for="fSalePaymentTerm">Plazos de Pago</label>
+                    <select id="fSalePaymentTerm" class="o_select">
+                      <option value="" ${!draft.payment_term ? 'selected disabled' : ''}>— Seleccione plazo de pago —</option>
+                      ${['Contado', '15 Días', '30 Días', '45 Días', '60 Días']
+                        .map((t) => `<option value="${t}" ${draft.payment_term === t ? 'selected' : ''}>${t}</option>`)
+                        .join('')}
+                    </select>
+                  </div>
+                  <div class="o_field_row">
+                    <label for="fSaleDate">Fecha de Orden</label>
+                    <input type="date" id="fSaleDate" class="o_input" value="${esc(draft.date_order)}" />
+                  </div>
+                  <div class="o_field_row">
+                    <label for="fSaleValidity">Fecha de Expiración</label>
+                    <input type="date" id="fSaleValidity" class="o_input" value="${esc(draft.validity_date)}" />
+                  </div>
+                  <div class="o_field_row">
+                    <label for="fSalePerson">Comercial Asignado</label>
+                    <input type="text" id="fSalePerson" class="o_input" value="${esc(draft.salesperson)}" />
+                  </div>
+                </div>
 
-            <div class="o_notebook_headers">
-              <button type="button" class="o_notebook_tab is-active">Líneas del Pedido</button>
-            </div>
+                <div class="o_notebook_headers">
+                  <button type="button" class="o_notebook_tab is-active">Líneas del Pedido</button>
+                </div>
 
-            <div tabindex="0" role="region" aria-label="Líneas del pedido de venta" class="table-wrapper" style="margin-bottom: 0.75rem;">
-              <table class="o_list_table" style="--label-2: 'Descripción'; --label-3: 'Cant.'; --label-4: 'Precio Unit.'; --label-5: 'Desc %'; --label-6: 'IVA %'; --label-7: 'Subtotal'; --label-8: 'Acción';">
-                <thead>
-                  <tr>
-                    <th>Producto / Servicio</th>
-                    <th>Descripción</th>
-                    <th style="width: 85px;">Cant.</th>
-                    <th style="width: 145px;">Precio Unit.</th>
-                    <th style="width: 85px;">Desc.%</th>
-                    <th style="width: 95px;">IVA %</th>
-                    <th class="text-end">Subtotal</th>
-                    <th style="width: 50px;"></th>
-                  </tr>
-                </thead>
-                <tbody id="saleLinesTbody">
-                  ${draftLines
-                    .map((l, idx) => {
-                      const sub = Number(l.quantity || 0) * Number(l.price_unit || 0) * (1 - Number(l.discount || 0) / 100);
-                      return `
-                      <tr data-line-idx="${idx}">
-                        <th>
-                          <select class="o_select line-product" data-idx="${idx}">
-                            <option value="" ${!l.product_id ? 'selected disabled' : ''}>— Seleccione producto —</option>
-                            ${(state.data.products || [])
-                              .map(
-                                (p) => `<option value="${p.id}" ${Number(l.product_id) === Number(p.id) ? 'selected' : ''}>${esc(p.name)}</option>`
-                              )
-                              .join('')}
-                          </select>
-                        </th>
-                        <td><input type="text" class="o_input line-desc" data-idx="${idx}" value="${esc(l.description || '')}" /></td>
-                        <td><input type="number" class="o_input line-qty" data-idx="${idx}" min="1" step="any" value="${Number(l.quantity || 1)}" /></td>
-                        <td><input type="number" class="o_input line-price" data-idx="${idx}" min="0" step="any" value="${Number(l.price_unit || 0)}" /></td>
-                        <td><input type="number" class="o_input line-disc" data-idx="${idx}" min="0" max="100" step="any" value="${Number(l.discount || 0)}" /></td>
-                        <td>
-                          <select class="o_select line-tax" data-idx="${idx}">
-                            <option value="" ${l.tax_rate === undefined || l.tax_rate === null || l.tax_rate === '' ? 'selected disabled' : ''}>— IVA —</option>
-                            ${[0, 5, 19]
-                              .map((t) => `<option value="${t}" ${l.tax_rate !== '' && Number(l.tax_rate) === t ? 'selected' : ''}>${t}%</option>`)
-                              .join('')}
-                          </select>
-                        </td>
-                        <td class="text-end"><strong>${formatMoney(sub)}</strong></td>
-                        <td><button type="button" class="btn btn-sm btn-danger btn-remove-line" data-idx="${idx}" title="Quitar línea">Quitar</button></td>
+                <div tabindex="0" role="region" aria-label="Líneas del pedido de venta" class="table-wrapper" style="margin-bottom: 0.75rem;">
+                  <table class="o_list_table" style="--label-2: 'Descripción'; --label-3: 'Cant.'; --label-4: 'Precio Unit.'; --label-5: 'Desc %'; --label-6: 'IVA %'; --label-7: 'Subtotal'; --label-8: 'Acción';">
+                    <thead>
+                      <tr>
+                        <th>Producto / Servicio</th>
+                        <th>Descripción</th>
+                        <th style="width: 85px;">Cant.</th>
+                        <th style="width: 145px;">Precio Unit.</th>
+                        <th style="width: 85px;">Desc.%</th>
+                        <th style="width: 95px;">IVA %</th>
+                        <th class="text-end">Subtotal</th>
+                        <th style="width: 50px;"></th>
                       </tr>
-                    `;
-                    })
-                    .join('')}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody id="saleLinesTbody">
+                      ${draftLines
+                        .map((l, idx) => {
+                          const sub = Number(l.quantity || 0) * Number(l.price_unit || 0) * (1 - Number(l.discount || 0) / 100);
+                          return `
+                          <tr data-line-idx="${idx}">
+                            <th>
+                              <select class="o_select line-product" data-idx="${idx}">
+                                <option value="" ${!l.product_id ? 'selected disabled' : ''}>— Seleccione producto —</option>
+                                ${(state.data.products || [])
+                                  .map(
+                                    (p) => `<option value="${p.id}" ${Number(l.product_id) === Number(p.id) ? 'selected' : ''}>${esc(p.name)}</option>`
+                                  )
+                                  .join('')}
+                              </select>
+                            </th>
+                            <td><input type="text" class="o_input line-desc" data-idx="${idx}" value="${esc(l.description || '')}" /></td>
+                            <td><input type="number" class="o_input line-qty" data-idx="${idx}" min="1" step="any" value="${Number(l.quantity || 1)}" /></td>
+                            <td><input type="number" class="o_input line-price" data-idx="${idx}" min="0" step="any" value="${Number(l.price_unit || 0)}" /></td>
+                            <td><input type="number" class="o_input line-disc" data-idx="${idx}" min="0" max="100" step="any" value="${Number(l.discount || 0)}" /></td>
+                            <td>
+                              <select class="o_select line-tax" data-idx="${idx}">
+                                <option value="" ${l.tax_rate === undefined || l.tax_rate === null || l.tax_rate === '' ? 'selected disabled' : ''}>— IVA —</option>
+                                ${[0, 5, 19]
+                                  .map((t) => `<option value="${t}" ${l.tax_rate !== '' && Number(l.tax_rate) === t ? 'selected' : ''}>${t}%</option>`)
+                                  .join('')}
+                              </select>
+                            </td>
+                            <td class="text-end"><strong>${formatMoney(sub)}</strong></td>
+                            <td><button type="button" class="btn btn-sm btn-danger btn-remove-line" data-idx="${idx}" title="Quitar línea">Quitar</button></td>
+                          </tr>
+                        `;
+                        })
+                        .join('')}
+                    </tbody>
+                  </table>
+                </div>
+
+                <button type="button" class="btn btn-secondary btn-sm" id="btnAddSaleLine">Agregar producto / línea</button>
+
+                <div class="o_totals_box">
+                  <div class="o_totals_row">
+                    <span>Base Imponible:</span>
+                    <strong>${formatMoney(calcUntaxed)}</strong>
+                  </div>
+                  <div class="o_totals_row">
+                    <span>IVA:</span>
+                    <strong>${formatMoney(calcTax)}</strong>
+                  </div>
+                  <div class="o_totals_row is-grand">
+                    <span>Total:</span>
+                    <span>${formatMoney(calcTotal)}</span>
+                  </div>
+                </div>
+
+                <div class="o_field_row" style="margin-top: 1rem;">
+                  <label for="fSaleNotes">Términos y Condiciones</label>
+                  <textarea id="fSaleNotes" class="o_textarea" rows="2">${esc(draft.notes || '')}</textarea>
+                </div>
+
+                ${renderOrderLinkedInvoicesHtml(existing)}
+              </div>
             </div>
 
-            <button type="button" class="btn btn-secondary btn-sm" id="btnAddSaleLine">Agregar producto / línea</button>
-
-            <div class="o_totals_box">
-              <div class="o_totals_row">
-                <span>Base Imponible:</span>
-                <strong>${formatMoney(calcUntaxed)}</strong>
-              </div>
-              <div class="o_totals_row">
-                <span>IVA:</span>
-                <strong>${formatMoney(calcTax)}</strong>
-              </div>
-              <div class="o_totals_row is-grand">
-                <span>Total:</span>
-                <span>${formatMoney(calcTotal)}</span>
-              </div>
-            </div>
-
-            <div class="o_field_row" style="margin-top: 1rem;">
-              <label for="fSaleNotes">Términos y Condiciones</label>
-              <textarea id="fSaleNotes" class="o_textarea" rows="2">${esc(draft.notes || '')}</textarea>
-            </div>
-
-            ${renderOrderLinkedInvoicesHtml(existing)}
+            ${renderChatterHtml('sales', existing)}
           </div>
         </div>
 
-        ${renderChatterHtml('sales', existing)}
+        <aside class="o_invoice_pdf_panel" aria-label="Previsualización PDF de la Cotización">
+          <div class="o_pdf_panel_header">
+            <div class="o_pdf_panel_title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+              ${existing.state === 'sale' ? 'Pedido de Venta (PDF)' : 'Cotización Comercial (PDF)'}
+            </div>
+            <div class="o_pdf_panel_actions">
+              <button type="button" class="btn btn-sm btn-secondary" id="btnPrintSalePdf" title="Imprimir documento">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                Imprimir
+              </button>
+              <button type="button" class="btn btn-sm btn-primary" id="btnDownloadSalePdf" title="Descargar o Abrir PDF">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Descargar
+              </button>
+            </div>
+          </div>
+          <div class="o_pdf_paper_viewport">
+            ${renderSalePdfSheetHtml(previewData)}
+          </div>
+        </aside>
       </div>
+    `;
     `;
 
     wireChatterEvents('sales', existing.id);
@@ -3638,14 +4128,19 @@
     if (partnerSelectEl) {
       partnerSelectEl.addEventListener('change', () => {
         syncSaleDraft();
-        const p = (state.data.contacts || []).find((c) => Number(c.id) === Number(partnerSelectEl.value));
-        const card = document.getElementById('salePartnerDetailsCard');
-        if (card) {
-          card.className = `o_partner_details_card ${!p ? 'is-empty' : ''}`;
-          card.innerHTML = renderSalePartnerDetailsHtml(p);
-        }
+        renderSaleOrderForm(container);
       });
     }
+
+    ['fSalePaymentTerm', 'fSaleDate', 'fSaleValidity', 'fSalePerson', 'fSaleNotes'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('change', () => {
+          syncSaleDraft();
+          renderSaleOrderForm(container);
+        });
+      }
+    });
 
     // Line events
     container.querySelectorAll('.line-product').forEach((sel) => {
@@ -3664,7 +4159,7 @@
       });
     });
 
-    container.querySelectorAll('.line-qty, .line-price, .line-disc, .line-tax').forEach((inp) => {
+    container.querySelectorAll('.line-qty, .line-price, .line-disc, .line-tax, .line-desc').forEach((inp) => {
       inp.addEventListener('change', () => {
         syncSaleDraft();
         renderSaleOrderForm(container);
@@ -3820,6 +4315,22 @@
         }
       });
     });
+
+    const btnPrintSale = document.getElementById('btnPrintSalePdf');
+    if (btnPrintSale) {
+      btnPrintSale.addEventListener('click', () => {
+        syncSaleDraft();
+        downloadSalePdf(previewData, true);
+      });
+    }
+
+    const btnDownloadSale = document.getElementById('btnDownloadSalePdf');
+    if (btnDownloadSale) {
+      btnDownloadSale.addEventListener('click', () => {
+        syncSaleDraft();
+        downloadSalePdf(previewData, false);
+      });
+    }
   }
 
   function renderProductsSubmodule(container) {
