@@ -325,6 +325,53 @@ function isSupplierMatch(nameA, nameB) {
   return false;
 }
 
+
+function areSaleLinesSemanticEqual(linesA = [], linesB = []) {
+  if (!Array.isArray(linesA) || !Array.isArray(linesB)) return false;
+  if (linesA.length !== linesB.length) return false;
+  for (let i = 0; i < linesA.length; i++) {
+    const a = linesA[i];
+    const b = linesB[i];
+    if (Number(a.product_id) !== Number(b.product_id)) return false;
+    if (Number(a.quantity) !== Number(b.quantity)) return false;
+    if (Number(a.price_unit) !== Number(b.price_unit)) return false;
+    if (Number(a.discount || 0) !== Number(b.discount || 0)) return false;
+    if (Number(a.tax_rate ?? 19) !== Number(b.tax_rate ?? 19)) return false;
+    if (String(a.description || a.product_name || '').trim() !== String(b.description || b.product_name || '').trim()) return false;
+  }
+  return true;
+}
+
+function areMoveLinesSemanticEqual(linesA = [], linesB = []) {
+  if (!Array.isArray(linesA) || !Array.isArray(linesB)) return false;
+  if (linesA.length !== linesB.length) return false;
+  for (let i = 0; i < linesA.length; i++) {
+    const a = linesA[i];
+    const b = linesB[i];
+    if (Number(a.product_id) !== Number(b.product_id)) return false;
+    if (Number(a.quantity) !== Number(b.quantity)) return false;
+    if (Number(a.price_unit) !== Number(b.price_unit)) return false;
+    if (Number(a.discount || 0) !== Number(b.discount || 0)) return false;
+    if (Number(a.tax_rate ?? 19) !== Number(b.tax_rate ?? 19)) return false;
+    if (String(a.name || a.description || '').trim() !== String(b.name || b.description || '').trim()) return false;
+  }
+  return true;
+}
+
+function areExpenseItemsSemanticEqual(itemsA = [], itemsB = []) {
+  if (!Array.isArray(itemsA) || !Array.isArray(itemsB)) return false;
+  if (itemsA.length !== itemsB.length) return false;
+  for (let i = 0; i < itemsA.length; i++) {
+    const a = itemsA[i];
+    const b = itemsB[i];
+    if (Number(a.product_id) !== Number(b.product_id)) return false;
+    if (Number(a.quantity) !== Number(b.quantity)) return false;
+    if (Number(a.unit_amount) !== Number(b.unit_amount)) return false;
+    if (String(a.description || '').trim() !== String(b.description || '').trim()) return false;
+  }
+  return true;
+}
+
 class ERPStore {
   constructor(dbPath = DEFAULT_DB_PATH, options = {}) {
     this.dbPath = dbPath;
@@ -841,15 +888,18 @@ class ERPStore {
         (payload.phone !== undefined && String(payload.phone).trim() !== String(existing.phone || '').trim()) ||
         (payload.payment_term !== undefined && String(payload.payment_term).trim() !== String(existing.payment_term || '').trim()) ||
         (payload.notes !== undefined && String(payload.notes).trim() !== String(existing.notes || '').trim());
-      updated.chatter = [...(existing.chatter || [])];
-      if (isContactChanged) {
-        updated.chatter.push({
-          id: this.nextChatterId(),
-          author: this.getActiveAuthor(),
-          date: this.formatNowShort(),
-          text: 'Ficha de contacto actualizada.'
-        });
+
+      if (!isContactChanged) {
+        return this.getEnrichedContacts().find((c) => Number(c.id) === Number(existing.id));
       }
+
+      updated.chatter = [...(existing.chatter || [])];
+      updated.chatter.push({
+        id: this.nextChatterId(),
+        author: this.getActiveAuthor(),
+        date: this.formatNowShort(),
+        text: 'Ficha de contacto actualizada.'
+      });
       this.data.contacts[idx] = updated;
       this.save();
       if (this.supabase) {
@@ -1184,23 +1234,26 @@ class ERPStore {
         notes: String(payload.notes ?? existing.notes).trim(),
         items
       };
-      const isItemsChanged = JSON.stringify(items) !== JSON.stringify(existing.items || []);
+      const isItemsChanged = !areExpenseItemsSemanticEqual(items, existing.items);
       const isExpenseChanged =
         (partner && Number(partner.id) !== Number(existing.partner_id)) ||
         (name && name !== existing.name) ||
         (payload.date && payload.date !== existing.date) ||
         (payload.receipt_ref && payload.receipt_ref !== existing.receipt_ref) ||
         (payload.notes !== undefined && String(payload.notes).trim() !== String(existing.notes || '').trim()) ||
-        totalAmount !== existing.total_amount;
-      updated.chatter = [...(existing.chatter || [])];
-      if (isItemsChanged || isExpenseChanged) {
-        updated.chatter.push({
-          id: this.nextChatterId(),
-          author: this.getActiveAuthor(),
-          date: this.formatNowShort(),
-          text: `Gasto actualizado ($ ${totalAmount.toLocaleString('es-CO')}).`
-        });
+        Math.abs(totalAmount - Number(existing.total_amount || 0)) > 0.01;
+
+      if (!isItemsChanged && !isExpenseChanged) {
+        return existing;
       }
+
+      updated.chatter = [...(existing.chatter || [])];
+      updated.chatter.push({
+        id: this.nextChatterId(),
+        author: this.getActiveAuthor(),
+        date: this.formatNowShort(),
+        text: `Gasto actualizado ($ ${totalAmount.toLocaleString('es-CO')}).`
+      });
       const oldExpense = { ...existing };
       this.data.expenses[idx] = updated;
       this.save();
@@ -1626,24 +1679,27 @@ class ERPStore {
         notes: String(payload.notes ?? existing.notes).trim()
       };
       this.recomputeSaleOrderInvoiceStatus(updated);
-      const isLinesChanged = JSON.stringify(lines) !== JSON.stringify(existing.lines || []);
+      const isLinesChanged = !areSaleLinesSemanticEqual(lines, existing.lines);
       const isSaleChanged =
         (partner && Number(partner.id) !== Number(existing.partner_id)) ||
-        (payload.date_order && payload.date_order !== existing.date_order) ||
-        (payload.validity_date && payload.validity_date !== existing.validity_date) ||
-        (payload.payment_term && payload.payment_term !== existing.payment_term) ||
-        (payload.salesperson && payload.salesperson !== existing.salesperson) ||
+        (payload.date_order && String(payload.date_order) !== String(existing.date_order)) ||
+        (payload.validity_date && String(payload.validity_date) !== String(existing.validity_date)) ||
+        (payload.payment_term !== undefined && String(payload.payment_term).trim() !== String(existing.payment_term || '').trim()) ||
+        (payload.salesperson !== undefined && String(payload.salesperson).trim() !== String(existing.salesperson || '').trim()) ||
         (payload.notes !== undefined && String(payload.notes).trim() !== String(existing.notes || '').trim()) ||
-        amountTotal !== existing.amount_total;
-      updated.chatter = [...(existing.chatter || [])];
-      if (isLinesChanged || isSaleChanged) {
-        updated.chatter.push({
-          id: this.nextChatterId(),
-          author: this.getActiveAuthor(),
-          date: this.formatNowShort(),
-          text: `Orden actualizada. Total: $ ${amountTotal.toLocaleString('es-CO')}.`
-        });
+        Math.abs(amountTotal - Number(existing.amount_total || 0)) > 0.01;
+
+      if (!isLinesChanged && !isSaleChanged) {
+        return existing;
       }
+
+      updated.chatter = [...(existing.chatter || [])];
+      updated.chatter.push({
+        id: this.nextChatterId(),
+        author: this.getActiveAuthor(),
+        date: this.formatNowShort(),
+        text: `Orden actualizada. Total: $ ${amountTotal.toLocaleString('es-CO')}.`
+      });
       const oldOrder = { ...existing };
       this.data.sales[idx] = updated;
       this.save();
@@ -2062,13 +2118,18 @@ class ERPStore {
         amount_residual: totalRetentions > 0 ? amountNet : amountTotal,
         chatter: [...(existing.chatter || [])]
       };
-      const isMoveLinesChanged = JSON.stringify(lines) !== JSON.stringify(existing.lines || []);
+      const isMoveLinesChanged = !areMoveLinesSemanticEqual(lines, existing.lines);
       const isMoveChanged =
         (partner && Number(partner.id) !== Number(existing.partner_id)) ||
         (invDate && invDate !== existing.invoice_date) ||
         (dueDate && dueDate !== existing.invoice_date_due) ||
         (payload.ref !== undefined && String(payload.ref).trim() !== String(existing.ref || '').trim()) ||
-        amountTotal !== existing.amount_total;
+        Math.abs(amountTotal - Number(existing.amount_total || 0)) > 0.01;
+
+      if (!isMoveLinesChanged && !isMoveChanged && !payload.auto_post) {
+        return existing;
+      }
+
       if (isMoveLinesChanged || isMoveChanged) {
         updatedMove.chatter.push({
           id: this.nextChatterId(),
@@ -2524,6 +2585,11 @@ class ERPStore {
     const record = collection.find((r) => Number(r.id) === Number(id));
     if (!record) throw new Error('Registro no encontrado.');
     record.chatter = Array.isArray(record.chatter) ? record.chatter : [];
+    const lastNote = record.chatter[record.chatter.length - 1];
+    if (lastNote && lastNote.text === clean && lastNote.author === this.getActiveAuthor()) {
+      return record; // Ignore rapid duplicate consecutive note
+    }
+
     const note = {
       id: this.nextChatterId(),
       author: this.getActiveAuthor(),

@@ -147,6 +147,132 @@
     return json;
   }
 
+  // ==================== MULTI-CLICK & DEDUPLICATION GUARDS ====================
+  const _actionLocks = new WeakSet();
+  async function withActionLock(buttonEl, asyncFn) {
+    if (!buttonEl) {
+      return await asyncFn();
+    }
+    if (_actionLocks.has(buttonEl) || buttonEl.disabled) {
+      return;
+    }
+    _actionLocks.add(buttonEl);
+    const prevDisabled = buttonEl.disabled;
+    const prevPointerEvents = buttonEl.style.pointerEvents;
+    const prevOpacity = buttonEl.style.opacity;
+
+    buttonEl.disabled = true;
+    buttonEl.style.pointerEvents = 'none';
+    buttonEl.style.opacity = '0.65';
+    try {
+      return await asyncFn();
+    } finally {
+      setTimeout(() => {
+        _actionLocks.delete(buttonEl);
+        buttonEl.disabled = prevDisabled;
+        buttonEl.style.pointerEvents = prevPointerEvents;
+        buttonEl.style.opacity = prevOpacity;
+      }, 350);
+    }
+  }
+
+  function hasSaleDraftChanged(existing, draft) {
+    if (!existing || !draft) return true;
+    if (Number(existing.partner_id || 0) !== Number(draft.partner_id || 0)) return true;
+    if (String(existing.payment_term || '').trim() !== String(draft.payment_term || '').trim()) return true;
+    if (String(existing.date_order || '').slice(0, 10) !== String(draft.date_order || '').slice(0, 10)) return true;
+    if (String(existing.validity_date || '').slice(0, 10) !== String(draft.validity_date || '').slice(0, 10)) return true;
+    if (String(existing.salesperson || '').trim() !== String(draft.salesperson || '').trim()) return true;
+    if (String(existing.notes || '').trim() !== String(draft.notes || '').trim()) return true;
+
+    const existLines = Array.isArray(existing.lines) ? existing.lines : [];
+    const draftLines = Array.isArray(draft.lines) ? draft.lines : [];
+    if (existLines.length !== draftLines.length) return true;
+
+    for (let i = 0; i < existLines.length; i++) {
+      const e = existLines[i] || {};
+      const d = draftLines[i] || {};
+      if (Number(e.product_id || 0) !== Number(d.product_id || 0)) return true;
+      if (Number(e.quantity || 0) !== Number(d.quantity || 0)) return true;
+      if (Number(e.price_unit || 0) !== Number(d.price_unit || 0)) return true;
+      if (Number(e.discount || 0) !== Number(d.discount || 0)) return true;
+      const eTax = e.tax_rate === '' || e.tax_rate === null || e.tax_rate === undefined ? '' : Number(e.tax_rate);
+      const dTax = d.tax_rate === '' || d.tax_rate === null || d.tax_rate === undefined ? '' : Number(d.tax_rate);
+      if (eTax !== dTax) return true;
+      if (String(e.description || '').trim() !== String(d.description || '').trim()) return true;
+    }
+    return false;
+  }
+
+  function hasMoveDraftChanged(existing, draft) {
+    if (!existing || !draft) return true;
+    if (Number(existing.partner_id || 0) !== Number(draft.partner_id || 0)) return true;
+    if (String(existing.ref || '').trim() !== String(draft.ref || '').trim()) return true;
+    if (String(existing.invoice_date || '').slice(0, 10) !== String(draft.invoice_date || '').slice(0, 10)) return true;
+    if (String(existing.invoice_date_due || '').slice(0, 10) !== String(draft.invoice_date_due || '').slice(0, 10)) return true;
+    if (Number(existing.retention_source_rate || 0) !== Number(draft.retention_source_rate || 0)) return true;
+    if (Number(existing.retention_ica_rate || 0) !== Number(draft.retention_ica_rate || 0)) return true;
+
+    const existLines = Array.isArray(existing.lines) ? existing.lines : [];
+    const draftLines = Array.isArray(draft.lines) ? draft.lines : [];
+    if (existLines.length !== draftLines.length) return true;
+
+    for (let i = 0; i < existLines.length; i++) {
+      const e = existLines[i] || {};
+      const d = draftLines[i] || {};
+      if (String(e.name || '').trim() !== String(d.name || '').trim()) return true;
+      if (String(e.account_code || '').trim() !== String(d.account_code || '').trim()) return true;
+      if (Number(e.quantity || 0) !== Number(d.quantity || 0)) return true;
+      if (Number(e.price_unit || 0) !== Number(d.price_unit || 0)) return true;
+      const eTax = e.tax_rate === '' || e.tax_rate === null || e.tax_rate === undefined ? '' : Number(e.tax_rate);
+      const dTax = d.tax_rate === '' || d.tax_rate === null || d.tax_rate === undefined ? '' : Number(d.tax_rate);
+      if (eTax !== dTax) return true;
+    }
+    return false;
+  }
+
+  function hasExpenseDraftChanged(existing, payload) {
+    if (!existing || !payload) return true;
+    if (String(existing.name || '').trim() !== String(payload.name || '').trim()) return true;
+    if (Number(existing.partner_id || 0) !== Number(payload.partner_id || 0)) return true;
+    if (String(existing.partner_name || '').trim() !== String(payload.partner_name || '').trim()) return true;
+    if (String(existing.supplier_vat || '').trim() !== String(payload.supplier_vat || '').trim()) return true;
+    if (String(existing.receipt_ref || '').trim() !== String(payload.receipt_ref || '').trim()) return true;
+    if (String(existing.date || '').slice(0, 10) !== String(payload.date || '').slice(0, 10)) return true;
+    if (Number(existing.total_amount || existing.price_unit || 0) !== Number(payload.total_amount || payload.price_unit || 0)) return true;
+    if (Number(existing.product_id || 0) !== Number(payload.product_id || 0)) return true;
+    if (String(existing.journal_code || '').trim() !== String(payload.journal_code || '').trim()) return true;
+    if (String(existing.notes || '').trim() !== String(payload.notes || '').trim()) return true;
+    if (String(existing.receipt_image || '').trim() !== String(payload.receipt_image || '').trim()) return true;
+
+    const existItems = Array.isArray(existing.items) ? existing.items : [];
+    const payItems = Array.isArray(payload.items) ? payload.items : [];
+    if (existItems.length !== payItems.length) return true;
+    for (let i = 0; i < existItems.length; i++) {
+      const e = existItems[i] || {};
+      const p = payItems[i] || {};
+      if (String(e.description || '').trim() !== String(p.description || '').trim()) return true;
+      if (Number(e.quantity || 0) !== Number(p.quantity || 0)) return true;
+      if (Number(e.price_unit || 0) !== Number(p.price_unit || 0)) return true;
+    }
+    return false;
+  }
+
+  function hasContactDraftChanged(existing, payload) {
+    if (!existing || !payload) return true;
+    const fields = ['name', 'doc_type', 'vat', 'function', 'email', 'phone', 'mobile', 'street', 'city', 'payment_term', 'notes'];
+    for (const f of fields) {
+      if (String(existing[f] || '').trim() !== String(payload[f] || '').trim()) return true;
+    }
+    if (Boolean(existing.is_company) !== Boolean(payload.is_company)) return true;
+    if (Number(existing.customer_rank || 0) !== Number(payload.customer_rank || 0)) return true;
+    if (Number(existing.supplier_rank || 0) !== Number(payload.supplier_rank || 0)) return true;
+    const eCat = Array.isArray(existing.category_ids) ? existing.category_ids.join(', ') : String(existing.category_ids || '');
+    const pCat = Array.isArray(payload.category_ids) ? payload.category_ids.join(', ') : String(payload.category_ids || '');
+    if (eCat.trim() !== pCat.trim()) return true;
+    return false;
+  }
+
   // ==================== DIALOG LIGHT-DISMISS FALLBACK ====================
   // Follows modern-web-guidance `light-dismiss-a-dialog`
   function setupDialogFallbacks() {
@@ -1311,41 +1437,46 @@
       });
     });
 
-    document.getElementById('btnSaveContact').addEventListener('click', async () => {
-      try {
-        const isComp = document.querySelector('input[name="is_company"]:checked').value === 'true';
-        const role = document.querySelector('input[name="contact_role"]:checked').value;
-        const payload = {
-          id: isNew ? undefined : existing.id,
-          name: document.getElementById('fContactName').value,
-          is_company: isComp,
-          doc_type: document.getElementById('fContactDocType').value,
-          vat: document.getElementById('fContactVat').value,
-          function: document.getElementById('fContactFunction').value,
-          email: document.getElementById('fContactEmail').value,
-          phone: document.getElementById('fContactPhone').value,
-          mobile: document.getElementById('fContactMobile').value,
-          street: document.getElementById('fContactStreet').value,
-          city: document.getElementById('fContactCity').value,
-          payment_term: document.getElementById('fContactPaymentTerm').value,
-          category_ids: document.getElementById('fContactTags').value,
-          customer_rank: role === 'customer' ? 1 : 0,
-          supplier_rank: role === 'supplier' ? 1 : 0,
-          notes: document.getElementById('fContactNotes').value
-        };
-        const res = await apiCall('/api/contacts', 'POST', payload);
-        if (isNew) {
-          state.activeRecordId = null;
-          state.viewType = 'list';
-        } else {
-          state.activeRecordId = res.contact.id;
-        }
-        showToast('Contacto guardado correctamente.');
-        renderModuleWorkspace();
-      } catch (err) {
-        showToast(err.message, true);
-      }
-    });
+    const btnSaveContactEl = document.getElementById('btnSaveContact');
+    if (btnSaveContactEl) {
+      btnSaveContactEl.addEventListener('click', () => {
+        withActionLock(btnSaveContactEl, async () => {
+          const isComp = document.querySelector('input[name="is_company"]:checked').value === 'true';
+          const role = document.querySelector('input[name="contact_role"]:checked').value;
+          const payload = {
+            id: isNew ? undefined : existing.id,
+            name: document.getElementById('fContactName').value,
+            is_company: isComp,
+            doc_type: document.getElementById('fContactDocType').value,
+            vat: document.getElementById('fContactVat').value,
+            function: document.getElementById('fContactFunction').value,
+            email: document.getElementById('fContactEmail').value,
+            phone: document.getElementById('fContactPhone').value,
+            mobile: document.getElementById('fContactMobile').value,
+            street: document.getElementById('fContactStreet').value,
+            city: document.getElementById('fContactCity').value,
+            payment_term: document.getElementById('fContactPaymentTerm').value,
+            category_ids: document.getElementById('fContactTags').value,
+            customer_rank: role === 'customer' ? 1 : 0,
+            supplier_rank: role === 'supplier' ? 1 : 0,
+            notes: document.getElementById('fContactNotes').value
+          };
+          if (!isNew && !hasContactDraftChanged(existing, payload)) {
+            showToast('No hay cambios pendientes por guardar.');
+            return;
+          }
+          const res = await apiCall('/api/contacts', 'POST', payload);
+          if (isNew) {
+            state.activeRecordId = null;
+            state.viewType = 'list';
+          } else {
+            state.activeRecordId = res.contact.id;
+          }
+          showToast('Contacto guardado correctamente.');
+          renderModuleWorkspace();
+        }).catch((err) => showToast(err.message, true));
+      });
+    }
 
     const contactFormEl = document.getElementById('contactForm');
     if (contactFormEl) {
@@ -1355,18 +1486,16 @@
       });
     }
 
-    const delBtn = document.getElementById('btnDeleteContact');
-    if (delBtn) {
-      delBtn.addEventListener('click', async () => {
-        try {
+    const delContactBtn = document.getElementById('btnDeleteContact');
+    if (delContactBtn) {
+      delContactBtn.addEventListener('click', () => {
+        withActionLock(delContactBtn, async () => {
           await apiCall(`/api/contacts/${existing.id}`, 'DELETE');
           showToast('Contacto eliminado.');
           state.activeRecordId = null;
           state.viewType = 'list';
           renderModuleWorkspace();
-        } catch (err) {
-          showToast(err.message, true);
-        }
+        }).catch((err) => showToast(err.message, true));
       });
     }
 
@@ -2015,93 +2144,94 @@
       });
     }
 
-    const delBtn = document.getElementById('btnDeleteFormExpense');
-    if (delBtn) {
-      delBtn.addEventListener('click', async () => {
-        if (!confirm(`¿Estás seguro de eliminar el gasto ${existing.reference || ('EXP/2026/' + String(existing.id).padStart(4, '0'))}?`)) return;
-        try {
+    const delExpBtn = document.getElementById('btnDeleteFormExpense');
+    if (delExpBtn) {
+      delExpBtn.addEventListener('click', () => {
+        withActionLock(delExpBtn, async () => {
+          if (!confirm(`¿Estás seguro de eliminar el gasto ${existing.reference || ('EXP/2026/' + String(existing.id).padStart(4, '0'))}?`)) return;
           await apiCall(`/api/expenses/${existing.id}`, 'DELETE');
           showToast('Gasto eliminado.');
           state.activeRecordId = null;
           state.formDraft = null;
           state.viewType = 'list';
           renderModuleWorkspace();
-        } catch (err) {
-          showToast(err.message, true);
-        }
+        }).catch((err) => showToast(err.message, true));
       });
     }
 
     const saveBtn = document.getElementById('btnSaveExpense');
     if (saveBtn) {
-      saveBtn.addEventListener('click', async () => {
-        const name = document.getElementById('fExpName').value.trim();
-        if (!name) {
-          showToast('La descripción del gasto es obligatoria.', true);
-          return;
-        }
-        const totalAmount = Number(document.getElementById('fExpTotal').value || 0);
-        if (!totalAmount || totalAmount <= 0) {
-          showToast('El monto total del gasto debe ser mayor a 0.', true);
-          return;
-        }
+      saveBtn.addEventListener('click', () => {
+        withActionLock(saveBtn, async () => {
+          const name = document.getElementById('fExpName').value.trim();
+          if (!name) {
+            showToast('La descripción del gasto es obligatoria.', true);
+            return;
+          }
+          const totalAmount = Number(document.getElementById('fExpTotal').value || 0);
+          if (!totalAmount || totalAmount <= 0) {
+            showToast('El monto total del gasto debe ser mayor a 0.', true);
+            return;
+          }
 
-        const partnerVal = document.getElementById('fExpPartner').value;
-        const partnerNameInput = document.getElementById('fExpPartnerName').value.trim();
-        const matchedPartner = partnerVal
-          ? (state.data.contacts || []).find((c) => Number(c.id) === Number(partnerVal))
-          : (partnerNameInput ? (state.data.contacts || []).find((c) => c.name.toLowerCase() === partnerNameInput.toLowerCase()) : null);
+          const partnerVal = document.getElementById('fExpPartner').value;
+          const partnerNameInput = document.getElementById('fExpPartnerName').value.trim();
+          const matchedPartner = partnerVal
+            ? (state.data.contacts || []).find((c) => Number(c.id) === Number(partnerVal))
+            : (partnerNameInput ? (state.data.contacts || []).find((c) => c.name.toLowerCase() === partnerNameInput.toLowerCase()) : null);
 
-        const prodVal = document.getElementById('fExpProduct').value;
-        const defaultProd = (state.data.products || [])[0];
-        const suppVatInput = document.getElementById('fExpPartnerVat') ? document.getElementById('fExpPartnerVat').value.trim() : '';
+          const prodVal = document.getElementById('fExpProduct').value;
+          const defaultProd = (state.data.products || [])[0];
+          const suppVatInput = document.getElementById('fExpPartnerVat') ? document.getElementById('fExpPartnerVat').value.trim() : '';
 
-        // Collect items from table
-        const cleanItems = expenseItems.filter(it => it.description || it.price_unit > 0).map((it, idx) => ({
-          id: idx + 1,
-          description: it.description || name,
-          quantity: Number(it.quantity || 1),
-          price_unit: Number(it.price_unit || 0),
-          subtotal: Math.round((Number(it.quantity || 1) * Number(it.price_unit || 0)) * 100) / 100
-        }));
+          // Collect items from table
+          const cleanItems = expenseItems.filter(it => it.description || it.price_unit > 0).map((it, idx) => ({
+            id: idx + 1,
+            description: it.description || name,
+            quantity: Number(it.quantity || 1),
+            price_unit: Number(it.price_unit || 0),
+            subtotal: Math.round((Number(it.quantity || 1) * Number(it.price_unit || 0)) * 100) / 100
+          }));
 
-        const payload = {
-          id: isNew ? undefined : existing.id,
-          name,
-          employee_name: document.getElementById('fExpEmployee').value.trim() || 'Andrés Salazar',
-          department: existing.department || 'Operaciones & Proyectos',
-          product_id: prodVal ? Number(prodVal) : (defaultProd ? defaultProd.id : 1),
-          product_name: prodVal
-            ? ((state.data.products.find((p) => Number(p.id) === Number(prodVal)) || {}).name || 'Gasto General')
-            : (defaultProd ? defaultProd.name : 'Gasto General'),
-          partner_id: matchedPartner ? matchedPartner.id : (existing.partner_id || null),
-          partner_name: partnerNameInput || (matchedPartner ? matchedPartner.name : ''),
-          supplier_vat: suppVatInput || existing.supplier_vat || '',
-          date: document.getElementById('fExpDate').value,
-          receipt_ref: document.getElementById('fExpReceipt').value.trim(),
-          quantity: 1,
-          price_unit: totalAmount,
-          tax_rate: 0,
-          untaxed_amount: totalAmount,
-          tax_amount: 0,
-          total_amount: totalAmount,
-          journal_code: document.getElementById('fExpJournal') ? document.getElementById('fExpJournal').value : (existing.journal_code || 'CSH1'),
-          payment_mode: document.getElementById('fExpPayMode').value || 'company_account',
-          notes: document.getElementById('fExpNotes').value.trim(),
-          receipt_image: existing.receipt_image || '',
-          items: cleanItems.length > 0 ? cleanItems : [{ id: 1, description: name, quantity: 1, price_unit: totalAmount, subtotal: totalAmount }]
-        };
+          const payload = {
+            id: isNew ? undefined : existing.id,
+            name,
+            employee_name: document.getElementById('fExpEmployee').value.trim() || 'Andrés Salazar',
+            department: existing.department || 'Operaciones & Proyectos',
+            product_id: prodVal ? Number(prodVal) : (defaultProd ? defaultProd.id : 1),
+            product_name: prodVal
+              ? ((state.data.products.find((p) => Number(p.id) === Number(prodVal)) || {}).name || 'Gasto General')
+              : (defaultProd ? defaultProd.name : 'Gasto General'),
+            partner_id: matchedPartner ? matchedPartner.id : (existing.partner_id || null),
+            partner_name: partnerNameInput || (matchedPartner ? matchedPartner.name : ''),
+            supplier_vat: suppVatInput || existing.supplier_vat || '',
+            date: document.getElementById('fExpDate').value,
+            receipt_ref: document.getElementById('fExpReceipt').value.trim(),
+            quantity: 1,
+            price_unit: totalAmount,
+            tax_rate: 0,
+            untaxed_amount: totalAmount,
+            tax_amount: 0,
+            total_amount: totalAmount,
+            journal_code: document.getElementById('fExpJournal') ? document.getElementById('fExpJournal').value : (existing.journal_code || 'CSH1'),
+            payment_mode: document.getElementById('fExpPayMode').value || 'company_account',
+            notes: document.getElementById('fExpNotes').value.trim(),
+            receipt_image: existing.receipt_image || '',
+            items: cleanItems.length > 0 ? cleanItems : [{ id: 1, description: name, quantity: 1, price_unit: totalAmount, subtotal: totalAmount }]
+          };
 
-        try {
+          if (!isNew && !hasExpenseDraftChanged(existing, payload)) {
+            showToast('No hay cambios pendientes por guardar.');
+            return;
+          }
+
           await apiCall('/api/expenses', 'POST', payload);
           showToast('Gasto guardado exitosamente y factura de proveedor generada.');
           state.activeRecordId = null;
           state.formDraft = null;
           state.viewType = 'list';
           renderModuleWorkspace();
-        } catch (err) {
-          showToast(err.message, true);
-        }
+        }).catch((err) => showToast(err.message, true));
       });
     }
   }
@@ -4386,7 +4516,7 @@
       });
     }
 
-    const saveOrderNow = async () => {
+    const saveOrderNow = async (forceSave = false) => {
       if (!isEditable) {
         showToast('No se puede modificar un pedido de venta confirmado o cancelado.', true);
         throw new Error('No se puede modificar un pedido de venta confirmado o cancelado.');
@@ -4400,6 +4530,10 @@
       if (hasEmptyProduct) {
         showToast('Debe seleccionar un producto en cada línea del pedido.', true);
         throw new Error('Debe seleccionar un producto en cada línea del pedido.');
+      }
+
+      if (!isNew && !hasSaleDraftChanged(existing, state.formDraft) && !forceSave) {
+        return existing;
       }
 
       const payload = {
@@ -4418,85 +4552,84 @@
       return res.order;
     };
 
-    const btnSaveEl = document.getElementById('btnSaveSaleOrder');
-    if (btnSaveEl) {
-      btnSaveEl.addEventListener('click', async () => {
-        try {
-          await saveOrderNow();
+    const btnSaveSale = document.getElementById('btnSaveSaleOrder');
+    if (btnSaveSale) {
+      btnSaveSale.addEventListener('click', () => {
+        withActionLock(btnSaveSale, async () => {
+          syncSaleDraft();
+          if (!isNew && !hasSaleDraftChanged(existing, state.formDraft)) {
+            showToast('No hay cambios pendientes por guardar.');
+            return;
+          }
+          await saveOrderNow(true);
           showToast('Cotización / Pedido guardado.');
           renderModuleWorkspace();
-        } catch (err) {
-          showToast(err.message, true);
-        }
+        }).catch((err) => showToast(err.message, true));
       });
     }
 
     const btnSendSaleWa = document.getElementById('btnSendSaleWhatsApp');
     if (btnSendSaleWa) {
-      btnSendSaleWa.addEventListener('click', async () => {
-        try {
-          const savedOrder = await saveOrderNow();
+      btnSendSaleWa.addEventListener('click', () => {
+        withActionLock(btnSendSaleWa, async () => {
+          const savedOrder = await saveOrderNow(false);
           await sendDocumentViaWhatsApp({
             model: 'sales',
             record: savedOrder || existing,
             containerSelector: '.o_sale_pdf_preview #salePdfSheet',
             filename: `Cotizacion_${((savedOrder || existing).name || 'COT').replace(/[\/\\]/g, '_')}.pdf`
           });
-        } catch (err) {
-          showToast(err.message, true);
-        }
+        }).catch((err) => showToast(err.message, true));
       });
     }
 
     container.querySelectorAll('[data-sale-action]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const action = btn.getAttribute('data-sale-action');
+      btn.addEventListener('click', () => {
+        withActionLock(btn, async () => {
+          const action = btn.getAttribute('data-sale-action');
 
-        if (action === 'create_invoice') {
-          const moves = (state.data.accounting && state.data.accounting.moves) || [];
-          const existingInvs = moves.filter((m) => (existing.invoice_ids || []).includes(m.id) && m.state !== 'cancel');
-          const invoicedTotal = existingInvs.reduce((s, m) => s + Number(m.amount_total || 0), 0);
-          const orderTotal = Number(existing.amount_total || 0);
-          const remaining = Math.max(0, orderTotal - invoicedTotal);
+          if (action === 'create_invoice') {
+            const moves = (state.data.accounting && state.data.accounting.moves) || [];
+            const existingInvs = moves.filter((m) => (existing.invoice_ids || []).includes(m.id) && m.state !== 'cancel');
+            const invoicedTotal = existingInvs.reduce((s, m) => s + Number(m.amount_total || 0), 0);
+            const orderTotal = Number(existing.amount_total || 0);
+            const remaining = Math.max(0, orderTotal - invoicedTotal);
 
-          if (remaining <= 0) {
-            return showToast('Este pedido de venta ya fue facturado en su totalidad.', true);
+            if (remaining <= 0) {
+              return showToast('Este pedido de venta ya fue facturado en su totalidad.', true);
+            }
+
+            promptInvoiceCreation(existing, remaining, async (chosenAmount) => {
+              try {
+                if (isEditable) {
+                  await saveOrderNow(false);
+                }
+                const res = await apiCall(`/api/sales/${state.activeRecordId}/action`, 'POST', {
+                  action: 'create_invoice',
+                  amount: chosenAmount
+                });
+                state.formDraft = null;
+                showToast(`Factura ${res.invoice ? res.invoice.name : ''} generada exitosamente.`);
+                if (res.invoice) {
+                  openApp('accounting', { submenu: 'out_invoice', viewType: 'form', recordId: res.invoice.id, returnTo: { app: 'sales', submenu: state.submenu, viewType: 'form', recordId: state.activeRecordId } });
+                } else {
+                  renderModuleWorkspace();
+                }
+              } catch (err) {
+                showToast(err.message, true);
+              }
+            });
+            return;
           }
 
-          promptInvoiceCreation(existing, remaining, async (chosenAmount) => {
-            try {
-              if (isEditable) {
-                await saveOrderNow();
-              }
-              const res = await apiCall(`/api/sales/${state.activeRecordId}/action`, 'POST', {
-                action: 'create_invoice',
-                amount: chosenAmount
-              });
-              state.formDraft = null;
-              showToast(`Factura ${res.invoice ? res.invoice.name : ''} generada exitosamente.`);
-              if (res.invoice) {
-                openApp('accounting', { submenu: 'out_invoice', viewType: 'form', recordId: res.invoice.id, returnTo: { app: 'sales', submenu: state.submenu, viewType: 'form', recordId: state.activeRecordId } });
-              } else {
-                renderModuleWorkspace();
-              }
-            } catch (err) {
-              showToast(err.message, true);
-            }
-          });
-          return;
-        }
-
-        try {
           if (isEditable) {
-            await saveOrderNow();
+            await saveOrderNow(false);
           }
           const res = await apiCall(`/api/sales/${state.activeRecordId}/action`, 'POST', { action });
           state.formDraft = null;
           showToast('Estado del pedido actualizado.');
           renderModuleWorkspace();
-        } catch (err) {
-          showToast(err.message, true);
-        }
+        }).catch((err) => showToast(err.message, true));
       });
     });
 
@@ -4766,53 +4899,54 @@
       </div>
     `;
 
-    document.getElementById('btnSaveProductForm').addEventListener('click', async () => {
-      try {
-        const name = (document.getElementById('prodName').value || '').trim();
-        if (!name) {
-          showToast('El nombre del producto es obligatorio.', true);
-          return;
-        }
-        const default_code = (document.getElementById('prodSku').value || '').trim();
-        const category = (document.getElementById('prodCategory').value || 'General').trim();
-        const uom = (document.getElementById('prodUom').value || '').trim();
-        if (!uom) {
-          showToast('Debe seleccionar una unidad de medida.', true);
-          return;
-        }
-        const list_price = Number(document.getElementById('prodPrice').value || 0);
-        const taxVal = document.getElementById('prodTax').value;
-        if (taxVal === '') {
-          showToast('Debe seleccionar la tarifa de IVA.', true);
-          return;
-        }
-        const tax_rate = Number(taxVal);
+    const btnSaveProd = document.getElementById('btnSaveProductForm');
+    if (btnSaveProd) {
+      btnSaveProd.addEventListener('click', () => {
+        withActionLock(btnSaveProd, async () => {
+          const name = (document.getElementById('prodName').value || '').trim();
+          if (!name) {
+            showToast('El nombre del producto es obligatorio.', true);
+            return;
+          }
+          const default_code = (document.getElementById('prodSku').value || '').trim();
+          const category = (document.getElementById('prodCategory').value || 'General').trim();
+          const uom = (document.getElementById('prodUom').value || '').trim();
+          if (!uom) {
+            showToast('Debe seleccionar una unidad de medida.', true);
+            return;
+          }
+          const list_price = Number(document.getElementById('prodPrice').value || 0);
+          const taxVal = document.getElementById('prodTax').value;
+          if (taxVal === '') {
+            showToast('Debe seleccionar la tarifa de IVA.', true);
+            return;
+          }
+          const tax_rate = Number(taxVal);
 
-        const payload = {
-          name,
-          default_code,
-          category,
-          type: existing.type || 'consu',
-          uom,
-          list_price,
-          standard_price: existing.standard_price || 0,
-          tax_rate,
-          can_be_sold: true,
-          can_be_expensed: existing.can_be_expensed !== undefined ? existing.can_be_expensed : false
-        };
-        if (!isNew) {
-          payload.id = existing.id;
-        }
+          const payload = {
+            name,
+            default_code,
+            category,
+            type: existing.type || 'consu',
+            uom,
+            list_price,
+            standard_price: existing.standard_price || 0,
+            tax_rate,
+            can_be_sold: true,
+            can_be_expensed: existing.can_be_expensed !== undefined ? existing.can_be_expensed : false
+          };
+          if (!isNew) {
+            payload.id = existing.id;
+          }
 
-        await apiCall('/api/products', 'POST', payload);
-        showToast(isNew ? 'Producto creado en el catálogo.' : 'Producto actualizado exitosamente.');
-        state.activeRecordId = null;
-        state.viewType = 'list';
-        renderModuleWorkspace();
-      } catch (err) {
-        showToast(err.message, true);
-      }
-    });
+          await apiCall('/api/products', 'POST', payload);
+          showToast(isNew ? 'Producto creado en el catálogo.' : 'Producto actualizado exitosamente.');
+          state.activeRecordId = null;
+          state.viewType = 'list';
+          renderModuleWorkspace();
+        }).catch((err) => showToast(err.message, true));
+      });
+    }
 
     document.getElementById('btnDiscardProductForm').addEventListener('click', () => {
       state.activeRecordId = null;
@@ -5936,11 +6070,15 @@
       });
     }
 
-    const saveMoveFromForm = async (autoPost) => {
+    const saveMoveFromForm = async (autoPost, forceSave = false) => {
       syncMoveDraft();
       if (!state.formDraft.partner_id) {
         showToast('Debe seleccionar un cliente o proveedor.', true);
         throw new Error('Debe seleccionar un cliente o proveedor.');
+      }
+      if (!isNew && !autoPost && !hasMoveDraftChanged(existing, state.formDraft) && !forceSave) {
+        showToast('No hay cambios pendientes por guardar.');
+        return existing;
       }
       const payload = {
         id: isNew ? undefined : existing.id,
@@ -5959,20 +6097,29 @@
       state.formDraft = null;
       showToast(autoPost ? `Factura publicada: ${res.move.name}` : 'Borrador contable guardado.');
       renderModuleWorkspace();
+      return res.move;
     };
 
     const btnSaveDraft = document.getElementById('btnSaveDraftMove');
-    if (btnSaveDraft) btnSaveDraft.addEventListener('click', () => saveMoveFromForm(false).catch((e) => showToast(e.message, true)));
+    if (btnSaveDraft) {
+      btnSaveDraft.addEventListener('click', () => {
+        withActionLock(btnSaveDraft, () => saveMoveFromForm(false, false)).catch((e) => showToast(e.message, true));
+      });
+    }
 
     const btnSavePost = document.getElementById('btnSaveAndPostMove');
-    if (btnSavePost) btnSavePost.addEventListener('click', () => saveMoveFromForm(true).catch((e) => showToast(e.message, true)));
+    if (btnSavePost) {
+      btnSavePost.addEventListener('click', () => {
+        withActionLock(btnSavePost, () => saveMoveFromForm(true, true)).catch((e) => showToast(e.message, true));
+      });
+    }
 
     const btnSendInvWa = document.getElementById('btnSendInvoiceWhatsApp');
     if (btnSendInvWa) {
-      btnSendInvWa.addEventListener('click', async () => {
-        try {
-          if (isEditable) {
-            await saveMoveFromForm(false);
+      btnSendInvWa.addEventListener('click', () => {
+        withActionLock(btnSendInvWa, async () => {
+          if (isEditable && hasMoveDraftChanged(existing, state.formDraft)) {
+            await saveMoveFromForm(false, true);
           }
           await sendDocumentViaWhatsApp({
             model: 'accounting',
@@ -5980,23 +6127,19 @@
             containerSelector: '.o_pdf_paper_viewport #invoicePdfSheet',
             filename: `Factura_${(existing.name || 'FAC').replace(/[\/\\]/g, '_')}.pdf`
           });
-        } catch (err) {
-          showToast(err.message, true);
-        }
+        }).catch((err) => showToast(err.message, true));
       });
     }
 
     container.querySelectorAll('[data-move-action]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const action = btn.getAttribute('data-move-action');
-        try {
+      btn.addEventListener('click', () => {
+        withActionLock(btn, async () => {
+          const action = btn.getAttribute('data-move-action');
           await apiCall(`/api/accounting/moves/${existing.id}/action`, 'POST', { action });
           state.formDraft = null;
           showToast('Documento contable actualizado.');
           renderModuleWorkspace();
-        } catch (err) {
-          showToast(err.message, true);
-        }
+        }).catch((err) => showToast(err.message, true));
       });
     });
 
@@ -6043,8 +6186,8 @@
 
     const btnGenResidualMove = document.getElementById('btnGenResidualMove');
     if (btnGenResidualMove) {
-      btnGenResidualMove.addEventListener('click', async () => {
-        try {
+      btnGenResidualMove.addEventListener('click', () => {
+        withActionLock(btnGenResidualMove, async () => {
           const res = await apiCall('/api/accounting/moves/' + existing.id + '/action', 'POST', {
             action: 'generate_residual_invoice'
           });
@@ -6054,9 +6197,7 @@
             state.activeRecordId = nextInv.id;
           }
           renderModuleWorkspace();
-        } catch (err) {
-          showToast(err.message, true);
-        }
+        }).catch((err) => showToast(err.message, true));
       });
     }
 
@@ -6381,8 +6522,8 @@
 
     const btnSave = document.getElementById('btnSaveSettings');
     if (btnSave) {
-      btnSave.addEventListener('click', async () => {
-        try {
+      btnSave.addEventListener('click', () => {
+        withActionLock(btnSave, async () => {
           const payload = {};
           const el = (id) => document.getElementById(id);
 
@@ -6412,9 +6553,7 @@
           state.data.settings = res.settings;
           updateSystray();
           showToast('Ajustes del sistema guardados.');
-        } catch (err) {
-          showToast(err.message, true);
-        }
+        }).catch((err) => showToast(err.message, true));
       });
     }
 
@@ -6566,15 +6705,15 @@
     const btn = document.getElementById('btnSendChatterNote');
     const input = document.getElementById('chatterInputText');
     if (btn && input) {
-      btn.addEventListener('click', async () => {
-        try {
-          if (!input.value.trim()) return;
-          await apiCall('/api/chatter', 'POST', { model, id: recordId, text: input.value });
+      btn.addEventListener('click', () => {
+        withActionLock(btn, async () => {
+          const text = input.value.trim();
+          if (!text) return;
+          input.value = '';
+          await apiCall('/api/chatter', 'POST', { model, id: recordId, text });
           showToast('Nota registrada en el historial.');
           renderModuleWorkspace();
-        } catch (err) {
-          showToast(err.message, true);
-        }
+        }).catch((err) => showToast(err.message, true));
       });
     }
   }
@@ -6728,41 +6867,43 @@
     const payDialog = document.getElementById('paymentDialog');
     document.getElementById('btnClosePaymentDialog').addEventListener('click', () => payDialog.close());
     document.getElementById('btnCancelPaymentDialog').addEventListener('click', () => payDialog.close());
-    document.getElementById('paymentDialogForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      try {
-        const moveId = Number(document.getElementById('payMoveId').value);
-        const journal_code = document.getElementById('payJournal').value;
-        if (!journal_code) {
-          showToast('Debe seleccionar un diario de pago.', true);
-          return;
-        }
-        const amount = Number(document.getElementById('payAmount').value);
-        const date = document.getElementById('payDate').value;
-        const ref = document.getElementById('payRef').value;
-        const chkGenResidual = document.getElementById('chkGenerateResidualInvoice');
-        const genResidual = Boolean(chkGenResidual && chkGenResidual.checked);
+    const payForm = document.getElementById('paymentDialogForm');
+    if (payForm) {
+      payForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const submitBtn = payForm.querySelector('button[type="submit"]');
+        withActionLock(submitBtn, async () => {
+          const moveId = Number(document.getElementById('payMoveId').value);
+          const journal_code = document.getElementById('payJournal').value;
+          if (!journal_code) {
+            showToast('Debe seleccionar un diario de pago.', true);
+            return;
+          }
+          const amount = Number(document.getElementById('payAmount').value);
+          const date = document.getElementById('payDate').value;
+          const ref = document.getElementById('payRef').value;
+          const chkGenResidual = document.getElementById('chkGenerateResidualInvoice');
+          const genResidual = Boolean(chkGenResidual && chkGenResidual.checked);
 
-        const res = await apiCall(`/api/accounting/moves/${moveId}/action`, 'POST', {
-          action: 'register_payment',
-          journal_code,
-          amount,
-          date,
-          ref,
-          generate_residual_invoice: genResidual
-        });
-        payDialog.close();
-        const nextInv = res.next_invoice || (res.move && res.move.next_invoice);
-        if (nextInv) {
-          showToast(`Pago registrado y siguiente factura ${nextInv.name} generada por el saldo restante.`);
-        } else {
-          showToast('Pago registrado y conciliado exitosamente.');
-        }
-        renderModuleWorkspace();
-      } catch (err) {
-        showToast(err.message, true);
-      }
-    });
+          const res = await apiCall(`/api/accounting/moves/${moveId}/action`, 'POST', {
+            action: 'register_payment',
+            journal_code,
+            amount,
+            date,
+            ref,
+            generate_residual_invoice: genResidual
+          });
+          payDialog.close();
+          const nextInv = res.next_invoice || (res.move && res.move.next_invoice);
+          if (nextInv) {
+            showToast(`Pago registrado y siguiente factura ${nextInv.name} generada por el saldo restante.`);
+          } else {
+            showToast('Pago registrado y conciliado exitosamente.');
+          }
+          renderModuleWorkspace();
+        }).catch((err) => showToast(err.message, true));
+      });
+    }
 
     // Command Palette Modal
     const cmdDialog = document.getElementById('commandPaletteDialog');

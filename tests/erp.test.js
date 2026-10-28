@@ -1656,4 +1656,77 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.equal(changeLines.status, 400);
     assert.match(changeLines.json.error, /no se puede modificar el cliente ni los productos/i);
   });
+
+  it('prevents multi-click duplication, ignores no-change saves, and guards chatter from duplicate entries', async () => {
+    const jsText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
+
+    // 1. Verify frontend guards and action locks in app.js
+    assert.ok(jsText.includes('withActionLock'), 'app.js must implement withActionLock');
+    assert.ok(jsText.includes('hasSaleDraftChanged'), 'app.js must implement hasSaleDraftChanged');
+    assert.ok(jsText.includes('hasMoveDraftChanged'), 'app.js must implement hasMoveDraftChanged');
+    assert.ok(jsText.includes('hasExpenseDraftChanged'), 'app.js must implement hasExpenseDraftChanged');
+    assert.ok(jsText.includes('hasContactDraftChanged'), 'app.js must implement hasContactDraftChanged');
+
+    // 2. Verify withActionLock wrapped around major buttons
+    assert.ok(jsText.includes('withActionLock(btnSaveSale'), 'btnSaveSale must be guarded with withActionLock');
+    assert.ok(jsText.includes('withActionLock(btnSendSaleWa'), 'btnSendSaleWhatsApp must be guarded with withActionLock');
+    assert.ok(jsText.includes('withActionLock(btnSaveDraft'), 'btnSaveDraftMove must be guarded with withActionLock');
+    assert.ok(jsText.includes('withActionLock(btnSavePost'), 'btnSaveAndPostMove must be guarded with withActionLock');
+    assert.ok(jsText.includes('withActionLock(btnSaveContactEl'), 'btnSaveContact must be guarded with withActionLock');
+    assert.ok(jsText.includes('withActionLock(saveBtn'), 'btnSaveExpense must be guarded with withActionLock');
+    assert.ok(jsText.includes('withActionLock(btnSave'), 'btnSaveSettings must be guarded with withActionLock');
+
+    // 3. Create a test sale order
+    const partnerRes = await req('/api/contacts', 'POST', { name: 'Cliente Multi-Click Test' });
+    assert.equal(partnerRes.status, 200);
+
+    const initialOrder = await req('/api/sales', 'POST', {
+      partner_id: partnerRes.json.contact.id,
+      payment_term: 'immediate',
+      notes: 'Nota original',
+      lines: [
+        { product_id: 1, description: 'Perfil 1', quantity: 2, price_unit: 10000, discount: 0, tax_rate: 19 }
+      ]
+    });
+    assert.equal(initialOrder.status, 200);
+    const initialNoteCount = (initialOrder.json.order.notes_history || []).length;
+
+    // 4. Send 3 identical updates to the order (simulating repeated clicks on Save without editing)
+    const payloadSame = {
+      id: initialOrder.json.order.id,
+      partner_id: partnerRes.json.contact.id,
+      payment_term: 'immediate',
+      notes: 'Nota original',
+      lines: [
+        { product_id: 1, description: 'Perfil 1', quantity: 2, price_unit: 10000, discount: 0, tax_rate: 19 }
+      ]
+    };
+
+    const rep1 = await req('/api/sales', 'POST', payloadSame);
+    assert.equal(rep1.status, 200);
+    assert.equal((rep1.json.order.notes_history || []).length, initialNoteCount, 'Repeated save without changes must not add chatter note');
+
+    const rep2 = await req('/api/sales', 'POST', payloadSame);
+    assert.equal(rep2.status, 200);
+    assert.equal((rep2.json.order.notes_history || []).length, initialNoteCount, 'Repeated save without changes must not add chatter note');
+
+    // 5. Test Chatter note deduplication on rapid identical messages
+    const note1 = await req('/api/chatter', 'POST', {
+      model: 'sales',
+      id: initialOrder.json.order.id,
+      text: 'Nota de seguimiento repetida'
+    });
+    assert.equal(note1.status, 200);
+    const chatterList = note1.json.record.chatter || [];
+    assert.ok(chatterList.length >= 1, 'Chatter list should have at least 1 note');
+    const countBefore = chatterList.length;
+
+    const note2 = await req('/api/chatter', 'POST', {
+      model: 'sales',
+      id: initialOrder.json.order.id,
+      text: 'Nota de seguimiento repetida'
+    });
+    assert.equal(note2.status, 200);
+    assert.equal((note2.json.record.chatter || []).length, countBefore, 'Identical consecutive chatter note within the same minute must be ignored');
+  });
 });
