@@ -944,6 +944,153 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.equal(payNextRes.json.move.payment_state, 'paid');
     assert.equal(payNextRes.json.move.amount_residual, 0);
   });
+
+  it('Representación Gráfica Profesional de Facturas (Paleta CHapp ERP & Estándar Comercial): Logo, Colores de la App (#074073 / #14B5D9), Marcas de Agua, Sello de Estado, Total en Letras, Datos Bancarios, Firmas y Estilos @media print (Sin CUFE ni QR)', async () => {
+    const cssText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'css', 'odoo20.css'), 'utf8');
+    const jsText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
+
+    // 1. Verificación de reglas CSS para representación gráfica con la paleta de la app (#074073 y #14B5D9)
+    assert.ok(cssText.includes('.o_pdf_sheet'), 'CSS debe definir contenedor .o_pdf_sheet');
+    assert.ok(cssText.includes('.o_pdf_watermark'), 'CSS debe definir marcas de agua .o_pdf_watermark');
+    assert.ok(cssText.includes('.o_pdf_watermark.is-paid'), 'CSS debe soportar marca de agua is-paid');
+    assert.ok(cssText.includes('.o_pdf_watermark.is-draft'), 'CSS debe soportar marca de agua is-draft');
+    assert.ok(cssText.includes('.o_pdf_watermark.is-cancel'), 'CSS debe soportar marca de agua is-cancel');
+    assert.ok(cssText.includes('.o_pdf_watermark.is-partial'), 'CSS debe soportar marca de agua is-partial');
+    assert.ok(cssText.includes('.o_pdf_watermark.is-overdue'), 'CSS debe soportar marca de agua is-overdue');
+    assert.ok(cssText.includes('.o_pdf_stamp'), 'CSS debe definir sellos de estado .o_pdf_stamp');
+    assert.ok(cssText.includes('.o_pdf_company_logo'), 'CSS debe definir estilos para el logo empresarial');
+    assert.ok(cssText.includes('.o_pdf_resolution_bar'), 'CSS debe definir la barra de resolución');
+    assert.ok(cssText.includes('.o_pdf_amount_words'), 'CSS debe definir contenedor de total en letras');
+    assert.ok(cssText.includes('.o_pdf_bank_info'), 'CSS debe definir instrucciones bancarias');
+    assert.ok(!cssText.includes('.o_pdf_qr_box'), 'CSS no debe incluir estilos de código QR');
+    assert.ok(cssText.includes('.o_pdf_signatures_section'), 'CSS debe definir sección de firmas formales');
+    assert.ok(cssText.includes('size: A4 portrait;'), 'CSS print debe configurar hoja A4 portrait');
+    assert.ok(cssText.includes('print-color-adjust: exact'), 'CSS print debe forzar reproducción exacta de colores y marcas de agua');
+    assert.ok(cssText.includes('table-header-group'), 'CSS print debe repetir thead en páginas sucesivas');
+    assert.ok(cssText.includes('#074073'), 'CSS debe utilizar el color primario de la app (#074073)');
+    assert.ok(cssText.includes('#14B5D9'), 'CSS debe utilizar el color acento de la app (#14B5D9)');
+
+    // 2. Verificación de helpers técnicos en app.js y ausencia estricta de CUFE y QR
+    assert.ok(jsText.includes('function numberToWordsSpanish'), 'app.js debe implementar conversión de cifras a letras en español');
+    assert.ok(!jsText.includes('function generateInvoiceCufe'), 'app.js no debe contener generador de CUFE');
+    assert.ok(!jsText.includes('function renderInvoiceQrSvg'), 'app.js no debe contener generador de código QR');
+    assert.ok(jsText.includes('Firma y Sello Emisor Autorizado'), 'app.js debe incluir bloque de firma emisor');
+    assert.ok(jsText.includes('Firma y Aceptación de Recibido'), 'app.js debe incluir bloque de aceptación comprador');
+    assert.ok(jsText.includes('Bancolombia Cuenta Corriente'), 'app.js debe proveer datos bancarios de consignación');
+
+    // 3. Extracción y prueba funcional de los algoritmos de la factura
+    const fnModule = {};
+    const evalEnv = `
+      const state = {
+        data: {
+          settings: {
+            company_name: 'GH Aluminios',
+            company_vat: '900.876.543-1',
+            fiscal_regime: 'Responsable de IVA - Régimen Ordinario',
+            company_address: 'Cra. 7 #18-45',
+            company_city: 'Pereira',
+            company_country: 'Colombia',
+            company_email: 'chappdevm@gmail.com'
+          },
+          contacts: [
+            { id: 10, name: 'Arquitectura y Vidrios SAS', doc_type: 'NIT', vat: '901.234.567-8', street: 'Calle 10 #15-20', city: 'Pereira', state_name: 'Risaralda', mobile: '3157778899', phone: '3201122', email: 'contabilidad@arqvidrios.com', payment_term: '30 Días' }
+          ],
+          sales: []
+        }
+      };
+      function esc(str) { return String(str == null ? '' : str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+      function formatMoney(amount, currency = '$') { const num = Number(amount) || 0; return currency + ' ' + num.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
+      
+      ${jsText.substring(jsText.indexOf('function numberToWordsSpanish'), jsText.indexOf('function renderSaleOrderForm'))}
+      
+      module.exports = { numberToWordsSpanish, renderInvoicePdfSheetHtml };
+    `;
+    const vm = require('node:vm');
+    const script = new vm.Script(evalEnv);
+    const context = vm.createContext({ module: fnModule, console, Math, Array, String, Number, Boolean, encodeURIComponent });
+    script.runInContext(context);
+    const { numberToWordsSpanish, renderInvoicePdfSheetHtml } = fnModule.exports;
+
+    // 3a. Conversión numérica a letras en español
+    assert.equal(numberToWordsSpanish(1190000), 'UN MILLÓN CIENTO NOVENTA MIL PESOS M/CTE');
+    assert.equal(numberToWordsSpanish(400000), 'CUATROCIENTOS MIL PESOS M/CTE');
+    assert.equal(numberToWordsSpanish(790000), 'SETECIENTOS NOVENTA MIL PESOS M/CTE');
+    assert.equal(numberToWordsSpanish(35000), 'TREINTA Y CINCO MIL PESOS M/CTE');
+    assert.equal(numberToWordsSpanish(0), 'CERO PESOS M/CTE');
+    assert.equal(numberToWordsSpanish(2000000000), 'DOS MIL MILLONES PESOS M/CTE');
+    assert.equal(numberToWordsSpanish(1000000000), 'MIL MILLONES PESOS M/CTE');
+    assert.equal(numberToWordsSpanish(150000.75), 'CIENTO CINCUENTA MIL PESOS CON 75/100 M/CTE');
+    assert.equal(numberToWordsSpanish(1), 'UN PESO M/CTE');
+
+    // 3b. Representación Gráfica Completa - Factura PAGADA (Sin CUFE ni QR)
+    const mockInvoice = {
+      id: 99,
+      name: 'FE-00042',
+      invoice_date: '2026-10-27',
+      invoice_date_due: '2026-11-26',
+      move_type: 'out_invoice',
+      state: 'posted',
+      payment_state: 'paid',
+      partner_id: 10,
+      amount_untaxed: 1000000,
+      amount_tax: 190000,
+      amount_total: 1190000,
+      amount_residual: 0,
+      lines: [
+        { name: 'Perfil Ventana Serie 3825', quantity: 10, uom: 'Metro Lineal', price_unit: 100000, tax_rate: 19, subtotal: 1000000 }
+      ]
+    };
+
+    const paidHtml = renderInvoicePdfSheetHtml(mockInvoice);
+    assert.ok(paidHtml.includes('class="o_pdf_watermark is-paid">PAGADA</div>'), 'Debe incluir marca de agua PAGADA');
+    assert.ok(paidHtml.includes('class="o_pdf_stamp is-paid"'), 'Debe incluir sello oficial PAGADA');
+    assert.ok(paidHtml.includes('src="/assets/icons/logo.png"'), 'Debe mostrar el logo empresarial');
+    assert.ok(paidHtml.includes('GH Aluminios'), 'Debe incluir el nombre de la empresa');
+    assert.ok(paidHtml.includes('900.876.543-1'), 'Debe incluir NIT emisor');
+    assert.ok(paidHtml.includes('Arquitectura y Vidrios SAS'), 'Debe incluir nombre del cliente');
+    assert.ok(paidHtml.includes('901.234.567-8'), 'Debe incluir NIT receptor');
+    assert.ok(paidHtml.includes('Metro Lineal'), 'Debe mostrar UoM Metro Lineal');
+    assert.ok(paidHtml.includes('SON: UN MILLÓN CIENTO NOVENTA MIL PESOS M/CTE'), 'Debe incluir total en letras');
+    assert.ok(paidHtml.includes('Bancolombia Cuenta Corriente'), 'Debe mostrar datos de pago');
+    assert.ok(paidHtml.includes('Firma y Sello Emisor Autorizado'), 'Debe contener firma del emisor');
+    assert.ok(paidHtml.includes('Firma y Aceptación de Recibido'), 'Debe contener firma del receptor');
+    assert.ok(!paidHtml.includes('CUFE'), 'No debe contener referencias a CUFE');
+    assert.ok(!paidHtml.includes('o_pdf_qr_box'), 'No debe contener caja de código QR');
+
+    // 3c. Representación Gráfica - Factura BORRADOR
+    const draftInvoice = { ...mockInvoice, state: 'draft', payment_state: 'not_paid', amount_residual: 1190000 };
+    const draftHtml = renderInvoicePdfSheetHtml(draftInvoice);
+    assert.ok(draftHtml.includes('class="o_pdf_watermark is-draft">BORRADOR</div>'), 'Debe incluir marca de agua BORRADOR');
+    assert.ok(draftHtml.includes('class="o_pdf_stamp is-draft"'), 'Debe incluir sello BORRADOR');
+
+    // 3d. Representación Gráfica - Factura CANCELADA
+    const cancelInvoice = { ...mockInvoice, state: 'cancel', payment_state: 'not_paid' };
+    const cancelHtml = renderInvoicePdfSheetHtml(cancelInvoice);
+    assert.ok(cancelHtml.includes('class="o_pdf_watermark is-cancel">CANCELADA</div>'), 'Debe incluir marca de agua CANCELADA');
+    assert.ok(cancelHtml.includes('class="o_pdf_stamp is-cancel"'), 'Debe incluir sello ANULADA');
+
+    // 3e. Representación Gráfica - Factura con PAGO PARCIAL
+    const partialInvoice = { ...mockInvoice, state: 'posted', payment_state: 'partial', amount_residual: 400000 };
+    const partialHtml = renderInvoicePdfSheetHtml(partialInvoice);
+    assert.ok(partialHtml.includes('class="o_pdf_watermark is-partial">PAGO PARCIAL</div>'), 'Debe incluir marca de agua PAGO PARCIAL');
+    assert.ok(partialHtml.includes('class="o_pdf_stamp is-partial"'), 'Debe incluir sello PAGO PARCIAL');
+    assert.ok(partialHtml.includes('Saldo Pendiente:'), 'Debe indicar fila de saldo pendiente');
+
+    // 3f. Representación Gráfica - Factura VENCIDA (Overdue)
+    const overdueInvoice = { ...mockInvoice, state: 'posted', payment_state: 'not_paid', invoice_date_due: '2020-01-01', amount_residual: 1190000 };
+    const overdueHtml = renderInvoicePdfSheetHtml(overdueInvoice);
+    assert.ok(overdueHtml.includes('class="o_pdf_watermark is-overdue">VENCIDA</div>'), 'Debe incluir marca de agua VENCIDA');
+    assert.ok(overdueHtml.includes('class="o_pdf_stamp is-overdue"'), 'Debe incluir sello VENCIDA');
+
+    // 3g. Representación Gráfica - Descuentos en Líneas
+    const discountedInvoice = {
+      ...mockInvoice,
+      lines: [
+        { name: 'Perfil Ventana Serie 3825', quantity: 10, uom: 'Metro Lineal', price_unit: 100000, discount: 10, tax_rate: 19, subtotal: 900000 }
+      ]
+    };
+    const discHtml = renderInvoicePdfSheetHtml(discountedInvoice);
+    assert.ok(discHtml.includes('Dcto.'), 'Debe incluir columna Dcto. cuando hay descuento');
+    assert.ok(discHtml.includes('-10%'), 'Debe reflejar el porcentaje de descuento en la línea');
+  });
 });
-
-

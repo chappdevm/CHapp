@@ -2149,11 +2149,89 @@
     });
   }
 
+  function numberToWordsSpanish(n) {
+    const numVal = Number(n);
+    if (isNaN(numVal) || numVal === 0) return 'CERO PESOS M/CTE';
+    const isNeg = numVal < 0;
+    const absVal = Math.abs(numVal);
+    const integerPart = Math.floor(absVal);
+    const cents = Math.round((absVal - integerPart) * 100);
+
+    const UNIDADES = ['', 'UN', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE'];
+    const DECENAS_10_19 = ['DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISÉIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE'];
+    const DECENAS = ['', 'DIEZ', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA'];
+    const CENTENAS = ['', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS'];
+
+    function readGroup(num) {
+      if (num === 0) return '';
+      if (num === 100) return 'CIEN';
+      let str = '';
+      const c = Math.floor(num / 100);
+      const du = num % 100;
+      const d = Math.floor(du / 10);
+      const u = du % 10;
+      if (c > 0) str += CENTENAS[c] + ' ';
+      if (du >= 10 && du <= 19) {
+        str += DECENAS_10_19[du - 10] + ' ';
+      } else if (du >= 21 && du <= 29) {
+        str += (u === 1 ? 'VEINTIÚN' : 'VEINTI' + UNIDADES[u]) + ' ';
+      } else {
+        if (d > 0) str += DECENAS[d] + (u > 0 ? ' Y ' : ' ');
+        if (u > 0) str += UNIDADES[u] + ' ';
+      }
+      return str.trim();
+    }
+
+    const chunks = [];
+    let temp = integerPart;
+    while (temp > 0) {
+      chunks.push(temp % 1000);
+      temp = Math.floor(temp / 1000);
+    }
+
+    const c0 = chunks[0] || 0;
+    const c1 = chunks[1] || 0;
+    const c2 = chunks[2] || 0;
+    const c3 = chunks[3] || 0;
+
+    let milMillonesStr = '';
+    if (c3 > 0) {
+      milMillonesStr = c3 === 1 ? 'MIL' : readGroup(c3) + ' MIL';
+    }
+
+    let millonesStr = '';
+    if (c3 > 0 || c2 > 0) {
+      if (c3 > 0 && c2 === 0) {
+        millonesStr = milMillonesStr + ' MILLONES';
+      } else if (c3 > 0 && c2 > 0) {
+        millonesStr = milMillonesStr + ' ' + readGroup(c2) + ' MILLONES';
+      } else if (c2 === 1) {
+        millonesStr = 'UN MILLÓN';
+      } else {
+        millonesStr = readGroup(c2) + ' MILLONES';
+      }
+    }
+
+    let milesStr = '';
+    if (c1 > 0) {
+      milesStr = c1 === 1 ? 'MIL' : readGroup(c1) + ' MIL';
+    }
+
+    const unidadesStr = readGroup(c0);
+    let words = [millonesStr, milesStr, unidadesStr].filter(Boolean).join(' ').trim();
+    if (!words) words = 'CERO';
+
+    const currencyUnit = integerPart === 1 ? 'PESO' : 'PESOS';
+    const centsStr = cents > 0 ? (' CON ' + String(cents).padStart(2, '0') + '/100') : '';
+    const prefix = isNeg ? 'MENOS ' : '';
+    return (prefix + words + ' ' + currencyUnit + centsStr + ' M/CTE').toUpperCase().replace(/\s+/g, ' ');
+  }
+
   function renderInvoicePdfSheetHtml(invoice) {
     const company = state.data.settings || {};
     const partner = (state.data.contacts || []).find((c) => Number(c.id) === Number(invoice.partner_id)) || {
       name: invoice.partner_name || 'Consumidor Final',
-      vat: '',
+      vat: invoice.partner_vat || '222222222',
       doc_type: 'NIT',
       street: '',
       city: 'Pereira',
@@ -2163,42 +2241,109 @@
       email: ''
     };
 
-    const lines = invoice.lines || [];
+    const lines = invoice.lines && invoice.lines.length > 0 ? invoice.lines : [
+      { name: 'Venta de Bienes / Servicios', quantity: 1, uom: 'Und', price_unit: Number(invoice.amount_untaxed || invoice.amount_total || 0), tax_rate: 19, subtotal: Number(invoice.amount_untaxed || invoice.amount_total || 0) }
+    ];
     const linkedSale = (state.data.sales || []).find((s) => s.name === invoice.origin || s.name === invoice.ref);
     const totalSaleAmount = linkedSale ? Number(linkedSale.amount_total || 0) : Number(invoice.order_total || invoice.amount_total);
     const isAbono = invoice.is_installment || Boolean(invoice.installment_number) || Boolean(invoice.order_residual !== undefined && invoice.order_residual !== null && invoice.order_residual > 0);
 
+    const isCancel = invoice.state === 'cancel';
+    const isDraft = invoice.state === 'draft';
+    const isPaid = invoice.payment_state === 'paid' || (invoice.state === 'posted' && Number(invoice.amount_residual ?? 0) <= 0.001);
+    const isPartial = !isPaid && !isDraft && !isCancel && (invoice.payment_state === 'partial' || (Number(invoice.amount_residual || 0) < Number(invoice.amount_total || 0) && Number(invoice.amount_residual || 0) > 0));
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const isOverdue = !isPaid && !isDraft && !isCancel && !isPartial && Boolean(invoice.invoice_date_due && invoice.invoice_date_due < todayStr);
+
+    let watermarkHtml = '';
+    if (isPaid) {
+      watermarkHtml = '<div class="o_pdf_watermark is-paid">PAGADA</div>';
+    } else if (isDraft) {
+      watermarkHtml = '<div class="o_pdf_watermark is-draft">BORRADOR</div>';
+    } else if (isCancel) {
+      watermarkHtml = '<div class="o_pdf_watermark is-cancel">CANCELADA</div>';
+    } else if (isPartial) {
+      watermarkHtml = '<div class="o_pdf_watermark is-partial">PAGO PARCIAL</div>';
+    } else if (isOverdue) {
+      watermarkHtml = '<div class="o_pdf_watermark is-overdue">VENCIDA</div>';
+    }
+
+    let stampHtml = '';
+    if (isPaid) {
+      stampHtml = '<div class="o_pdf_stamp is-paid"><span class="stamp-inner">✓ PAGADA</span><span class="stamp-sub">CANCELADA TOTAL</span></div>';
+    } else if (isDraft) {
+      stampHtml = '<div class="o_pdf_stamp is-draft"><span class="stamp-inner">✎ BORRADOR</span><span class="stamp-sub">SIN VALIDEZ FISCAL</span></div>';
+    } else if (isCancel) {
+      stampHtml = '<div class="o_pdf_stamp is-cancel"><span class="stamp-inner">✕ ANULADA</span><span class="stamp-sub">DOCUMENTO CANCELADO</span></div>';
+    } else if (isPartial) {
+      stampHtml = '<div class="o_pdf_stamp is-partial"><span class="stamp-inner">◐ PAGO PARCIAL</span><span class="stamp-sub">SALDO PENDIENTE</span></div>';
+    } else if (isOverdue) {
+      stampHtml = '<div class="o_pdf_stamp is-overdue"><span class="stamp-inner">⚠ VENCIDA</span><span class="stamp-sub">PAGO MOROSO</span></div>';
+    } else {
+      stampHtml = '<div class="o_pdf_stamp is-posted"><span class="stamp-inner">★ PUBLICADA</span><span class="stamp-sub">POR COBRAR</span></div>';
+    }
+
+
+    const paymentTerm = partner.payment_term || '30 Días';
+    const isCredit = /d[ií]as/i.test(paymentTerm);
+    const paymentTypeDesc = isCredit ? `Crédito (${paymentTerm})` : 'Contado';
+    const paymentMethodDesc = invoice.journal_name || (isCredit ? 'Crédito Comercial' : 'Transferencia Electrónica / Bancaria');
+
+    const totalUntaxed = Number(invoice.amount_untaxed || 0);
+    const totalTax = Number(invoice.amount_tax || 0);
+    const totalAmount = Number(invoice.amount_total || 0);
+    const residualAmount = Number(invoice.amount_residual ?? 0);
+    const paidAmount = Math.max(0, totalAmount - residualAmount);
+
+    const hasDiscounts = lines.some((l) => Number(l.discount || 0) > 0);
+    const totalDiscount = lines.reduce((sum, l) => {
+      const gross = Number(l.quantity || 1) * Number(l.price_unit || 0);
+      return sum + (gross * (Number(l.discount || 0) / 100));
+    }, 0);
+
     return `
       <div class="o_pdf_sheet" id="invoicePdfSheet">
+        ${watermarkHtml}
+
         <div class="o_pdf_brand_header">
           <div class="o_pdf_company_info">
+            <img src="/assets/icons/logo.png" alt="GH Aluminios" class="o_pdf_company_logo" onerror="this.style.display='none'" />
             <h2>${esc(company.company_name || 'GH Aluminios')}</h2>
-            <p><strong>NIT:</strong> ${esc(company.company_vat || '900.876.543-1')}</p>
-            <p>${esc(company.fiscal_regime || 'Responsable de IVA - Régimen Ordinario')}</p>
-            <p>${esc(company.company_address || 'Cra. 7 #18-45')} · ${esc(company.company_city || 'Pereira')}, Colombia</p>
-            <p>Email: ${esc(company.company_email || 'chappdevm@gmail.com')}</p>
+            <p><strong>NIT:</strong> ${esc(company.company_vat || '900.876.543-1')} · <span>${esc(company.fiscal_regime || 'Responsable de IVA - Régimen Ordinario')}</span></p>
+            <p>${esc(company.company_address || 'Cra. 7 #18-45')} · ${esc(company.company_city || 'Pereira')}, ${esc(company.company_country || 'Colombia')}</p>
+            <p>Email: ${esc(company.company_email || 'chappdevm@gmail.com')} · PBX: (606) 315-0000</p>
           </div>
           <div class="o_pdf_doc_box">
             <div class="doc_type_title">${invoice.move_type === 'in_invoice' ? 'Factura Proveedor' : 'Factura de Venta'}</div>
             <div class="doc_number">${esc(invoice.name)}</div>
-            <div style="font-size: 0.76rem; color: #4b5563;">Fecha: <strong>${esc(invoice.invoice_date || '')}</strong></div>
-            <div style="font-size: 0.76rem; color: #4b5563;">Vence: <strong>${esc(invoice.invoice_date_due || '')}</strong></div>
-            ${invoice.origin ? `<div style="font-size: 0.74rem; color: #1e40af; margin-top: 4px;">Orden: <strong>${esc(invoice.origin)}</strong></div>` : ''}
+            <div class="o_pdf_doc_meta">
+              <div class="o_pdf_doc_meta_row"><span>Emisión:</span><strong>${esc(invoice.invoice_date || '')}</strong></div>
+              <div class="o_pdf_doc_meta_row"><span>Vencimiento:</span><strong>${esc(invoice.invoice_date_due || '')}</strong></div>
+              ${invoice.origin ? `<div class="o_pdf_doc_meta_row"><span>Orden Origen:</span><strong style="color: #1e40af;">${esc(invoice.origin)}</strong></div>` : ''}
+              <div class="o_pdf_doc_meta_row"><span>Forma de Pago:</span><strong>${esc(paymentTypeDesc)}</strong></div>
+            </div>
+            ${stampHtml}
           </div>
+        </div>
+
+        <div class="o_pdf_resolution_bar">
+          Resolución DIAN No. 18764000001 de 2026-01-15 · Habilitación Técnica Factura Electrónica · Rango Autorizado: FE-00001 al FE-99999 · Vigencia: 24 Meses
         </div>
 
         <div class="o_pdf_client_section">
           <div class="o_pdf_client_col">
-            <p style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: #6b7280;">Adquiriente / Cliente</p>
-            <p style="font-size: 0.95rem; font-weight: 700; color: #111827;">${esc(partner.name)}</p>
-            <p><strong>${esc(partner.doc_type || 'NIT')}:</strong> ${esc(partner.vat || 'No registrado')}</p>
+            <div class="o_pdf_col_title">Adquiriente / Cliente</div>
+            <p style="font-size: 0.95rem; font-weight: 700; color: #0f172a; margin-bottom: 0.35rem;">${esc(partner.name)}</p>
+            <p><strong>Cédula / NIT:</strong> ${esc(partner.doc_type || (partner.is_company ? 'NIT' : 'CC'))} ${esc(partner.vat || 'No registrado')}</p>
             <p><strong>Dirección:</strong> ${esc([partner.street, partner.city, partner.state_name].filter(Boolean).join(', ') || 'Pereira, Risaralda')}</p>
+            <p><strong>Ciudad / País:</strong> ${esc(partner.city || 'Pereira')}, ${esc(partner.state_name || 'Risaralda')} - Colombia</p>
           </div>
           <div class="o_pdf_client_col">
-            <p style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: #6b7280;">Datos de Contacto</p>
-            <p><strong>Tel / Celular:</strong> ${esc([partner.mobile, partner.phone].filter(Boolean).join(' / ') || 'No registrado')}</p>
+            <div class="o_pdf_col_title">Datos de Contacto y Comerciales</div>
+            <p><strong>Celular / Teléfono:</strong> ${esc([partner.mobile, partner.phone].filter(Boolean).join(' / ') || 'No registrado')}</p>
             <p><strong>Correo:</strong> ${esc(partner.email || 'No registrado')}</p>
-            <p><strong>Forma de Pago:</strong> ${esc(partner.payment_term || '30 Días')}</p>
+            <p><strong>Forma de Pago:</strong> ${esc(paymentTerm)}</p>
+            <p><strong>Medio de Pago:</strong> ${esc(paymentMethodDesc)}</p>
           </div>
         </div>
 
@@ -2259,114 +2404,429 @@
         <table class="o_pdf_items_table">
           <thead>
             <tr>
+              <th style="width: 32px; text-align: center;">#</th>
               <th>Concepto / Producto</th>
-              <th style="width: 50px; text-align: center;">Cant.</th>
+              <th style="width: 75px; text-align: center;">Unidad</th>
+              <th style="width: 55px; text-align: center;">Cant.</th>
               <th style="width: 105px; text-align: right;">Vr. Unitario</th>
+              ${hasDiscounts ? '<th style="width: 60px; text-align: center;">Dcto.</th>' : ''}
               <th style="width: 65px; text-align: center;">IVA</th>
               <th style="width: 110px; text-align: right;">Subtotal</th>
             </tr>
           </thead>
           <tbody>
-            ${lines.map((l) => `
-              <tr>
-                <td><strong>${esc(l.name)}</strong></td>
-                <td style="text-align: center;">${l.quantity || 1}</td>
-                <td style="text-align: right;">${formatMoney(l.price_unit || 0)}</td>
-                <td style="text-align: center;">${l.tax_rate ?? 19}%</td>
-                <td style="text-align: right;"><strong>${formatMoney(l.subtotal || (Number(l.quantity || 1) * Number(l.price_unit || 0)))}</strong></td>
-              </tr>
-            `).join('')}
+            ${lines.map((l, idx) => {
+              const qty = Number(l.quantity || 1);
+              const price = Number(l.price_unit || 0);
+              const disc = Number(l.discount || 0);
+              const calcSub = l.subtotal !== undefined && l.subtotal !== null ? Number(l.subtotal) : (qty * price * (1 - disc / 100));
+              return `
+                <tr>
+                  <td class="text-center" style="color: #64748b;">${idx + 1}</td>
+                  <td><strong>${esc(l.name)}</strong></td>
+                  <td class="text-center" style="color: #64748b;">${esc(l.uom || (l.name && l.name.toLowerCase().includes('perfil') ? 'Metro Lineal' : 'Und'))}</td>
+                  <td class="text-center">${qty}</td>
+                  <td class="text-end">${formatMoney(price)}</td>
+                  ${hasDiscounts ? `<td class="text-center" style="color: ${disc > 0 ? '#b91c1c' : '#64748b'};">${disc > 0 ? `-${disc}%` : '0%'}</td>` : ''}
+                  <td class="text-center">${l.tax_rate ?? 19}%</td>
+                  <td class="text-end"><strong>${formatMoney(calcSub)}</strong></td>
+                </tr>
+              `;
+            }).join('')}
           </tbody>
         </table>
 
-        <div class="o_pdf_totals_section">
-          <table class="o_pdf_totals_table">
-            <tr>
-              <td>Subtotal:</td>
-              <td style="text-align: right;"><strong>${formatMoney(invoice.amount_untaxed || 0)}</strong></td>
-            </tr>
-            <tr>
-              <td>IVA (19%):</td>
-              <td style="text-align: right;"><strong>${formatMoney(invoice.amount_tax || 0)}</strong></td>
-            </tr>
-            <tr class="is-grand-total">
-              <td>TOTAL:</td>
-              <td style="text-align: right;">${formatMoney(invoice.amount_total || 0)}</td>
-            </tr>
-            ${invoice.amount_residual > 0 ? `
-              <tr style="color: #dc2626; font-weight: 600;">
-                <td>Saldo Pendiente:</td>
-                <td style="text-align: right;">${formatMoney(invoice.amount_residual)}</td>
+        <div class="o_pdf_bottom_grid">
+          <div class="o_pdf_bottom_left">
+            <div class="o_pdf_amount_words">
+              <span class="label">Total en Letras:</span>
+              <span class="words">SON: ${numberToWordsSpanish(totalAmount)}</span>
+            </div>
+
+            <div class="o_pdf_bank_info">
+              <strong>Instrucciones de Pago / Consignación:</strong><br/>
+              Bancolombia Cuenta Corriente No. <strong>452-892100-34</strong><br/>
+              Titular: <strong>GH Aluminios</strong> (NIT: ${esc(company.company_vat || '900.876.543-1')})<br/>
+              Favor enviar comprobante a: <em>${esc(company.company_email || 'chappdevm@gmail.com')}</em>
+            </div>
+
+          </div>
+
+          <div class="o_pdf_totals_section">
+            <table class="o_pdf_totals_table">
+              <tr>
+                <td>Subtotal:</td>
+                <td style="text-align: right;"><strong>${formatMoney(totalUntaxed)}</strong></td>
               </tr>
-            ` : `
-              <tr style="color: #059669; font-weight: 600;">
-                <td>Estado Pago:</td>
-                <td style="text-align: right;">PAGADA</td>
+              ${totalDiscount > 0 ? `
+                <tr style="color: #b91c1c; font-size: 0.76rem;">
+                  <td>Descuento Comercial:</td>
+                  <td style="text-align: right;">- ${formatMoney(totalDiscount)}</td>
+                </tr>
+              ` : ''}
+              <tr>
+                <td>Base Gravable (19%):</td>
+                <td style="text-align: right;">${formatMoney(totalUntaxed)}</td>
               </tr>
-            `}
-          </table>
+              <tr>
+                <td>IVA (19%):</td>
+                <td style="text-align: right;"><strong>${formatMoney(totalTax)}</strong></td>
+              </tr>
+              <tr class="is-grand-total">
+                <td>TOTAL:</td>
+                <td style="text-align: right;">${formatMoney(totalAmount)}</td>
+              </tr>
+              ${paidAmount > 0 && residualAmount > 0 ? `
+                <tr style="color: #059669; font-size: 0.76rem;">
+                  <td>Abonos / Pagos Aplicados:</td>
+                  <td style="text-align: right;">- ${formatMoney(paidAmount)}</td>
+                </tr>
+              ` : ''}
+              ${residualAmount > 0 ? `
+                <tr class="is-residual-row">
+                  <td>Saldo Pendiente:</td>
+                  <td style="text-align: right;">${formatMoney(residualAmount)}</td>
+                </tr>
+              ` : `
+                <tr class="is-paid-row">
+                  <td>Estado Pago:</td>
+                  <td style="text-align: right;">PAGADA</td>
+                </tr>
+              `}
+            </table>
+          </div>
+        </div>
+
+        <div class="o_pdf_signatures_section">
+          <div class="o_pdf_sign_box">
+            <div class="sign_line"></div>
+            <div class="sign_name">${esc(company.company_name || 'GH Aluminios')}</div>
+            <div class="sign_title">Firma y Sello Emisor Autorizado</div>
+            <div class="sign_sub">NIT: ${esc(company.company_vat || '900.876.543-1')}</div>
+          </div>
+          <div class="o_pdf_sign_box">
+            <div class="sign_line"></div>
+            <div class="sign_name">${esc(partner.name || 'Adquiriente')}</div>
+            <div class="sign_title">Firma y Aceptación de Recibido</div>
+            <div class="sign_sub">C.C. / NIT: ____________________ Fecha: ____/____/2026</div>
+          </div>
         </div>
 
         <div class="o_pdf_legal_footer">
-          Esta factura de venta es título valor conforme al Código de Comercio colombiano.<br/>
-          Generado automáticamente por <strong>GH Aluminios</strong> — CHapp ERP.
+          Esta factura de venta es título valor conforme al Código de Comercio colombiano (Arts. 772, 773 y 774) y Ley 1231 de 2008.<br/>
+          La firma o constancia de recibido implica la aceptación plena de las mercancías y servicios descritos.<br/>
+          Generado automáticamente por <strong>GH Aluminios</strong> — CHapp ERP Odoo 20 Edition.
         </div>
       </div>
     `;
   }
 
-  function downloadInvoicePdf(invoice) {
+  function downloadInvoicePdf(invoice, autoPrint = false) {
     const company = state.data.settings || {};
     const sheetHtml = renderInvoicePdfSheetHtml(invoice);
+    const printScript = autoPrint ? '<script>window.onload = function() { window.print(); };</script>' : '';
 
     const fullHtml = `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <title>Factura ${invoice.name} - ${company.company_name || 'GH Aluminios'}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Factura ${esc(invoice.name)} - ${esc(company.company_name || 'GH Aluminios')}</title>
   <style>
-    body { margin: 0; padding: 24px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #fff; color: #111; }
-    .o_pdf_sheet { max-width: 800px; margin: 0 auto; padding: 24px; border: 1px solid #ddd; }
-    .o_pdf_brand_header { display: flex; justify-content: space-between; border-bottom: 2px solid #031626; padding-bottom: 12px; margin-bottom: 16px; }
-    .o_pdf_company_info h2 { margin: 0 0 4px 0; color: #031626; }
-    .o_pdf_company_info p { margin: 2px 0; font-size: 13px; color: #444; }
-    .o_pdf_doc_box { border: 1.5px solid #031626; padding: 10px 16px; text-align: center; border-radius: 6px; background: #f8fafc; }
-    .doc_type_title { font-weight: bold; font-size: 13px; }
-    .doc_number { font-size: 18px; font-weight: bold; color: #e11d48; margin: 4px 0; }
-    .o_pdf_client_section { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 6px; margin-bottom: 16px; }
-    .o_pdf_client_col p { margin: 3px 0; font-size: 13px; }
-    .o_pdf_trace_box { background: #eff6ff; border: 1.5px dashed #3b82f6; border-radius: 6px; padding: 10px 14px; margin-bottom: 16px; font-size: 13px; }
-    .o_pdf_items_table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 13px; }
-    .o_pdf_items_table th { background: #031626; color: #fff; padding: 8px 10px; text-align: left; }
-    .o_pdf_items_table td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; }
-    .o_pdf_items_table tr:nth-child(even) td { background: #f8fafc; }
-    .o_pdf_totals_section { display: flex; justify-content: flex-end; margin-bottom: 16px; }
-    .o_pdf_totals_table { width: 260px; border-collapse: collapse; font-size: 14px; }
-    .o_pdf_totals_table td { padding: 4px 8px; }
-    .is-grand-total td { font-weight: bold; font-size: 16px; border-top: 2px solid #031626; padding-top: 8px; }
-    .o_pdf_legal_footer { border-top: 1px solid #e2e8f0; padding-top: 12px; font-size: 11px; color: #666; text-align: center; }
-    @media print {
-      body { padding: 0; }
-      .o_pdf_sheet { border: none; padding: 0; max-width: 100%; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #031626;
+      color: #1e293b;
     }
+    .o_pdf_sheet {
+      position: relative;
+      overflow: hidden;
+      max-width: 840px;
+      margin: 0 auto;
+      padding: 2.2rem 2rem;
+      background: #ffffff;
+      border: 1px solid #cbe0f1;
+      border-radius: 6px;
+      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3);
+      font-size: 0.82rem;
+      line-height: 1.45;
+    }
+    .o_pdf_watermark {
+      position: absolute;
+      top: 48%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-28deg);
+      font-size: 4.8rem;
+      font-weight: 900;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      pointer-events: none;
+      user-select: none;
+      z-index: 1;
+      border: 6px dashed currentColor;
+      padding: 0.6rem 2.2rem;
+      border-radius: 12px;
+      line-height: 1;
+      white-space: nowrap;
+    }
+    .o_pdf_watermark.is-paid { color: #22b053; opacity: 0.12; border-style: double; border-width: 8px; }
+    .o_pdf_watermark.is-draft { color: #5593c2; opacity: 0.10; }
+    .o_pdf_watermark.is-cancel { color: #cb2f2f; opacity: 0.12; }
+    .o_pdf_watermark.is-partial { color: #14B5D9; opacity: 0.12; }
+    .o_pdf_watermark.is-overdue { color: #cb2f2f; opacity: 0.12; }
+    .o_pdf_stamp {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid currentColor;
+      border-radius: 6px;
+      padding: 3px 10px;
+      text-transform: uppercase;
+      font-weight: 800;
+      line-height: 1.15;
+      margin-top: 6px;
+      letter-spacing: 0.04em;
+    }
+    .o_pdf_stamp.is-paid { color: #22b053; border-color: #22b053; background: #ecfdf5; }
+    .o_pdf_stamp.is-draft { color: #5593c2; border-color: #93bee0; background: #f0f7fc; }
+    .o_pdf_stamp.is-cancel { color: #cb2f2f; border-color: #cb2f2f; background: #fef2f2; }
+    .o_pdf_stamp.is-partial { color: #074073; border-color: #14B5D9; background: #f0f9ff; }
+    .o_pdf_stamp.is-overdue { color: #cb2f2f; border-color: #cb2f2f; background: #fef2f2; }
+    .o_pdf_stamp.is-posted { color: #074073; border-color: #14B5D9; background: #f0f7fc; }
+    .o_pdf_stamp .stamp-inner { font-size: 0.8rem; font-weight: 800; }
+    .o_pdf_stamp .stamp-sub { font-size: 0.62rem; font-weight: 700; opacity: 0.85; letter-spacing: 0.06em; }
+    .o_pdf_brand_header {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2.5px solid #074073;
+      padding-bottom: 0.85rem;
+      margin-bottom: 0.75rem;
+      gap: 1rem;
+    }
+    .o_pdf_company_info { flex: 1; }
+    .o_pdf_company_logo { max-height: 54px; max-width: 170px; object-fit: contain; margin-bottom: 0.4rem; display: block; }
+    .o_pdf_company_info h2 { font-size: 1.35rem; font-weight: 800; color: #074073; margin: 0 0 0.25rem 0; letter-spacing: 0.01em; }
+    .o_pdf_company_info p { margin: 0.15rem 0; font-size: 0.77rem; color: #4b5563; }
+    .o_pdf_company_info p strong { color: #074073; }
+    .o_pdf_doc_box {
+      background: #f8fafc;
+      border: 2px solid #074073;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      text-align: center;
+      min-width: 195px;
+      box-shadow: 0 2px 4px rgba(7, 64, 115, 0.08);
+    }
+    .doc_type_title {
+      font-size: 0.82rem;
+      font-weight: 800;
+      color: #ffffff;
+      background: #074073;
+      border-bottom: 2px solid #14B5D9;
+      margin: -0.75rem -1rem 0.6rem -1rem;
+      padding: 0.35rem 0.5rem;
+      border-radius: 5px 5px 0 0;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .doc_number { font-size: 1.18rem; font-weight: 800; color: #074073; margin: 0.25rem 0; font-variant-numeric: tabular-nums; }
+    .o_pdf_doc_meta { display: flex; flex-direction: column; gap: 0.2rem; margin-top: 0.4rem; border-top: 1px dashed #cbd5e1; padding-top: 0.4rem; }
+    .o_pdf_doc_meta_row { display: flex; justify-content: space-between; font-size: 0.74rem; color: #4b5563; }
+    .o_pdf_doc_meta_row strong { color: #074073; }
+    .o_pdf_resolution_bar {
+      position: relative;
+      z-index: 2;
+      background: #f0f7fc;
+      border: 1px solid #cbe0f1;
+      border-left: 3px solid #14B5D9;
+      border-radius: 4px;
+      padding: 0.4rem 0.75rem;
+      font-size: 0.68rem;
+      color: #074073;
+      text-align: center;
+      margin-bottom: 0.85rem;
+      line-height: 1.35;
+    }
+    .o_pdf_client_section {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      background: #f8fafc;
+      border: 1px solid #cbe0f1;
+      border-top: 2px solid #074073;
+      border-radius: 6px;
+      padding: 0.85rem 1rem;
+      margin-bottom: 0.85rem;
+    }
+    .o_pdf_client_col .o_pdf_col_title {
+      font-size: 0.7rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #074073;
+      margin-bottom: 0.35rem;
+      border-bottom: 1.5px solid #14B5D9;
+      padding-bottom: 0.2rem;
+    }
+    .o_pdf_client_col p { margin: 0.22rem 0; font-size: 0.78rem; color: #334155; }
+    .o_pdf_client_col p strong { color: #074073; }
+    .o_pdf_trace_box {
+      position: relative;
+      z-index: 2;
+      background: #f0f9ff;
+      border: 1.5px dashed #14B5D9;
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      margin-bottom: 0.85rem;
+      font-size: 0.79rem;
+    }
+    .o_pdf_trace_box strong { color: #074073; }
+    .o_pdf_payments_history_box {
+      position: relative;
+      z-index: 2;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      margin-bottom: 0.85rem;
+    }
+    .o_pdf_subtable { width: 100%; border-collapse: collapse; font-size: 0.74rem; margin-top: 0.35rem; }
+    .o_pdf_subtable th { background: #dcfce7; color: #166534; padding: 0.3rem 0.5rem; text-align: left; font-weight: 700; border-bottom: 1px solid #86efac; }
+    .o_pdf_subtable td { padding: 0.35rem 0.5rem; border-bottom: 1px solid #bbf7d0; }
+    .o_pdf_items_table {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 0.95rem;
+      font-size: 0.78rem;
+    }
+    .o_pdf_items_table thead { display: table-header-group !important; }
+    .o_pdf_items_table tbody { display: table-row-group; }
+    .o_pdf_items_table th {
+      background: #074073;
+      color: #ffffff;
+      border-bottom: 2px solid #14B5D9;
+      padding: 0.5rem 0.6rem;
+      text-align: left;
+      font-weight: 700;
+      font-size: 0.73rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .o_pdf_items_table th:first-child { border-top-left-radius: 4px; }
+    .o_pdf_items_table th:last-child { border-top-right-radius: 4px; }
+    .o_pdf_items_table td { padding: 0.5rem 0.6rem; border-bottom: 1px solid #e2e8f0; color: #334155; vertical-align: middle; }
+    .o_pdf_items_table tr:nth-child(even) td { background: #f8fafc; }
+    .o_pdf_items_table .text-center { text-align: center; }
+    .o_pdf_items_table .text-end { text-align: right; font-variant-numeric: tabular-nums; }
+    .o_pdf_bottom_grid {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: 1.25fr 1fr;
+      gap: 1.25rem;
+      margin-bottom: 1rem;
+      align-items: start;
+    }
+    .o_pdf_bottom_left { display: flex; flex-direction: column; gap: 0.65rem; }
+    .o_pdf_amount_words {
+      background: #f0f7fc;
+      border-left: 4px solid #14B5D9;
+      border-top: 1px solid #cbe0f1;
+      border-right: 1px solid #cbe0f1;
+      border-bottom: 1px solid #cbe0f1;
+      border-radius: 0 4px 4px 0;
+      padding: 0.55rem 0.8rem;
+      font-size: 0.74rem;
+      color: #074073;
+      line-height: 1.4;
+    }
+    .o_pdf_amount_words .label { font-weight: 700; text-transform: uppercase; font-size: 0.67rem; color: #5593c2; display: block; margin-bottom: 0.15rem; }
+    .o_pdf_amount_words .words { font-weight: 700; color: #074073; }
+    .o_pdf_bank_info {
+      background: #f0f7fc;
+      border: 1px solid #cbe0f1;
+      border-left: 4px solid #074073;
+      border-radius: 0 4px 4px 0;
+      padding: 0.55rem 0.8rem;
+      font-size: 0.72rem;
+      color: #074073;
+      line-height: 1.45;
+    }
+    .o_pdf_bank_info strong { color: #074073; }
+    .o_pdf_totals_section { display: flex; justify-content: flex-end; }
+    .o_pdf_totals_table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+      background: #ffffff;
+      border: 1px solid #cbe0f1;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .o_pdf_totals_table td { padding: 0.38rem 0.65rem; border-bottom: 1px solid #f1f5f9; }
+    .o_pdf_totals_table .is-grand-total td {
+      font-size: 1.05rem;
+      font-weight: 800;
+      border-top: 2px solid #14B5D9;
+      border-bottom: 2px solid #14B5D9;
+      background: #074073;
+      color: #ffffff;
+      padding: 0.5rem 0.65rem;
+    }
+    .o_pdf_totals_table .is-residual-row td { color: #cb2f2f; font-weight: 700; background: #fef2f2; }
+    .o_pdf_totals_table .is-paid-row td { color: #22b053; font-weight: 700; background: #ecfdf5; }
+    .o_pdf_signatures_section {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      margin: 1.25rem 0 1rem 0;
+      padding-top: 0.5rem;
+    }
+    .o_pdf_sign_box { text-align: center; padding: 0 1rem; }
+    .o_pdf_sign_box .sign_line { border-bottom: 1.5px solid #074073; margin-bottom: 0.45rem; height: 38px; }
+    .o_pdf_sign_box .sign_name { font-size: 0.78rem; font-weight: 700; color: #074073; }
+    .o_pdf_sign_box .sign_title { font-size: 0.68rem; color: #14B5D9; text-transform: uppercase; font-weight: 700; }
+    .o_pdf_sign_box .sign_sub { font-size: 0.66rem; color: #4b5563; margin-top: 0.15rem; }
   </style>
 </head>
 <body>
   ${sheetHtml}
-  <script>
-    window.onload = function() { window.print(); };
-  </script>
+  ${printScript}
 </body>
 </html>`;
 
-    const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const win = window.open(url, '_blank');
-    if (!win) {
+    if (autoPrint) {
+      const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, '_blank');
+      if (!win) {
+        window.print();
+      }
+    } else {
+      const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Factura_${invoice.name.replace(/\//g, '_')}.html`;
+      a.download = `Factura_${(invoice.name || 'documento').replace(/[\/\\]/g, '_')}.html`;
+      document.body.appendChild(a);
       a.click();
+      setTimeout(() => {
+        if (a.parentNode) a.parentNode.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 1000);
     }
   }
 
@@ -3942,7 +4402,7 @@
     if (btnDownloadPdf) {
       btnDownloadPdf.addEventListener('click', () => {
         syncMoveDraft();
-        downloadInvoicePdf(previewData);
+        downloadInvoicePdf(previewData, false);
       });
     }
 
@@ -3950,7 +4410,7 @@
     if (btnPrintPdf) {
       btnPrintPdf.addEventListener('click', () => {
         syncMoveDraft();
-        downloadInvoicePdf(previewData);
+        downloadInvoicePdf(previewData, true);
       });
     }
   }
