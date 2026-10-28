@@ -1,17 +1,18 @@
-# CHapp ERP — Basado en Odoo 20 Enterprise
+# CHapp ERP — GH Aluminios Enterprise
 
-Aplicación web ERP inspirada y construida tomando la arquitectura visual, paleta de diseño, iconos vectoriales y flujos funcionales de la instalación local de **Odoo 20** (`C:\Program Files\Odoo 20`).
+Aplicación web ERP de alto rendimiento con arquitectura limpia, diseño profesional, iconos vectoriales y flujos de negocio optimizados para GH Aluminios.
 
 ---
 
-## ✨ Módulos Incluidos (Base Odoo 20)
+## ✨ Módulos Incluidos
 
 1. **Contactos (`res.partner`)**:
-   - Vistas **Kanban**, **Lista** y **Formulario Odoo Sheet**.
+   - Vistas **Kanban**, **Lista** y **Formulario de Ficha Técnica**.
    - Clasificación Compañía / Individual, NIT/CC, etiquetas, plazos de pago y **Smart Buttons** conectados en tiempo real con las Ventas, Facturas y Gastos de cada tercero.
 2. **Gastos (`hr.expense`)**:
    - Tablero superior de estados (`Por Enviar`, `Esperando Aprobación`, `Por Contabilizar`, `Por Reembolsar`, `Pagados`).
-   - Flujo completo Odoo 20: `Borrador` ➔ `Enviar al Gerente` ➔ `Aprobar` ➔ `Publicar Asiento Contable` (genera automáticamente el asiento en **Contabilidad**) ➔ `Registrar Reembolso / Pago`.
+   - Flujo completo de gastos: `Borrador` ➔ `Enviar al Gerente` ➔ `Aprobar` ➔ `Publicar Asiento Contable` (genera automáticamente el asiento en **Contabilidad**) ➔ `Registrar Reembolso / Pago`.
+   - Escáner de facturas con IA (Gemini Vision) y autocompletado inteligente de proveedores.
 3. **Ventas (`sale.order` & `product.template`)**:
    - Gestión de **Cotizaciones**, **Pedidos de Venta** y **Catálogo de Productos**.
    - Editor dinámico de líneas de pedido con cálculo automático de Base Imponible, Descuentos, IVA y Total.
@@ -20,7 +21,7 @@ Aplicación web ERP inspirada y construida tomando la arquitectura visual, palet
    - **Tablero Contable** por diarios (`Facturas de Clientes`, `Facturas de Proveedores`, `Banco Bancolombia`, `Gastos y Operaciones Varias`).
    - Facturación de clientes y proveedores, visualización de **Apuntes Contables de Partida Doble (Debe / Haber)** en cuentas PUC, registro de pagos parciales o totales mediante modal nativo, y **Plan Único de Cuentas (PUC)**.
 5. **Ajustes (`res.config.settings`)**:
-   - Configuración de la compañía, moneda (`COP`, `USD`, `EUR`), alternancia entre **Modo Oscuro Odoo 20** y **Modo Claro**, parámetros de ventas/impuestos, exportación de respaldo JSON y restauración de datos demo.
+   - Configuración de la compañía, moneda (`COP`, `USD`, `EUR`), alternancia entre **Modo Oscuro** y **Modo Claro**, parámetros de ventas/impuestos, exportación de respaldo JSON y restauración de datos demo.
 
 ---
 
@@ -58,4 +59,3 @@ SUPABASE_SERVICE_ROLE_KEY=<tu-service-role-key>
 - **PostgREST Nativo:** Comunicación HTTP sin clientes pesados, permitiendo arranques en frío ultrarrápidos en serverless.
 - **Fallback Transparente:** Si las variables no están presentes o se trabaja sin conexión, CHapp ERP continúa operando fluidamente utilizando almacenamiento local en `data/db.json` (o `/tmp` en serverless).
 - **Esquema Relacional (`supabase_schema.sql`):** Estructura relacional con las tablas `res_partner`, `product_template`, `hr_expense`, `sale_order`, `sale_order_line`, `account_move`, `account_payment` y `res_config_settings`.
-

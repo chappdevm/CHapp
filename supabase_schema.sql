@@ -1,6 +1,6 @@
 -- ============================================================================
 -- CHapp ERP — Esquema Relacional Base (PostgreSQL / Supabase)
--- Basado en el modelo de datos de Odoo 20:
+-- Esquema relacional de tablas principales:
 --   res_partner (Contactos), product_template (Productos),
 --   hr_expense (Gastos), sale_order & sale_order_line (Ventas),
 --   account_move & account_payment (Contabilidad), res_config_settings (Ajustes)

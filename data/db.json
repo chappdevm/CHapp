@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "20.0.1.0",
-    "based_on": "Odoo 20 Enterprise",
+    "based_on": "CHapp ERP Enterprise",
     "sequences": {
       "contact": 5,
       "product": 3,

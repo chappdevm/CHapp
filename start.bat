@@ -1,7 +1,7 @@
 @echo off
-title CHapp ERP - Basado en Odoo 20
+title CHapp ERP - GH Aluminios
 echo ========================================================
-echo   Iniciando servidor local para CHapp ERP (Odoo 20)...
+echo   Iniciando servidor local para CHapp ERP...
 echo   URL: http://localhost:3000
 echo ========================================================
 start http://localhost:3000

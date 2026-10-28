@@ -292,7 +292,7 @@ if (require.main === module) {
     const { getSupabaseConfig } = require('./server/supabase');
     const supa = getSupabaseConfig();
     console.log('====================================================');
-    console.log('  CHapp ERP — Basado en Odoo 20 Enterprise');
+    console.log('  CHapp ERP — GH Aluminios Enterprise');
     console.log(`  URL: http://localhost:${PORT}`);
     console.log(`  Supabase: ${supa.enabled ? 'CONECTADO (' + (supa.isServiceRole ? 'service_role' : 'anon/público') + ')' : 'DESACTIVADO (almacenamiento local)'}`);
     if (supa.enabled && !supa.isServiceRole) {

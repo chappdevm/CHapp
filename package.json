@@ -1,7 +1,7 @@
 {
   "name": "chapp-erp",
   "version": "1.0.0",
-  "description": "CHapp ERP Web — Basado en la arquitectura y diseño de Odoo 20 (Contactos, Gastos, Ventas, Contabilidad y Ajustes)",
+  "description": "CHapp ERP Web — Sistema de gestión empresarial GH Aluminios (Contactos, Gastos, Ventas, Contabilidad y Ajustes)",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
@@ -13,7 +13,6 @@
   },
   "keywords": [
     "erp",
-    "odoo-20",
     "contacts",
     "expenses",
     "sales",

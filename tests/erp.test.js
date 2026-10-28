@@ -6,7 +6,7 @@ const path = require('path');
 const os = require('os');
 const { createAppServer } = require('../index');
 
-describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
+describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
   let server;
   let baseUrl;
   let tempDbPath;
@@ -38,7 +38,7 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     return { status: res.status, json };
   }
 
-  it('serves the Odoo 20 Home Menu HTML, CSS, JS, and all 5 custom PNG module icons', async () => {
+  it('serves the Home Menu HTML, CSS, JS, and all 5 custom PNG module icons', async () => {
     const htmlRes = await fetch(`${baseUrl}/`);
     assert.equal(htmlRes.status, 200);
     const html = await htmlRes.text();
@@ -54,7 +54,7 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     }
   });
 
-  it('bootstraps clean Odoo 20 state with all 5 modules initialized', async () => {
+  it('bootstraps clean state with all 5 modules initialized', async () => {
     const statusRes = await req('/api/status');
     assert.equal(statusRes.status, 200);
     assert.equal(statusRes.json.ok, true);
@@ -123,7 +123,7 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.equal(del.json.removed.id, created.json.contact.id);
   });
 
-  it('Module 2 (Gastos -> Contabilidad): runs full Odoo 20 expense workflow (draft -> submit -> approve -> post journal entry -> pay)', async () => {
+  it('Module 2 (Gastos -> Contabilidad): runs full expense workflow (draft -> submit -> approve -> post journal entry -> pay)', async () => {
     // Edge case: zero or negative quantity rejected
     const badExp = await req('/api/expenses', 'POST', {
       name: 'Gasto inválido',
@@ -1064,10 +1064,12 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.ok(draftHtml.includes('class="o_pdf_stamp is-draft"'), 'Debe incluir sello BORRADOR');
 
     // 3d. Representación Gráfica - Factura CANCELADA
-    const cancelInvoice = { ...mockInvoice, state: 'cancel', payment_state: 'not_paid' };
+    const cancelInvoice = { ...mockInvoice, state: 'cancel', payment_state: 'paid', amount_residual: 0 };
     const cancelHtml = renderInvoicePdfSheetHtml(cancelInvoice);
     assert.ok(cancelHtml.includes('class="o_pdf_watermark is-cancel">CANCELADA</div>'), 'Debe incluir marca de agua CANCELADA');
     assert.ok(cancelHtml.includes('class="o_pdf_stamp is-cancel"'), 'Debe incluir sello ANULADA');
+    assert.ok(!cancelHtml.includes('class="o_pdf_watermark is-paid">PAGADA</div>'), 'Factura anulada nunca debe mostrar marca PAGADA');
+    assert.ok(cancelHtml.includes('ANULADA'), 'Fila de totales debe indicar documento ANULADA');
 
     // 3e. Representación Gráfica - Factura con PAGO PARCIAL
     const partialInvoice = { ...mockInvoice, state: 'posted', payment_state: 'partial', amount_residual: 400000 };
@@ -1092,6 +1094,26 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     const discHtml = renderInvoicePdfSheetHtml(discountedInvoice);
     assert.ok(discHtml.includes('Dcto.'), 'Debe incluir columna Dcto. cuando hay descuento');
     assert.ok(discHtml.includes('-10%'), 'Debe reflejar el porcentaje de descuento en la línea');
+
+    // 3h. Representación Gráfica - Discriminación de Retenciones en la Fuente (Retefuente 2.5% y ReteICA 0.414%)
+    const retainedInvoice = {
+      ...mockInvoice,
+      amount_untaxed: 1000000,
+      amount_tax: 190000,
+      amount_total: 1190000,
+      retention_source_rate: 2.5,
+      retention_source_amount: 25000,
+      retention_ica_rate: 0.414,
+      retention_ica_amount: 4140,
+      amount_net: 1160860
+    };
+    const retHtml = renderInvoicePdfSheetHtml(retainedInvoice);
+    assert.ok(retHtml.includes('Retefuente (2.5%)'), 'Debe incluir fila de Retefuente 2.5%');
+    assert.ok(retHtml.includes('25.000'), 'Debe reflejar el monto de la Retefuente');
+    assert.ok(retHtml.includes('ReteICA (0.414%)'), 'Debe incluir fila de ReteICA 0.414%');
+    assert.ok(retHtml.includes('4.140'), 'Debe reflejar el monto de ReteICA');
+    assert.ok(retHtml.includes('NETO A PAGAR:'), 'Debe mostrar el valor NETO A PAGAR liquidado');
+    assert.ok(retHtml.includes('1.160.860'), 'Debe reflejar el valor neto a pagar');
   });
 
   it('Module 2 (Gastos Simplificado & IA): creación directa de gasto manual, borrado de gasto, escaneo con IA y eliminación de pestañas/estados burocráticos', async () => {

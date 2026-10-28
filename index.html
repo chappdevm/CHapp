@@ -17,7 +17,7 @@
 </head>
 <body>
   <div id="webclient" class="o_web_client o_home_menu_background">
-    <!-- Top Navbar (Odoo 20 Webclient Header) -->
+    <!-- Top Navbar (CHapp Header) -->
     <header class="o_main_navbar" role="navigation" aria-label="Barra principal de navegación">
       <div class="o_navbar_left">
         <button
@@ -85,8 +85,8 @@
       </div>
     </header>
 
-    <!-- 1. ODOO 20 HOME MENU (Panel Principal) -->
-    <main id="homeMenuView" class="o_home_menu" role="main" aria-label="Panel principal de módulos Odoo 20">
+    <!-- 1. HOME MENU (Panel Principal) -->
+    <main id="homeMenuView" class="o_home_menu" role="main" aria-label="Panel principal de módulos">
       <div class="o_home_menu_brand_header">
         <img src="/assets/icons/logo.png" alt="CH Aluminios" class="o_home_menu_logo" />
         <h1 class="o_home_menu_brand_title">CH Aluminios</h1>
@@ -250,7 +250,7 @@
   <dialog id="commandPaletteDialog" class="o_dialog" closedby="any" aria-labelledby="commandPaletteTitle">
     <div class="o_dialog_content">
       <div class="o_dialog_header">
-        <h2 id="commandPaletteTitle" style="font-size: 1rem;">Paleta de Comandos Odoo 20</h2>
+        <h2 id="commandPaletteTitle" style="font-size: 1rem;">Paleta de Comandos</h2>
         <button type="button" class="btn btn-sm btn-secondary" id="btnCloseCommandPalette">Esc</button>
       </div>
       <div class="o_searchview" style="margin-bottom: 0.85rem;">
@@ -267,6 +267,7 @@
 
   <div id="toastContainer" class="o_toast_container" aria-live="polite"></div>
 
+  <script src="/assets/js/html2pdf.bundle.min.js"></script>
   <script src="/assets/js/app.js"></script>
 </body>
 </html>

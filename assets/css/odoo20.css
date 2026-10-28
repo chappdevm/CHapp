@@ -1,6 +1,6 @@
 /* ==========================================================================
-   CHapp ERP — Odoo 20 Enterprise Design System & Stylesheet
-   Extracted & adapted from C:\Program Files\Odoo 20\server\odoo\addons\web_enterprise
+   CHapp ERP — Enterprise Design System & Stylesheet
+   Diseño profesional y responsivo para GH Aluminios
    Fully responsive across Mobile (<600px), Tablet (600-1024px), Laptop & Desktop (>1200px)
    ========================================================================== */
 
@@ -49,7 +49,7 @@
   --o-text-main: #F2F2F2;
   --o-text-muted: #95b8d4;
 
-  /* Odoo 20 Home Menu Dark Variables */
+  /* Home Menu Dark Variables */
   --AppSwitcherBg-base: #031626;
   --AppSwitcherBg-contrastRadial: rgba(3, 22, 38, 0.94);
   --AppSwitcherBg-dots: rgba(65, 242, 242, 0.18);
@@ -144,8 +144,8 @@ button, input, select, textarea {
 }
 
 /* ==========================================================================
-   1. ODOO 20 HOME MENU BACKGROUND & APP SWITCHER
-   Exact replica of C:\Program Files\Odoo 20\server\odoo\addons\web_enterprise
+   1. HOME MENU BACKGROUND & APP SWITCHER
+   Home Menu & App Switcher styles
    ========================================================================== */
 
 .o_web_client {
@@ -270,7 +270,7 @@ button, input, select, textarea {
   font-size: 0.95rem;
 }
 
-/* App grid matching Odoo 20 responsive layout across desktop, tablet and mobile */
+/* App grid responsive layout across desktop, tablet and mobile */
 .o_apps {
   display: grid;
   grid-template-columns: repeat(5, minmax(110px, 1fr));
@@ -411,7 +411,7 @@ button, input, select, textarea {
 }
 
 /* ==========================================================================
-   2. TOP NAVBAR & SYSTRAY (Odoo 20 Webclient Header)
+   2. TOP NAVBAR & SYSTRAY (Webclient Header)
    ========================================================================== */
 
 .o_main_navbar {
@@ -990,7 +990,7 @@ button, input, select, textarea {
 }
 
 /* ==========================================================================
-   4. BUTTONS & BADGES (Odoo 20 primary_variables.dark.scss)
+   4. BUTTONS & BADGES
    ========================================================================== */
 
 .btn {
@@ -1118,7 +1118,7 @@ button, input, select, textarea {
   border: 1px solid var(--o-border-color);
 }
 
-/* Odoo Tag Palette (1-11) */
+/* Tag Palette (1-11) */
 .o_tag {
   display: inline-flex;
   align-items: center;
@@ -1142,7 +1142,7 @@ button, input, select, textarea {
   padding: clamp(0.75rem, 2vw, 1.25rem) clamp(0.6rem, 2vw, 1.25rem) 2.5rem;
 }
 
-/* Odoo Expense / Sales Top KPI Banner */
+/* Expense / Sales Top KPI Banner */
 .o_dashboard_banner {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
@@ -1494,7 +1494,7 @@ button, input, select, textarea {
 }
 
 /* ==========================================================================
-   7. ODOO 20 FORM VIEW (Statusbar Header + Sheet + Smart Buttons + Chatter)
+   7. FORM VIEW (Statusbar Header + Sheet + Smart Buttons + Chatter)
    ========================================================================== */
 
 .o_form_view {
@@ -1760,7 +1760,7 @@ button, input, select, textarea {
   color: var(--o-action);
 }
 
-/* Odoo Chatter Sidebar */
+/* Chatter Sidebar */
 .o_chatter {
   background-color: var(--o-view-bg);
   border: 1px solid var(--o-border-color);
@@ -2419,7 +2419,7 @@ dialog.o_dialog::backdrop {
 }
 
 /* ==========================================================================
-   Kanban Stage Columns Board (Columnas por Etapa Odoo 20)
+   Kanban Stage Columns Board (Columnas por Etapa)
    ========================================================================== */
 .o_kanban_board {
   display: flex;
@@ -2581,29 +2581,29 @@ dialog.o_dialog::backdrop {
 
 .o_pdf_watermark.is-paid {
   color: #22b053;
-  opacity: 0.12;
+  opacity: 0.16;
   border-style: double;
   border-width: 8px;
 }
 
 .o_pdf_watermark.is-draft {
   color: #5593c2;
-  opacity: 0.10;
+  opacity: 0.14;
 }
 
 .o_pdf_watermark.is-cancel {
   color: #cb2f2f;
-  opacity: 0.12;
+  opacity: 0.16;
 }
 
 .o_pdf_watermark.is-partial {
   color: #14B5D9;
-  opacity: 0.12;
+  opacity: 0.16;
 }
 
 .o_pdf_watermark.is-overdue {
   color: #cb2f2f;
-  opacity: 0.12;
+  opacity: 0.16;
 }
 
 /* Sello Oficial de Estado */
@@ -2715,7 +2715,7 @@ dialog.o_dialog::backdrop {
 
 /* Recuadro de Documento / Numeración */
 .o_pdf_doc_box {
-  background: #f8fafc;
+  background: rgba(248, 250, 252, 0.85);
   border: 2px solid #074073;
   border-radius: 8px;
   padding: 0.75rem 1rem;
@@ -2770,7 +2770,7 @@ dialog.o_dialog::backdrop {
 .o_pdf_resolution_bar {
   position: relative;
   z-index: 2;
-  background: #f0f7fc;
+  background: rgba(240, 247, 252, 0.85);
   border: 1px solid #cbe0f1;
   border-left: 3px solid #14B5D9;
   border-radius: 4px;
@@ -2789,7 +2789,7 @@ dialog.o_dialog::backdrop {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
-  background: #f8fafc;
+  background: rgba(248, 250, 252, 0.85);
   border: 1px solid #cbe0f1;
   border-top: 2px solid #074073;
   border-radius: 6px;
@@ -2822,7 +2822,7 @@ dialog.o_dialog::backdrop {
 .o_pdf_trace_box {
   position: relative;
   z-index: 2;
-  background: #f0f9ff;
+  background: rgba(240, 249, 255, 0.85);
   border: 1.5px dashed #14B5D9;
   border-radius: 6px;
   padding: 0.75rem 1rem;
@@ -2837,7 +2837,7 @@ dialog.o_dialog::backdrop {
 .o_pdf_payments_history_box {
   position: relative;
   z-index: 2;
-  background: #f0fdf4;
+  background: rgba(240, 253, 244, 0.85);
   border: 1px solid #bbf7d0;
   border-radius: 6px;
   padding: 0.75rem 1rem;
@@ -2852,7 +2852,7 @@ dialog.o_dialog::backdrop {
 }
 
 .o_pdf_subtable th {
-  background: #dcfce7;
+  background: rgba(220, 252, 231, 0.85);
   color: #166534;
   padding: 0.3rem 0.5rem;
   text-align: left;
@@ -2907,11 +2907,12 @@ dialog.o_dialog::backdrop {
   padding: 0.5rem 0.6rem;
   border-bottom: 1px solid #e2e8f0;
   color: #334155;
+  background: rgba(255, 255, 255, 0.70);
   vertical-align: middle;
 }
 
 .o_pdf_items_table tr:nth-child(even) td {
-  background: #f8fafc;
+  background: rgba(248, 250, 252, 0.75);
 }
 
 .o_pdf_items_table .text-center {
@@ -2947,7 +2948,7 @@ dialog.o_dialog::backdrop {
 }
 
 .o_pdf_amount_words {
-  background: #f0f7fc;
+  background: rgba(240, 247, 252, 0.85);
   border-left: 4px solid #14B5D9;
   border-top: 1px solid #cbe0f1;
   border-right: 1px solid #cbe0f1;
@@ -2974,7 +2975,7 @@ dialog.o_dialog::backdrop {
 }
 
 .o_pdf_bank_info {
-  background: #f0f7fc;
+  background: rgba(240, 247, 252, 0.85);
   border: 1px solid #cbe0f1;
   border-left: 4px solid #074073;
   border-radius: 0 4px 4px 0;
@@ -2998,7 +2999,7 @@ dialog.o_dialog::backdrop {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.8rem;
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.88);
   border: 1px solid #cbe0f1;
   border-radius: 6px;
   overflow: hidden;
@@ -3007,6 +3008,13 @@ dialog.o_dialog::backdrop {
 .o_pdf_totals_table td {
   padding: 0.38rem 0.65rem;
   border-bottom: 1px solid #f1f5f9;
+  background: transparent;
+}
+
+.o_pdf_totals_table .is-cancel-row td {
+  color: #cb2f2f;
+  font-weight: 800;
+  background: rgba(254, 242, 242, 0.88);
 }
 
 .o_pdf_totals_table .is-grand-total td {

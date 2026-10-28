@@ -28,7 +28,7 @@ function createInitialData() {
   return {
   "meta": {
     "version": "20.0.1.0",
-    "based_on": "Odoo 20 Enterprise",
+    "based_on": "CHapp ERP Enterprise",
     "sequences": {
       "contact": 1,
       "product": 1,
@@ -556,7 +556,7 @@ class ERPStore {
     return (this.data.settings && this.data.settings.active_user && this.data.settings.active_user.name) || 'Administrador CHapp';
   }
 
-  // Enriches contacts with Odoo smart-button statistics (linked sales, invoices, expenses)
+  // Enriches contacts with smart-button statistics (linked sales, invoices, expenses)
   getEnrichedContacts() {
     return this.data.contacts.map((c) => {
       const sales = this.data.sales.filter((s) => Number(s.partner_id) === Number(c.id) && s.state !== 'cancel');
@@ -1802,6 +1802,13 @@ class ERPStore {
     const amountTax = round2(lines.reduce((s, l) => s + l.tax_amount, 0));
     const amountTotal = round2(amountUntaxed + amountTax);
 
+    const retSourceRate = Number(payload.retention_source_rate !== undefined ? payload.retention_source_rate : (existing ? existing.retention_source_rate : 0) || 0);
+    const retIcaRate = Number(payload.retention_ica_rate !== undefined ? payload.retention_ica_rate : (existing ? existing.retention_ica_rate : 0) || 0);
+    const retSourceAmount = round2(amountUntaxed * (retSourceRate / 100));
+    const retIcaAmount = round2(amountUntaxed * (retIcaRate / 100));
+    const totalRetentions = round2(retSourceAmount + retIcaAmount);
+    const amountNet = Math.max(0, round2(amountTotal - totalRetentions));
+
     const journal =
       moveType === 'out_invoice'
         ? { id: 1, code: 'INV', name: 'Facturas de Clientes' }
@@ -1812,14 +1819,18 @@ class ERPStore {
     const journalItems =
       moveType === 'out_invoice'
         ? [
-            { account_code: '130505', account_name: 'Clientes Nacionales (Cuentas por Cobrar)', label: partnerName, debit: amountTotal, credit: 0 },
+            { account_code: '130505', account_name: 'Clientes Nacionales (Cuentas por Cobrar)', label: partnerName, debit: totalRetentions > 0 ? amountNet : amountTotal, credit: 0 },
+            ...(retSourceAmount > 0 ? [{ account_code: '135515', account_name: 'Anticipo Impuestos - Retención en la Fuente', label: `Retefuente ${retSourceRate}%`, debit: retSourceAmount, credit: 0 }] : []),
+            ...(retIcaAmount > 0 ? [{ account_code: '135518', account_name: 'Anticipo Impuestos - ReteICA', label: `ReteICA ${retIcaRate}%`, debit: retIcaAmount, credit: 0 }] : []),
             { account_code: '413501', account_name: 'Ingresos por Servicios de Software y Consultoría', label: 'Ingresos por facturación', debit: 0, credit: amountUntaxed },
             ...(amountTax > 0 ? [{ account_code: '240801', account_name: 'IVA Generado en Ventas (19%)', label: 'IVA Generado', debit: 0, credit: amountTax }] : [])
           ]
         : [
             { account_code: '519530', account_name: 'Gastos de Tecnología, Licencias y Suministros', label: 'Compras / Gastos', debit: amountUntaxed, credit: 0 },
             ...(amountTax > 0 ? [{ account_code: '240802', account_name: 'IVA Descontable en Compras y Gastos (19%)', label: 'IVA Descontable', debit: amountTax, credit: 0 }] : []),
-            { account_code: '220505', account_name: 'Proveedores Nacionales (Cuentas por Pagar)', label: partnerName, debit: 0, credit: amountTotal }
+            ...(retSourceAmount > 0 ? [{ account_code: '236540', account_name: 'Retención en la Fuente por Pagar', label: `Retefuente ${retSourceRate}%`, debit: 0, credit: retSourceAmount }] : []),
+            ...(retIcaAmount > 0 ? [{ account_code: '236801', account_name: 'ReteICA por Pagar', label: `ReteICA ${retIcaRate}%`, debit: 0, credit: retIcaAmount }] : []),
+            { account_code: '220505', account_name: 'Proveedores Nacionales (Cuentas por Pagar)', label: partnerName, debit: 0, credit: totalRetentions > 0 ? amountNet : amountTotal }
           ];
 
     const invDate = payload.invoice_date || (existing && existing.invoice_date) || todayStr();
@@ -1842,7 +1853,12 @@ class ERPStore {
         amount_untaxed: amountUntaxed,
         amount_tax: amountTax,
         amount_total: amountTotal,
-        amount_residual: amountTotal,
+        retention_source_rate: retSourceRate,
+        retention_source_amount: retSourceAmount,
+        retention_ica_rate: retIcaRate,
+        retention_ica_amount: retIcaAmount,
+        amount_net: amountNet,
+        amount_residual: totalRetentions > 0 ? amountNet : amountTotal,
         chatter: [...(existing.chatter || [])]
       };
       const isMoveLinesChanged = JSON.stringify(lines) !== JSON.stringify(existing.lines || []);
@@ -1900,7 +1916,12 @@ class ERPStore {
       amount_untaxed: amountUntaxed,
       amount_tax: amountTax,
       amount_total: amountTotal,
-      amount_residual: amountTotal,
+      retention_source_rate: retSourceRate,
+      retention_source_amount: retSourceAmount,
+      retention_ica_rate: retIcaRate,
+      retention_ica_amount: retIcaAmount,
+      amount_net: amountNet,
+      amount_residual: totalRetentions > 0 ? amountNet : amountTotal,
       chatter: [
         { id: this.nextChatterId(), author: this.getActiveAuthor(), date: this.formatNowShort(), text: 'Documento contable creado en estado Borrador.' }
       ]

@@ -1,5 +1,5 @@
 /* ==========================================================================
-   CHapp ERP — Odoo 20 Webclient & Module Controller
+   CHapp ERP — Webclient & Module Controller
    Modules: Contactos, Gastos, Ventas, Contabilidad, Ajustes
    ========================================================================== */
 
@@ -77,7 +77,7 @@
 
   const state = {
     data: null,
-    currentApp: null, // null = Odoo 20 Home Menu
+    currentApp: null, // null = Home Menu
     submenu: 'all',
     viewType: 'list', // 'kanban' | 'list' | 'form'
     activeRecordId: null, // number | 'new' | null
@@ -2257,7 +2257,7 @@
         `
         <div tabindex="0" role="region" aria-labelledby="sales-table-caption" class="table-wrapper">
           <table class="o_list_table" style="--label-2: 'Fecha'; --label-3: 'Cliente'; --label-4: 'Comercial'; --label-5: 'Total'; --label-6: 'Estado Factura'; --label-7: 'Estado';">
-            <caption id="sales-table-caption">Cotizaciones y Pedidos de Venta Odoo 20</caption>
+            <caption id="sales-table-caption">Cotizaciones y Pedidos de Venta</caption>
             <thead>
               <tr>
                 <th>Número</th>
@@ -2403,7 +2403,7 @@
                   <td><span class="o_badge o_badge_info">${esc(inv.is_installment ? `Abono Cuota #${inv.installment_number || (idx + 1)}` : 'Factura')}</span></td>
                   <td class="text-end"><strong>${formatMoney(inv.amount_total)}</strong></td>
                   <td class="text-end">${formatMoney(inv.amount_residual)}</td>
-                  <td>${paymentStateBadge(inv.payment_state)}</td>
+                  <td>${paymentStateBadge(inv.payment_state, inv.state)}</td>
                   <td class="text-end">
                     <span class="btn btn-sm btn-secondary" style="pointer-events: none;">Ver Factura y PDF</span>
                   </td>
@@ -2600,6 +2600,25 @@
     return (prefix + words + ' ' + currencyUnit + centsStr + ' M/CTE').toUpperCase().replace(/\s+/g, ' ');
   }
 
+  
+  let cachedLogoDataUrl = '';
+  function getLogoDataUrl() {
+    if (cachedLogoDataUrl) return cachedLogoDataUrl;
+    try {
+      const brandImg = document.getElementById('navbarBrandIcon') || document.querySelector('.o_home_menu_logo');
+      if (brandImg && brandImg.complete && brandImg.naturalWidth > 0) {
+        const canvas = document.createElement('canvas');
+        canvas.width = brandImg.naturalWidth;
+        canvas.height = brandImg.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(brandImg, 0, 0);
+        cachedLogoDataUrl = canvas.toDataURL('image/png');
+        return cachedLogoDataUrl;
+      }
+    } catch (_) {}
+    return '';
+  }
+
   function renderInvoicePdfSheetHtml(invoice) {
     const company = state.data.settings || {};
     const partner = (state.data.contacts || []).find((c) => Number(c.id) === Number(invoice.partner_id)) || {
@@ -2622,19 +2641,19 @@
     const isAbono = invoice.is_installment || Boolean(invoice.installment_number) || Boolean(invoice.order_residual !== undefined && invoice.order_residual !== null && invoice.order_residual > 0);
 
     const isCancel = invoice.state === 'cancel';
-    const isDraft = invoice.state === 'draft';
-    const isPaid = invoice.payment_state === 'paid' || (invoice.state === 'posted' && Number(invoice.amount_residual ?? 0) <= 0.001);
+    const isDraft = !isCancel && invoice.state === 'draft';
+    const isPaid = !isCancel && (invoice.payment_state === 'paid' || (invoice.state === 'posted' && Number(invoice.amount_residual ?? 0) <= 0.001));
     const isPartial = !isPaid && !isDraft && !isCancel && (invoice.payment_state === 'partial' || (Number(invoice.amount_residual || 0) < Number(invoice.amount_total || 0) && Number(invoice.amount_residual || 0) > 0));
     const todayStr = new Date().toISOString().slice(0, 10);
     const isOverdue = !isPaid && !isDraft && !isCancel && !isPartial && Boolean(invoice.invoice_date_due && invoice.invoice_date_due < todayStr);
 
     let watermarkHtml = '';
-    if (isPaid) {
-      watermarkHtml = '<div class="o_pdf_watermark is-paid">PAGADA</div>';
+    if (isCancel) {
+      watermarkHtml = '<div class="o_pdf_watermark is-cancel">CANCELADA</div>';
     } else if (isDraft) {
       watermarkHtml = '<div class="o_pdf_watermark is-draft">BORRADOR</div>';
-    } else if (isCancel) {
-      watermarkHtml = '<div class="o_pdf_watermark is-cancel">CANCELADA</div>';
+    } else if (isPaid) {
+      watermarkHtml = '<div class="o_pdf_watermark is-paid">PAGADA</div>';
     } else if (isPartial) {
       watermarkHtml = '<div class="o_pdf_watermark is-partial">PAGO PARCIAL</div>';
     } else if (isOverdue) {
@@ -2642,12 +2661,12 @@
     }
 
     let stampHtml = '';
-    if (isPaid) {
-      stampHtml = '<div class="o_pdf_stamp is-paid"><span class="stamp-inner">✓ PAGADA</span><span class="stamp-sub">CANCELADA TOTAL</span></div>';
+    if (isCancel) {
+      stampHtml = '<div class="o_pdf_stamp is-cancel"><span class="stamp-inner">✕ ANULADA</span><span class="stamp-sub">DOCUMENTO CANCELADO</span></div>';
     } else if (isDraft) {
       stampHtml = '<div class="o_pdf_stamp is-draft"><span class="stamp-inner">✎ BORRADOR</span><span class="stamp-sub">SIN VALIDEZ FISCAL</span></div>';
-    } else if (isCancel) {
-      stampHtml = '<div class="o_pdf_stamp is-cancel"><span class="stamp-inner">✕ ANULADA</span><span class="stamp-sub">DOCUMENTO CANCELADO</span></div>';
+    } else if (isPaid) {
+      stampHtml = '<div class="o_pdf_stamp is-paid"><span class="stamp-inner">✓ PAGADA</span><span class="stamp-sub">CANCELADA TOTAL</span></div>';
     } else if (isPartial) {
       stampHtml = '<div class="o_pdf_stamp is-partial"><span class="stamp-inner">◐ PAGO PARCIAL</span><span class="stamp-sub">SALDO PENDIENTE</span></div>';
     } else if (isOverdue) {
@@ -2667,6 +2686,13 @@
     const totalAmount = Number(invoice.amount_total || 0);
     const residualAmount = Number(invoice.amount_residual ?? 0);
     const paidAmount = Math.max(0, totalAmount - residualAmount);
+
+    const retSourceRate = Number(invoice.retention_source_rate || 0);
+    const retIcaRate = Number(invoice.retention_ica_rate || 0);
+    const retefuenteAmount = Number(invoice.retention_source_amount ?? (retSourceRate > 0 ? totalUntaxed * (retSourceRate / 100) : 0));
+    const reteicaAmount = Number(invoice.retention_ica_amount ?? (retIcaRate > 0 ? totalUntaxed * (retIcaRate / 100) : 0));
+    const totalRetentions = retefuenteAmount + reteicaAmount;
+    const netPayable = Math.max(0, totalAmount - totalRetentions);
 
     const hasDiscounts = lines.some((l) => Number(l.discount || 0) > 0);
     const totalDiscount = lines.reduce((sum, l) => {
@@ -2849,13 +2875,36 @@
                 <td>TOTAL:</td>
                 <td style="text-align: right;">${formatMoney(totalAmount)}</td>
               </tr>
+              ${totalRetentions > 0 ? `
+                ${retefuenteAmount > 0 ? `
+                  <tr style="color: #b45309; font-size: 0.76rem; background: rgba(254, 243, 199, 0.45);">
+                    <td>(-) Retefuente (${retSourceRate}%):</td>
+                    <td style="text-align: right;">- ${formatMoney(retefuenteAmount)}</td>
+                  </tr>
+                ` : ''}
+                ${reteicaAmount > 0 ? `
+                  <tr style="color: #b45309; font-size: 0.76rem; background: rgba(254, 243, 199, 0.45);">
+                    <td>(-) ReteICA (${retIcaRate}%):</td>
+                    <td style="text-align: right;">- ${formatMoney(reteicaAmount)}</td>
+                  </tr>
+                ` : ''}
+                <tr class="is-net-total" style="font-weight: 800; font-size: 0.95rem; border-top: 1.5px solid #14B5D9; border-bottom: 1.5px solid #14B5D9; background: rgba(240, 247, 252, 0.9); color: #074073;">
+                  <td>NETO A PAGAR:</td>
+                  <td style="text-align: right;">${formatMoney(netPayable)}</td>
+                </tr>
+              ` : ''}
               ${paidAmount > 0 && residualAmount > 0 ? `
                 <tr style="color: #059669; font-size: 0.76rem;">
                   <td>Abonos / Pagos Aplicados:</td>
                   <td style="text-align: right;">- ${formatMoney(paidAmount)}</td>
                 </tr>
               ` : ''}
-              ${residualAmount > 0 ? `
+              ${isCancel ? `
+                <tr class="is-cancel-row">
+                  <td>Estado Documento:</td>
+                  <td style="text-align: right; color: #cb2f2f; font-weight: 800;">ANULADA</td>
+                </tr>
+              ` : residualAmount > 0 ? `
                 <tr class="is-residual-row">
                   <td>Saldo Pendiente:</td>
                   <td style="text-align: right;">${formatMoney(residualAmount)}</td>
@@ -2888,7 +2937,7 @@
         <div class="o_pdf_legal_footer">
           Esta factura de venta es título valor conforme al Código de Comercio colombiano (Arts. 772, 773 y 774) y Ley 1231 de 2008.<br/>
           La firma o constancia de recibido implica la aceptación plena de las mercancías y servicios descritos.<br/>
-          Generado automáticamente por <strong>CH Aluminios</strong> — CHapp ERP Odoo 20 Edition.
+          Generado automáticamente por <strong>CH Aluminios</strong> — CHapp ERP.
         </div>
       </div>
     `;
@@ -2896,8 +2945,51 @@
 
   function downloadInvoicePdf(invoice, autoPrint = false) {
     const company = state.data.settings || {};
-    const sheetHtml = renderInvoicePdfSheetHtml(invoice);
-    const printScript = autoPrint ? '<script>window.onload = function() { window.print(); };</script>' : '';
+
+    // Direct PDF file export via html2pdf when clicking Download (!autoPrint)
+    if (!autoPrint && typeof window !== 'undefined' && typeof window.html2pdf === 'function') {
+      const filename = `Factura_${(invoice.name || 'documento').replace(/[/\\]/g, '_')}.pdf`;
+      const container = document.querySelector('.o_pdf_paper_viewport #invoicePdfSheet') || document.getElementById('invoicePdfSheet');
+      const targetEl = container ? container.cloneNode(true) : null;
+      if (targetEl) {
+        targetEl.style.width = '210mm';
+        targetEl.style.margin = '0 auto';
+        targetEl.style.boxShadow = 'none';
+        targetEl.style.border = 'none';
+        const logoData = getLogoDataUrl();
+        const logoImg = targetEl.querySelector('.o_pdf_company_logo');
+        if (logoImg && logoData && logoData.startsWith('data:')) {
+          logoImg.src = logoData;
+        }
+
+        const opt = {
+          margin: [8, 8, 8, 8],
+          filename: filename,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, logging: false },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        if (typeof showToast === 'function') showToast('Generando archivo PDF...');
+        window.html2pdf().set(opt).from(targetEl).save().then(() => {
+          if (typeof showToast === 'function') showToast(`PDF descargado: ${filename}`);
+        }).catch((err) => {
+          console.warn('Error exportando con html2pdf, abriendo diálogo de impresión:', err);
+          downloadInvoicePdf(invoice, true);
+        });
+        return;
+      }
+    }
+
+    let sheetHtml = renderInvoicePdfSheetHtml(invoice);
+    const logoData = getLogoDataUrl();
+    if (logoData && logoData.startsWith('data:')) {
+      sheetHtml = sheetHtml.replace('src="/assets/icons/logo.png"', 'src="' + logoData + '"');
+      sheetHtml = sheetHtml.replace('onerror="this.style.display=\'none\'"', '');
+    } else if (window.location && window.location.origin) {
+      sheetHtml = sheetHtml.replace('src="/assets/icons/logo.png"', 'src="' + window.location.origin + '/assets/icons/logo.png"');
+    }
+    const printScript = autoPrint ? '<script>window.addEventListener("load", function() { var imgs = Array.from(document.images); Promise.all(imgs.map(function(img) { if (img.complete) return Promise.resolve(); return new Promise(function(res) { img.onload = img.onerror = res; }); })).then(function() { setTimeout(function() { window.print(); }, 250); }); });</script>' : '';
 
     const fullHtml = `<!DOCTYPE html>
 <html lang="es">
@@ -2945,11 +3037,11 @@
       line-height: 1;
       white-space: nowrap;
     }
-    .o_pdf_watermark.is-paid { color: #22b053; opacity: 0.12; border-style: double; border-width: 8px; }
-    .o_pdf_watermark.is-draft { color: #5593c2; opacity: 0.10; }
-    .o_pdf_watermark.is-cancel { color: #cb2f2f; opacity: 0.12; }
-    .o_pdf_watermark.is-partial { color: #14B5D9; opacity: 0.12; }
-    .o_pdf_watermark.is-overdue { color: #cb2f2f; opacity: 0.12; }
+    .o_pdf_watermark.is-paid { color: #22b053; opacity: 0.16; border-style: double; border-width: 8px; }
+    .o_pdf_watermark.is-draft { color: #5593c2; opacity: 0.14; }
+    .o_pdf_watermark.is-cancel { color: #cb2f2f; opacity: 0.16; }
+    .o_pdf_watermark.is-partial { color: #14B5D9; opacity: 0.16; }
+    .o_pdf_watermark.is-overdue { color: #cb2f2f; opacity: 0.16; }
     .o_pdf_stamp {
       display: inline-flex;
       flex-direction: column;
@@ -2989,7 +3081,7 @@
     .o_pdf_company_info p { margin: 0.15rem 0; font-size: 0.77rem; color: #4b5563; }
     .o_pdf_company_info p strong { color: #074073; }
     .o_pdf_doc_box {
-      background: #f8fafc;
+      background: rgba(248, 250, 252, 0.85);
       border: 2px solid #074073;
       border-radius: 8px;
       padding: 0.75rem 1rem;
@@ -3016,7 +3108,7 @@
     .o_pdf_resolution_bar {
       position: relative;
       z-index: 2;
-      background: #f0f7fc;
+      background: rgba(240, 247, 252, 0.85);
       border: 1px solid #cbe0f1;
       border-left: 3px solid #14B5D9;
       border-radius: 4px;
@@ -3033,7 +3125,7 @@
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 1rem;
-      background: #f8fafc;
+      background: rgba(248, 250, 252, 0.85);
       border: 1px solid #cbe0f1;
       border-top: 2px solid #074073;
       border-radius: 6px;
@@ -3055,7 +3147,7 @@
     .o_pdf_trace_box {
       position: relative;
       z-index: 2;
-      background: #f0f9ff;
+      background: rgba(240, 249, 255, 0.85);
       border: 1.5px dashed #14B5D9;
       border-radius: 6px;
       padding: 0.75rem 1rem;
@@ -3066,14 +3158,14 @@
     .o_pdf_payments_history_box {
       position: relative;
       z-index: 2;
-      background: #f0fdf4;
+      background: rgba(240, 253, 244, 0.85);
       border: 1px solid #bbf7d0;
       border-radius: 6px;
       padding: 0.75rem 1rem;
       margin-bottom: 0.85rem;
     }
     .o_pdf_subtable { width: 100%; border-collapse: collapse; font-size: 0.74rem; margin-top: 0.35rem; }
-    .o_pdf_subtable th { background: #dcfce7; color: #166534; padding: 0.3rem 0.5rem; text-align: left; font-weight: 700; border-bottom: 1px solid #86efac; }
+    .o_pdf_subtable th { background: rgba(220, 252, 231, 0.85); color: #166534; padding: 0.3rem 0.5rem; text-align: left; font-weight: 700; border-bottom: 1px solid #86efac; }
     .o_pdf_subtable td { padding: 0.35rem 0.5rem; border-bottom: 1px solid #bbf7d0; }
     .o_pdf_items_table {
       position: relative;
@@ -3098,8 +3190,8 @@
     }
     .o_pdf_items_table th:first-child { border-top-left-radius: 4px; }
     .o_pdf_items_table th:last-child { border-top-right-radius: 4px; }
-    .o_pdf_items_table td { padding: 0.5rem 0.6rem; border-bottom: 1px solid #e2e8f0; color: #334155; vertical-align: middle; }
-    .o_pdf_items_table tr:nth-child(even) td { background: #f8fafc; }
+    .o_pdf_items_table td { padding: 0.5rem 0.6rem; border-bottom: 1px solid #e2e8f0; color: #334155; vertical-align: middle; background: rgba(255, 255, 255, 0.70); }
+    .o_pdf_items_table tr:nth-child(even) td { background: rgba(248, 250, 252, 0.75); }
     .o_pdf_items_table .text-center { text-align: center; }
     .o_pdf_items_table .text-end { text-align: right; font-variant-numeric: tabular-nums; }
     .o_pdf_bottom_grid {
@@ -3113,7 +3205,7 @@
     }
     .o_pdf_bottom_left { display: flex; flex-direction: column; gap: 0.65rem; }
     .o_pdf_amount_words {
-      background: #f0f7fc;
+      background: rgba(240, 247, 252, 0.85);
       border-left: 4px solid #14B5D9;
       border-top: 1px solid #cbe0f1;
       border-right: 1px solid #cbe0f1;
@@ -3127,7 +3219,7 @@
     .o_pdf_amount_words .label { font-weight: 700; text-transform: uppercase; font-size: 0.67rem; color: #5593c2; display: block; margin-bottom: 0.15rem; }
     .o_pdf_amount_words .words { font-weight: 700; color: #074073; }
     .o_pdf_bank_info {
-      background: #f0f7fc;
+      background: rgba(240, 247, 252, 0.85);
       border: 1px solid #cbe0f1;
       border-left: 4px solid #074073;
       border-radius: 0 4px 4px 0;
@@ -3142,12 +3234,13 @@
       width: 100%;
       border-collapse: collapse;
       font-size: 0.8rem;
-      background: #ffffff;
+      background: rgba(255, 255, 255, 0.88);
       border: 1px solid #cbe0f1;
       border-radius: 6px;
       overflow: hidden;
     }
-    .o_pdf_totals_table td { padding: 0.38rem 0.65rem; border-bottom: 1px solid #f1f5f9; }
+    .o_pdf_totals_table td { padding: 0.38rem 0.65rem; border-bottom: 1px solid #f1f5f9; background: transparent; }
+    .o_pdf_totals_table .is-cancel-row td { color: #cb2f2f; font-weight: 800; background: rgba(254, 242, 242, 0.88); }
     .o_pdf_totals_table .is-grand-total td {
       font-size: 1.05rem;
       font-weight: 800;
@@ -3173,6 +3266,39 @@
     .o_pdf_sign_box .sign_name { font-size: 0.78rem; font-weight: 700; color: #074073; }
     .o_pdf_sign_box .sign_title { font-size: 0.68rem; color: #14B5D9; text-transform: uppercase; font-weight: 700; }
     .o_pdf_sign_box .sign_sub { font-size: 0.66rem; color: #4b5563; margin-top: 0.15rem; }
+
+    @media print {
+      @page {
+        size: A4 portrait;
+        margin: 8mm 10mm 10mm 10mm;
+      }
+      html, body {
+        background: #ffffff !important;
+        color: #000000 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .o_pdf_sheet {
+        box-shadow: none !important;
+        border: none !important;
+        padding: 0 !important;
+        max-width: 100% !important;
+        background: #ffffff !important;
+      }
+      .o_pdf_company_logo {
+        display: block !important;
+        max-height: 54px !important;
+        max-width: 170px !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .o_pdf_watermark {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+    }
   </style>
 </head>
 <body>
@@ -4282,7 +4408,7 @@
                   <td>${esc(m.journal_code)} · ${esc(m.origin || m.ref || '')}</td>
                   <td class="text-end"><strong>${formatMoney(m.amount_total)}</strong></td>
                   <td class="text-end">${formatMoney(m.amount_residual)}</td>
-                  <td>${paymentStateBadge(m.payment_state)}</td>
+                  <td>${paymentStateBadge(m.payment_state, m.state)}</td>
                   <td><span class="o_badge ${m.state === 'posted' ? 'o_badge_success' : m.state === 'cancel' ? 'o_badge_danger' : 'o_badge_info'}">${m.state === 'posted' ? 'Publicado' : m.state === 'cancel' ? 'Cancelado' : 'Borrador'}</span></td>
                 </tr>
               `
@@ -4359,6 +4485,8 @@
         ref: existing.ref || '',
         invoice_date: existing.invoice_date,
         invoice_date_due: existing.invoice_date_due,
+        retention_source_rate: existing.retention_source_rate || 0,
+        retention_ica_rate: existing.retention_ica_rate || 0,
         lines: JSON.parse(JSON.stringify(existing.lines || []))
       };
     }
@@ -4371,13 +4499,24 @@
       0
     );
     const calcTotal = calcUntaxed + calcTax;
-    const calcResidual = isEditable ? calcTotal : Number(existing.amount_residual || 0);
+    const calcRetSourceRate = Number(draft.retention_source_rate || 0);
+    const calcRetIcaRate = Number(draft.retention_ica_rate || 0);
+    const calcRetSourceAmount = round2(calcUntaxed * (calcRetSourceRate / 100));
+    const calcRetIcaAmount = round2(calcUntaxed * (calcRetIcaRate / 100));
+    const calcTotalRetentions = round2(calcRetSourceAmount + calcRetIcaAmount);
+    const calcAmountNet = Math.max(0, round2(calcTotal - calcTotalRetentions));
+    const calcResidual = isEditable ? (calcTotalRetentions > 0 ? calcAmountNet : calcTotal) : Number(existing.amount_residual || 0);
 
     const previewData = {
       ...existing,
       partner_id: draft.partner_id || existing.partner_id,
       invoice_date: draft.invoice_date || existing.invoice_date,
       invoice_date_due: draft.invoice_date_due || existing.invoice_date_due,
+      retention_source_rate: calcRetSourceRate,
+      retention_source_amount: calcRetSourceAmount,
+      retention_ica_rate: calcRetIcaRate,
+      retention_ica_amount: calcRetIcaAmount,
+      amount_net: calcAmountNet,
       lines: draft.lines || existing.lines,
       amount_untaxed: calcUntaxed,
       amount_tax: calcTax,
@@ -4433,7 +4572,7 @@
                 </span>
                 <h2 style="font-size: 1.5rem;">${esc(existing.name)}</h2>
               </div>
-              <div>${paymentStateBadge(existing.payment_state)}</div>
+              <div>${paymentStateBadge(existing.payment_state, existing.state)}</div>
             </div>
 
             <div class="o_group">
@@ -4470,6 +4609,27 @@
               <div class="o_field_row">
                 <label for="fMoveDue">Fecha de Vencimiento</label>
                 <input type="date" id="fMoveDue" class="o_input" value="${esc(draft.invoice_date_due)}" ${!isEditable ? 'readonly' : ''} />
+              </div>
+            </div>
+
+            <div class="o_group" style="margin-top: 0.65rem; background: var(--o-view-bg); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--o-border-color); display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+              <div class="o_field_row">
+                <label for="fMoveRetSource">Retención en la Fuente (Renta)</label>
+                <select id="fMoveRetSource" class="o_select" ${!isEditable ? 'disabled' : ''}>
+                  <option value="0" ${!draft.retention_source_rate ? 'selected' : ''}>Sin Retefuente (0%)</option>
+                  <option value="2.5" ${Number(draft.retention_source_rate) === 2.5 ? 'selected' : ''}>Retefuente 2.5% (Compras generales / aluminio)</option>
+                  <option value="4" ${Number(draft.retention_source_rate) === 4 ? 'selected' : ''}>Retefuente 4.0% (Servicios y confección)</option>
+                  <option value="1" ${Number(draft.retention_source_rate) === 1 ? 'selected' : ''}>Retefuente 1.0% (Declarantes compras)</option>
+                </select>
+              </div>
+              <div class="o_field_row">
+                <label for="fMoveRetIca">ReteICA (Industria y Comercio)</label>
+                <select id="fMoveRetIca" class="o_select" ${!isEditable ? 'disabled' : ''}>
+                  <option value="0" ${!draft.retention_ica_rate ? 'selected' : ''}>Sin ReteICA (0%)</option>
+                  <option value="0.414" ${Number(draft.retention_ica_rate) === 0.414 ? 'selected' : ''}>ReteICA 0.414% (4.14‰ - Actividades industriales)</option>
+                  <option value="0.966" ${Number(draft.retention_ica_rate) === 0.966 ? 'selected' : ''}>ReteICA 0.966% (9.66‰ - Actividades de servicios)</option>
+                  <option value="0.5" ${Number(draft.retention_ica_rate) === 0.5 ? 'selected' : ''}>ReteICA 0.500% (5.00‰ - Actividades comerciales)</option>
+                </select>
               </div>
             </div>
 
@@ -4562,15 +4722,38 @@
                 <strong>${formatMoney(calcUntaxed)}</strong>
               </div>
               <div class="o_totals_row">
-                <span>IVA:</span>
+                <span>IVA (19%):</span>
                 <strong>${formatMoney(calcTax)}</strong>
               </div>
-              <div class="o_totals_row is-grand">
-                <span>Total Documento:</span>
-                <span>${formatMoney(calcTotal)}</span>
-              </div>
               <div class="o_totals_row">
-                <span>Importe Adeudado:</span>
+                <span>Total Factura:</span>
+                <strong>${formatMoney(calcTotal)}</strong>
+              </div>
+              ${calcRetSourceAmount > 0 ? `
+                <div class="o_totals_row" style="color: #b45309; font-size: 0.8rem;">
+                  <span>(-) Retefuente (${calcRetSourceRate}%):</span>
+                  <strong>- ${formatMoney(calcRetSourceAmount)}</strong>
+                </div>
+              ` : ''}
+              ${calcRetIcaAmount > 0 ? `
+                <div class="o_totals_row" style="color: #b45309; font-size: 0.8rem;">
+                  <span>(-) ReteICA (${calcRetIcaRate}%):</span>
+                  <strong>- ${formatMoney(calcRetIcaAmount)}</strong>
+                </div>
+              ` : ''}
+              ${calcTotalRetentions > 0 ? `
+                <div class="o_totals_row is-grand">
+                  <span>Neto a Cobrar:</span>
+                  <span>${formatMoney(calcAmountNet)}</span>
+                </div>
+              ` : `
+                <div class="o_totals_row is-grand">
+                  <span>Total Documento:</span>
+                  <span>${formatMoney(calcTotal)}</span>
+                </div>
+              `}
+              <div class="o_totals_row">
+                <span>Importe Adeudado / Saldo:</span>
                 <strong>${formatMoney(calcResidual)}</strong>
               </div>
             </div>
@@ -4611,10 +4794,14 @@
       const rEl = document.getElementById('fMoveRef');
       const dEl = document.getElementById('fMoveDate');
       const dueEl = document.getElementById('fMoveDue');
+      const retSourceEl = document.getElementById('fMoveRetSource');
+      const retIcaEl = document.getElementById('fMoveRetIca');
       if (pEl) state.formDraft.partner_id = Number(pEl.value);
       if (rEl) state.formDraft.ref = rEl.value;
       if (dEl) state.formDraft.invoice_date = dEl.value;
       if (dueEl) state.formDraft.invoice_date_due = dueEl.value;
+      if (retSourceEl) state.formDraft.retention_source_rate = Number(retSourceEl.value || 0);
+      if (retIcaEl) state.formDraft.retention_ica_rate = Number(retIcaEl.value || 0);
 
       container.querySelectorAll('#moveLinesTbody tr').forEach((tr) => {
         const idx = Number(tr.getAttribute('data-move-line-idx'));
@@ -4688,7 +4875,9 @@
         invoice_date: state.formDraft.invoice_date,
         invoice_date_due: state.formDraft.invoice_date_due,
         auto_post: autoPost,
-        lines: state.formDraft.lines
+        lines: state.formDraft.lines,
+        retention_source_rate: Number(state.formDraft.retention_source_rate || 0),
+        retention_ica_rate: Number(state.formDraft.retention_ica_rate || 0)
       };
       const res = await apiCall('/api/accounting/moves', 'POST', payload);
       state.activeRecordId = res.move.id;
@@ -4777,6 +4966,22 @@
       });
     }
 
+    const retSourceInp = document.getElementById('fMoveRetSource');
+    if (retSourceInp) {
+      retSourceInp.addEventListener('change', () => {
+        syncMoveDraft();
+        renderAccountMoveForm(container);
+      });
+    }
+
+    const retIcaInp = document.getElementById('fMoveRetIca');
+    if (retIcaInp) {
+      retIcaInp.addEventListener('change', () => {
+        syncMoveDraft();
+        renderAccountMoveForm(container);
+      });
+    }
+
     const btnDownloadPdf = document.getElementById('btnDownloadInvoicePdf');
     if (btnDownloadPdf) {
       btnDownloadPdf.addEventListener('click', () => {
@@ -4830,7 +5035,7 @@
               <button type="button" class="btn btn-action" id="btnSaveSettings">Guardar Ajustes</button>
               <button type="button" class="btn btn-secondary" id="btnBackHomeFromSettings">Volver al Panel Principal</button>
             </div>
-            <span style="font-size: 0.8rem; color: var(--o-text-muted);">Basado en Odoo 20 Enterprise (${esc(state.data.meta.version)})</span>
+            <span style="font-size: 0.8rem; color: var(--o-text-muted);">CHapp ERP Enterprise (${esc(state.data.meta.version)})</span>
           </div>
 
           <div class="o_settings_block">
@@ -4862,10 +5067,10 @@
                 </select>
               </div>
               <div class="o_field_row">
-                <label for="setTheme">Tema Visual Odoo 20</label>
+                <label for="setTheme">Tema Visual</label>
                 <select id="setTheme" class="o_select">
                   <option value="" ${!s.theme ? 'selected disabled' : ''}>— Seleccione Tema —</option>
-                  <option value="dark" ${s.theme === 'dark' ? 'selected' : ''}>Modo Oscuro Odoo 20 (Predeterminado)</option>
+                  <option value="dark" ${s.theme === 'dark' ? 'selected' : ''}>Modo Oscuro (Predeterminado)</option>
                   <option value="light" ${s.theme === 'light' ? 'selected' : ''}>Modo Claro</option>
                 </select>
               </div>
