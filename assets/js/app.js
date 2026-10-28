@@ -2867,14 +2867,16 @@
         ${watermarkHtml}
 
         <div class="o_pdf_brand_header">
-          <div class="o_pdf_logo_col">
-            <img src="${logoSrc}" alt="CH Aluminios" class="o_pdf_company_logo" onerror="if(!this.src.startsWith('data:'))this.style.display='none'" />
-          </div>
-          <div class="o_pdf_company_info">
-            <h2>${esc(company.company_name || 'CH Aluminios')}</h2>
-            <p><strong>NIT:</strong> ${esc(company.company_vat || '900.876.543-1')} · <span>${esc(company.fiscal_regime || 'Responsable de IVA - Régimen Ordinario')}</span></p>
-            <p>${esc(company.company_address || 'Cra. 7 #18-45')} · ${esc(company.company_city || 'Pereira')}, ${esc(company.company_country || 'Colombia')}</p>
-            <p>Email: ${esc(company.company_email || 'chappdevm@gmail.com')} · PBX: (606) 315-0000</p>
+          <div class="o_pdf_brand_identity">
+            <div class="o_pdf_logo_col">
+              <img src="${logoSrc}" alt="CH Aluminios" class="o_pdf_company_logo" onerror="if(!this.src.startsWith('data:'))this.style.display='none'" />
+            </div>
+            <div class="o_pdf_company_info">
+              <h2>${esc(company.company_name || 'CH Aluminios')}</h2>
+              <p><strong>NIT:</strong> ${esc(company.company_vat || '900.876.543-1')} · <span>${esc(company.fiscal_regime || 'Responsable de IVA - Régimen Ordinario')}</span></p>
+              <p>${esc(company.company_address || 'Cra. 7 #18-45')} · ${esc(company.company_city || 'Pereira')}, ${esc(company.company_country || 'Colombia')}</p>
+              <p>Email: ${esc(company.company_email || 'chappdevm@gmail.com')} · PBX: (606) 315-0000</p>
+            </div>
           </div>
           <div class="o_pdf_doc_box">
             <div class="doc_type_title">${invoice.move_type === 'in_invoice' ? 'Factura Proveedor' : 'Factura de Venta'}</div>
@@ -3227,25 +3229,32 @@
       position: relative;
       z-index: 2;
       display: grid;
-      grid-template-columns: 240px 1fr 275px;
+      grid-template-columns: minmax(0, 1fr) minmax(240px, 280px);
       align-items: center;
       border-bottom: 2.5px solid #074073;
-      padding-bottom: 0.85rem;
-      margin-bottom: 0.75rem;
+      padding-bottom: 0.95rem;
+      margin-bottom: 0.95rem;
+      gap: 1.5rem;
+    }
+    .o_pdf_brand_identity {
+      display: flex;
+      align-items: center;
       gap: 1.25rem;
+      min-width: 0;
     }
     .o_pdf_logo_col {
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 100%;
-      height: 100%;
+      flex: 0 0 auto;
+      width: 105px;
+      height: 105px;
     }
     .o_pdf_company_logo {
-      max-height: 180px;
-      max-width: 100%;
+      max-height: 105px;
+      max-width: 105px;
       width: auto;
-      height: 175px;
+      height: auto;
       object-fit: contain;
       margin: 0 auto;
       display: block;
@@ -3254,10 +3263,11 @@
       display: flex;
       flex-direction: column;
       justify-content: center;
-      padding: 0 0.25rem;
+      min-width: 0;
+      flex: 1;
     }
-    .o_pdf_company_info h2 { font-size: 1.45rem; font-weight: 800; color: #074073; margin: 0 0 0.3rem 0; letter-spacing: 0.01em; }
-    .o_pdf_company_info p { margin: 0.18rem 0; font-size: 0.78rem; color: #4b5563; line-height: 1.4; }
+    .o_pdf_company_info h2 { font-size: 1.45rem; font-weight: 800; color: #074073; margin: 0 0 0.35rem 0; letter-spacing: 0.01em; white-space: nowrap; }
+    .o_pdf_company_info p { margin: 0.2rem 0; font-size: 0.82rem; color: #475569; line-height: 1.45; }
     .o_pdf_company_info p strong { color: #074073; }
     .o_pdf_doc_box {
       background: rgba(248, 250, 252, 0.85);
@@ -3468,22 +3478,36 @@
       }
       .o_pdf_brand_header {
         display: grid !important;
-        grid-template-columns: 210px 1fr 265px !important;
+        grid-template-columns: minmax(0, 1fr) 270px !important;
         align-items: center !important;
-        gap: 1rem !important;
+        gap: 1.25rem !important;
+      }
+      .o_pdf_brand_identity {
+        display: flex !important;
+        align-items: center !important;
+        gap: 1.25rem !important;
       }
       .o_pdf_logo_col {
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
+        flex: 0 0 auto !important;
+        width: 105px !important;
+        height: 105px !important;
       }
       .o_pdf_company_logo {
         display: block !important;
-        max-height: 165px !important;
-        height: 160px !important;
-        max-width: 100% !important;
+        max-height: 105px !important;
+        max-width: 105px !important;
+        width: auto !important;
+        height: auto !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
+        object-fit: contain !important;
+        margin: 0 auto !important;
+      }
+      .o_pdf_company_info h2 {
+        white-space: nowrap !important;
       }
       .o_pdf_doc_box {
         width: 100% !important;
@@ -3603,14 +3627,16 @@
         ${watermarkHtml}
 
         <div class="o_pdf_brand_header">
-          <div class="o_pdf_logo_col">
-            <img src="${logoSrc}" alt="CH Aluminios" class="o_pdf_company_logo" onerror="if(!this.src.startsWith('data:'))this.style.display='none'" />
-          </div>
-          <div class="o_pdf_company_info">
-            <h2>${esc(company.company_name || 'CH Aluminios')}</h2>
-            <p><strong>NIT:</strong> ${esc(company.company_vat || '900.876.543-1')} · <span>${esc(company.fiscal_regime || 'Responsable de IVA - Régimen Ordinario')}</span></p>
-            <p>${esc(company.company_address || 'Cra. 7 #18-45')} · ${esc(company.company_city || 'Pereira')}, ${esc(company.company_country || 'Colombia')}</p>
-            <p>Email: ${esc(company.company_email || 'chappdevm@gmail.com')} · PBX: (606) 315-0000</p>
+          <div class="o_pdf_brand_identity">
+            <div class="o_pdf_logo_col">
+              <img src="${logoSrc}" alt="CH Aluminios" class="o_pdf_company_logo" onerror="if(!this.src.startsWith('data:'))this.style.display='none'" />
+            </div>
+            <div class="o_pdf_company_info">
+              <h2>${esc(company.company_name || 'CH Aluminios')}</h2>
+              <p><strong>NIT:</strong> ${esc(company.company_vat || '900.876.543-1')} · <span>${esc(company.fiscal_regime || 'Responsable de IVA - Régimen Ordinario')}</span></p>
+              <p>${esc(company.company_address || 'Cra. 7 #18-45')} · ${esc(company.company_city || 'Pereira')}, ${esc(company.company_country || 'Colombia')}</p>
+              <p>Email: ${esc(company.company_email || 'chappdevm@gmail.com')} · PBX: (606) 315-0000</p>
+            </div>
           </div>
           <div class="o_pdf_doc_box">
             <div class="doc_type_title">${esc(docTitle)}</div>
@@ -3851,25 +3877,32 @@
       position: relative;
       z-index: 2;
       display: grid;
-      grid-template-columns: 240px 1fr 275px;
+      grid-template-columns: minmax(0, 1fr) minmax(240px, 280px);
+      align-items: center;
+      gap: 1.5rem;
+      border-bottom: 2.5px solid #074073;
+      padding-bottom: 0.95rem;
+      margin-bottom: 1.25rem;
+    }
+    .o_pdf_brand_identity {
+      display: flex;
       align-items: center;
       gap: 1.25rem;
-      border-bottom: 2.5px solid #074073;
-      padding-bottom: 0.85rem;
-      margin-bottom: 1.25rem;
+      min-width: 0;
     }
     .o_pdf_logo_col {
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 100%;
-      height: 100%;
+      flex: 0 0 auto;
+      width: 105px;
+      height: 105px;
     }
     .o_pdf_company_logo {
-      max-height: 180px;
-      max-width: 100%;
+      max-height: 105px;
+      max-width: 105px;
       width: auto;
-      height: 175px;
+      height: auto;
       object-fit: contain;
       margin: 0 auto;
       display: block;
@@ -3878,10 +3911,12 @@
       display: flex;
       flex-direction: column;
       justify-content: center;
-      padding: 0 0.25rem;
+      min-width: 0;
+      flex: 1;
     }
-    .o_pdf_company_info h2 { margin: 0 0 0.3rem 0; font-size: 1.45rem; font-weight: 800; color: #074073; }
-    .o_pdf_company_info p { margin: 0 0 0.2rem 0; font-size: 0.78rem; color: #475569; line-height: 1.4; }
+    .o_pdf_company_info h2 { font-size: 1.45rem; font-weight: 800; color: #074073; margin: 0 0 0.35rem 0; letter-spacing: 0.01em; white-space: nowrap; }
+    .o_pdf_company_info p { margin: 0.2rem 0; font-size: 0.82rem; color: #475569; line-height: 1.45; }
+    .o_pdf_company_info p strong { color: #074073; }
     .o_pdf_doc_box {
       border: 2px solid #074073;
       border-radius: 8px;
@@ -3957,22 +3992,36 @@
       .o_pdf_sheet { border: none !important; box-shadow: none !important; padding: 0 !important; max-width: 100% !important; }
       .o_pdf_brand_header {
         display: grid !important;
-        grid-template-columns: 210px 1fr 265px !important;
+        grid-template-columns: minmax(0, 1fr) 270px !important;
         align-items: center !important;
-        gap: 1rem !important;
+        gap: 1.25rem !important;
+      }
+      .o_pdf_brand_identity {
+        display: flex !important;
+        align-items: center !important;
+        gap: 1.25rem !important;
       }
       .o_pdf_logo_col {
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
+        flex: 0 0 auto !important;
+        width: 105px !important;
+        height: 105px !important;
       }
       .o_pdf_company_logo {
         display: block !important;
-        max-height: 165px !important;
-        height: 160px !important;
-        max-width: 100% !important;
+        max-height: 105px !important;
+        max-width: 105px !important;
+        width: auto !important;
+        height: auto !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
+        object-fit: contain !important;
+        margin: 0 auto !important;
+      }
+      .o_pdf_company_info h2 {
+        white-space: nowrap !important;
       }
       .o_pdf_doc_box {
         width: 100% !important;

@@ -2680,32 +2680,40 @@ dialog.o_dialog::backdrop {
   letter-spacing: 0.06em;
 }
 
-/* Encabezado Corporativo y Logo (3 Columnas: Logo, Empresa, Documento) */
+/* Encabezado Corporativo y Logo (Identidad Unificada y Tarjeta de Documento) */
 .o_pdf_brand_header {
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: 240px 1fr 275px;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 280px);
   align-items: center;
   border-bottom: 2.5px solid #074073;
-  padding-bottom: 0.85rem;
-  margin-bottom: 0.75rem;
+  padding-bottom: 0.95rem;
+  margin-bottom: 0.95rem;
+  gap: 1.5rem;
+}
+
+.o_pdf_brand_identity {
+  display: flex;
+  align-items: center;
   gap: 1.25rem;
+  min-width: 0;
 }
 
 .o_pdf_logo_col {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  height: 100%;
+  flex: 0 0 auto;
+  width: 105px;
+  height: 105px;
 }
 
 .o_pdf_company_logo {
-  max-height: 180px;
-  max-width: 100%;
+  max-height: 105px;
+  max-width: 105px;
   width: auto;
-  height: 175px;
+  height: auto;
   object-fit: contain;
   margin: 0 auto;
   display: block;
@@ -2715,22 +2723,24 @@ dialog.o_dialog::backdrop {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 0 0.25rem;
+  min-width: 0;
+  flex: 1;
 }
 
 .o_pdf_company_info h2 {
   font-size: 1.45rem;
   font-weight: 800;
   color: #074073;
-  margin: 0 0 0.3rem 0;
+  margin: 0 0 0.35rem 0;
   letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 
 .o_pdf_company_info p {
-  margin: 0.18rem 0;
-  font-size: 0.78rem;
-  color: #4b5563;
-  line-height: 1.4;
+  margin: 0.2rem 0;
+  font-size: 0.82rem;
+  color: #475569;
+  line-height: 1.45;
 }
 
 .o_pdf_company_info p strong {
@@ -2749,45 +2759,45 @@ dialog.o_dialog::backdrop {
 }
 
 .o_pdf_doc_box .doc_type_title {
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   font-weight: 800;
   color: #ffffff;
   background: #074073;
   border-bottom: 2px solid #14B5D9;
   margin: -0.75rem -1rem 0.6rem -1rem;
-  padding: 0.35rem 0.5rem;
+  padding: 0.4rem 0.5rem;
   border-radius: 5px 5px 0 0;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .o_pdf_doc_box .doc_number {
-  font-size: 1.18rem;
-  font-weight: 800;
+  font-size: 1.25rem;
+  font-weight: 900;
   color: #074073;
-  margin: 0.25rem 0;
+  margin: 0.25rem 0 0.4rem 0;
   font-variant-numeric: tabular-nums;
 }
 
 .o_pdf_doc_meta {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.25rem;
   margin-top: 0.4rem;
   border-top: 1px dashed #cbd5e1;
-  padding-top: 0.4rem;
+  padding-top: 0.45rem;
 }
 
 .o_pdf_doc_meta_row {
   display: flex;
   justify-content: space-between;
-  font-size: 0.74rem;
+  font-size: 0.80rem;
   color: #4b5563;
 }
 
 .o_pdf_doc_meta_row strong {
   color: #074073;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 /* Barra de Resolución DIAN / Cotización */
@@ -2798,12 +2808,12 @@ dialog.o_dialog::backdrop {
   border: 1px solid #cbe0f1;
   border-left: 3px solid #14B5D9;
   border-radius: 4px;
-  padding: 0.4rem 0.75rem;
-  font-size: 0.68rem;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.76rem;
   color: #074073;
   text-align: center;
-  margin-bottom: 0.85rem;
-  line-height: 1.35;
+  margin-bottom: 0.95rem;
+  line-height: 1.4;
 }
 
 .o_pdf_resolution_bar.is-quote {
@@ -2821,29 +2831,29 @@ dialog.o_dialog::backdrop {
   z-index: 2;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+  gap: 1.25rem;
   background: rgba(248, 250, 252, 0.85);
   border: 1px solid #cbe0f1;
   border-top: 2px solid #074073;
   border-radius: 6px;
-  padding: 0.85rem 1rem;
-  margin-bottom: 0.85rem;
+  padding: 0.95rem 1.15rem;
+  margin-bottom: 0.95rem;
 }
 
 .o_pdf_client_col .o_pdf_col_title {
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: #074073;
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.4rem;
   border-bottom: 1.5px solid #14B5D9;
-  padding-bottom: 0.2rem;
+  padding-bottom: 0.25rem;
 }
 
 .o_pdf_client_col p {
-  margin: 0.22rem 0;
-  font-size: 0.78rem;
+  margin: 0.24rem 0;
+  font-size: 0.84rem;
   color: #334155;
 }
 
@@ -2904,8 +2914,8 @@ dialog.o_dialog::backdrop {
   z-index: 2;
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 0.95rem;
-  font-size: 0.78rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.84rem;
 }
 
 .o_pdf_items_table thead {
@@ -2920,10 +2930,10 @@ dialog.o_dialog::backdrop {
   background: #074073;
   color: #ffffff;
   border-bottom: 2px solid #14B5D9;
-  padding: 0.5rem 0.6rem;
+  padding: 0.65rem 0.75rem;
   text-align: left;
   font-weight: 700;
-  font-size: 0.73rem;
+  font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
@@ -2937,7 +2947,7 @@ dialog.o_dialog::backdrop {
 }
 
 .o_pdf_items_table td {
-  padding: 0.5rem 0.6rem;
+  padding: 0.65rem 0.75rem;
   border-bottom: 1px solid #e2e8f0;
   color: #334155;
   background: rgba(255, 255, 255, 0.70);
@@ -2963,8 +2973,8 @@ dialog.o_dialog::backdrop {
   z-index: 2;
   display: grid;
   grid-template-columns: 1.25fr 1fr;
-  gap: 1.25rem;
-  margin-bottom: 1rem;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
   align-items: start;
 }
 
@@ -2977,7 +2987,7 @@ dialog.o_dialog::backdrop {
 .o_pdf_bottom_left {
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
+  gap: 0.75rem;
 }
 
 .o_pdf_amount_words {
@@ -2987,23 +2997,23 @@ dialog.o_dialog::backdrop {
   border-right: 1px solid #cbe0f1;
   border-bottom: 1px solid #cbe0f1;
   border-radius: 0 4px 4px 0;
-  padding: 0.55rem 0.8rem;
-  font-size: 0.74rem;
+  padding: 0.65rem 0.95rem;
+  font-size: 0.82rem;
   color: #074073;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .o_pdf_amount_words .label {
   font-weight: 700;
   text-transform: uppercase;
-  font-size: 0.67rem;
+  font-size: 0.72rem;
   color: #5593c2;
   display: block;
-  margin-bottom: 0.15rem;
+  margin-bottom: 0.2rem;
 }
 
 .o_pdf_amount_words .words {
-  font-weight: 700;
+  font-weight: 800;
   color: #074073;
 }
 
@@ -3031,7 +3041,7 @@ dialog.o_dialog::backdrop {
 .o_pdf_totals_table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   background: rgba(255, 255, 255, 0.88);
   border: 1px solid #cbe0f1;
   border-radius: 6px;
@@ -3039,7 +3049,7 @@ dialog.o_dialog::backdrop {
 }
 
 .o_pdf_totals_table td {
-  padding: 0.38rem 0.65rem;
+  padding: 0.45rem 0.75rem;
   border-bottom: 1px solid #f1f5f9;
   background: transparent;
 }
@@ -3051,13 +3061,13 @@ dialog.o_dialog::backdrop {
 }
 
 .o_pdf_totals_table .is-grand-total td {
-  font-size: 1.05rem;
-  font-weight: 800;
+  font-size: 1.12rem;
+  font-weight: 900;
   border-top: 2px solid #14B5D9;
   border-bottom: 2px solid #14B5D9;
   background: #074073;
   color: #ffffff;
-  padding: 0.5rem 0.65rem;
+  padding: 0.55rem 0.75rem;
 }
 
 .o_pdf_totals_table .is-residual-row td {
@@ -3078,8 +3088,8 @@ dialog.o_dialog::backdrop {
   z-index: 2;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 2rem;
-  margin: 1.25rem 0 1rem 0;
+  gap: 2.5rem;
+  margin: 2.25rem 0 1.25rem 0;
   padding-top: 0.5rem;
 }
 
@@ -3090,27 +3100,27 @@ dialog.o_dialog::backdrop {
 
 .o_pdf_sign_box .sign_line {
   border-bottom: 1.5px solid #074073;
-  margin-bottom: 0.45rem;
-  height: 38px;
+  margin-bottom: 0.55rem;
+  height: 48px;
 }
 
 .o_pdf_sign_box .sign_name {
-  font-size: 0.78rem;
-  font-weight: 700;
+  font-size: 0.88rem;
+  font-weight: 800;
   color: #074073;
 }
 
 .o_pdf_sign_box .sign_title {
-  font-size: 0.68rem;
+  font-size: 0.78rem;
   color: #14B5D9;
   text-transform: uppercase;
   font-weight: 700;
 }
 
 .o_pdf_sign_box .sign_sub {
-  font-size: 0.66rem;
+  font-size: 0.74rem;
   color: #4b5563;
-  margin-top: 0.15rem;
+  margin-top: 0.2rem;
 }
 
 /* Pie Legal */
@@ -3118,6 +3128,13 @@ dialog.o_dialog::backdrop {
   position: relative;
   z-index: 2;
   border-top: 1px solid #e2e8f0;
+  padding-top: 0.85rem;
+  margin-top: 1.5rem;
+  text-align: center;
+  font-size: 0.74rem;
+  color: #64748b;
+  line-height: 1.5;
+}
   padding-top: 0.75rem;
   font-size: 0.69rem;
   color: #64748b;
@@ -3174,22 +3191,36 @@ dialog.o_dialog::backdrop {
   }
   .o_pdf_brand_header {
     display: grid !important;
-    grid-template-columns: 210px 1fr 265px !important;
+    grid-template-columns: minmax(0, 1fr) 270px !important;
     align-items: center !important;
-    gap: 1rem !important;
+    gap: 1.25rem !important;
+  }
+  .o_pdf_brand_identity {
+    display: flex !important;
+    align-items: center !important;
+    gap: 1.25rem !important;
   }
   .o_pdf_logo_col {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
+    flex: 0 0 auto !important;
+    width: 105px !important;
+    height: 105px !important;
   }
   .o_pdf_company_logo {
     display: block !important;
-    max-height: 165px !important;
-    height: 160px !important;
-    max-width: 100% !important;
+    max-height: 105px !important;
+    max-width: 105px !important;
+    width: auto !important;
+    height: auto !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    object-fit: contain !important;
+    margin: 0 auto !important;
+  }
+  .o_pdf_company_info h2 {
+    white-space: nowrap !important;
   }
   .o_pdf_doc_box {
     width: 100% !important;
