@@ -2406,6 +2406,15 @@ dialog.o_dialog::backdrop {
   flex-direction: column;
   gap: 1.25rem;
   min-width: 0;
+  width: 100%;
+}
+
+.o_invoice_left_col .o_form_sheet_bg {
+  width: 100%;
+}
+
+.o_invoice_left_col .o_chatter {
+  width: 100%;
 }
 
 .o_invoice_link_row {

@@ -3881,8 +3881,7 @@
     container.innerHTML = `
       <div class="o_invoice_split_container">
         <div class="o_invoice_left_col">
-          <div class="o_form_view">
-            <div class="o_form_sheet_bg">
+          <div class="o_form_sheet_bg">
               <div class="o_form_statusbar">
                 <div class="o_statusbar_buttons">
                   <button type="button" class="btn btn-primary" id="btnSaveSaleOrder">Guardar</button>
@@ -4067,7 +4066,6 @@
             </div>
 
             ${renderChatterHtml('sales', existing)}
-          </div>
         </div>
 
         <aside class="o_invoice_pdf_panel" aria-label="Previsualización PDF de la Cotización">
