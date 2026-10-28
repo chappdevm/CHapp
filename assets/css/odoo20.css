@@ -2385,11 +2385,11 @@ dialog.o_dialog::backdrop {
 }
 
 /* ==========================================================================
-   Split View y Previsualización Lateral de Factura PDF
+   Split View y Previsualización Lateral de Factura PDF / Cotización
    ========================================================================== */
 .o_invoice_split_container {
   display: grid;
-  grid-template-columns: minmax(360px, 1fr) minmax(460px, 1.25fr);
+  grid-template-columns: minmax(0, 65fr) minmax(0, 35fr);
   gap: 1.5rem;
   align-items: start;
 }
@@ -2511,6 +2511,7 @@ dialog.o_dialog::backdrop {
   max-height: calc(100vh - 2rem);
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .o_pdf_panel_header {
@@ -2536,7 +2537,7 @@ dialog.o_dialog::backdrop {
 
 .o_pdf_paper_viewport {
   padding: 1.25rem;
-  overflow-y: auto;
+  overflow: auto;
   background: #525659;
   flex: 1;
 }

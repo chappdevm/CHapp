@@ -896,10 +896,10 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.ok(jsText.includes('class="o_invoice_link_row" data-invoice-id="'), 'Linked invoice rows must have data-invoice-id on <tr>');
     assert.ok(jsText.includes("container.querySelectorAll('.o_linked_invoices_panel tbody tr[data-invoice-id]')"), 'JS must attach click listener directly to linked invoice rows');
 
-    // 3. Layout de Factura: Tarjeta de Historial y Auditoría debajo de la tarjeta de factura, y PDF ocupando el espacio derecho
+    // 3. Layout de Factura: Tarjeta de Historial y Auditoría debajo de la tarjeta de factura, y PDF ocupando el espacio derecho (65% formulario / 35% previsualización)
     assert.ok(cssText.includes('.o_invoice_left_col'), 'CSS must define .o_invoice_left_col with flex column layout');
     assert.ok(jsText.includes('<div class="o_invoice_left_col">'), 'Invoice view must stack sheet and chatter vertically in o_invoice_left_col');
-    assert.ok(cssText.includes('minmax(460px, 1.25fr)'), 'CSS must allocate wide flexible space for right-hand invoice PDF panel');
+    assert.ok(cssText.includes('minmax(0, 65fr) minmax(0, 35fr)'), 'CSS must allocate 65% space for form and 35% for right-hand invoice PDF panel');
 
     // 4. Modal de pago con opción de generar automáticamente la factura por saldo restante
     assert.ok(htmlText.includes('id="chkGenerateResidualInvoice"'), 'Payment dialog must have chkGenerateResidualInvoice checkbox');
