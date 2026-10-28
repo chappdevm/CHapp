@@ -147,7 +147,18 @@ function createHandler(store = new ERPStore(undefined, { useSupabase: isSupabase
             return sendJson(res, 400, { ok: false, error: 'Se requiere la imagen de la factura en base64.' });
           }
           const parsed = await analyzeInvoiceImage(body.image, body.mime_type || 'image/jpeg');
-          return sendJson(res, 200, { ok: true, data: parsed });
+          let matchedPartner = null;
+          if (parsed && (parsed.supplier_name || parsed.supplier_vat)) {
+            matchedPartner = store.findMatchingContact(parsed.supplier_name, parsed.supplier_vat);
+          }
+          return sendJson(res, 200, {
+            ok: true,
+            data: parsed,
+            matched_partner: matchedPartner
+              ? { id: matchedPartner.id, name: matchedPartner.name, vat: matchedPartner.vat }
+              : null,
+            state: store.getBootstrapState()
+          });
         }
 
         // Expenses

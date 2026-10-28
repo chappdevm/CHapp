@@ -438,18 +438,27 @@
 
         dialog.close();
         aiLoading.style.display = 'none';
-        showToast('IA de Gemini: Factura analizada exitosamente');
+
+        const matched = res.matched_partner;
+        if (matched) {
+          showToast(`IA: Factura leída. Proveedor reconocido: ${matched.name}`);
+        } else if (res.data.supplier_name) {
+          showToast(`IA: Factura leída. Proveedor: "${res.data.supplier_name}" (se creará automáticamente si es nuevo)`);
+        } else {
+          showToast('IA: Factura analizada exitosamente');
+        }
 
         if (targetCallback) {
-          targetCallback(res.data, base64Data);
+          targetCallback(res.data, base64Data, matched);
         } else {
           state.currentApp = 'expenses';
           state.viewType = 'form';
           state.activeRecordId = 'new';
           state.formDraft = {
             name: res.data.name || 'Gasto proveedor',
-            partner_name: res.data.supplier_name || '',
-            supplier_vat: res.data.supplier_vat || '',
+            partner_id: matched ? matched.id : '',
+            partner_name: matched ? matched.name : (res.data.supplier_name || ''),
+            supplier_vat: res.data.supplier_vat || (matched ? matched.vat : ''),
             receipt_ref: res.data.reference || '',
             date: res.data.date || new Date().toISOString().slice(0, 10),
             total_amount: Number(res.data.total_amount || 0),
@@ -1694,9 +1703,23 @@
     wireChatterEvents('expenses', existing.id);
 
     const openCameraForForm = () => {
-      openExpenseCameraDialog((scannedData, imageBase64) => {
+      openExpenseCameraDialog((scannedData, imageBase64, matched) => {
         if (scannedData.name) document.getElementById('fExpName').value = scannedData.name;
-        if (scannedData.supplier_name) document.getElementById('fExpPartnerName').value = scannedData.supplier_name;
+        if (matched) {
+          const pSel = document.getElementById('fExpPartner');
+          if (pSel) pSel.value = String(matched.id);
+          document.getElementById('fExpPartnerName').value = matched.name;
+          existing.partner_id = matched.id;
+          existing.partner_name = matched.name;
+        } else if (scannedData.supplier_name) {
+          const pSel = document.getElementById('fExpPartner');
+          if (pSel) pSel.value = '';
+          document.getElementById('fExpPartnerName').value = scannedData.supplier_name;
+          existing.partner_name = scannedData.supplier_name;
+        }
+        if (scannedData.supplier_vat) {
+          existing.supplier_vat = scannedData.supplier_vat;
+        }
         if (scannedData.reference) document.getElementById('fExpReceipt').value = scannedData.reference;
         if (scannedData.date) document.getElementById('fExpDate').value = scannedData.date;
         if (scannedData.total_amount) document.getElementById('fExpTotal').value = scannedData.total_amount;
@@ -1787,7 +1810,8 @@
             ? ((state.data.products.find((p) => Number(p.id) === Number(prodVal)) || {}).name || 'Gasto General')
             : (defaultProd ? defaultProd.name : 'Gasto General'),
           partner_id: matchedPartner ? matchedPartner.id : (existing.partner_id || null),
-          partner_name: partnerNameInput || (matchedPartner ? matchedPartner.name : 'Proveedor General'),
+          partner_name: partnerNameInput || (matchedPartner ? matchedPartner.name : ''),
+          supplier_vat: existing.supplier_vat || '',
           date: document.getElementById('fExpDate').value,
           receipt_ref: document.getElementById('fExpReceipt').value.trim(),
           quantity: 1,

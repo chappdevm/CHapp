@@ -241,6 +241,74 @@ function createInitialData() {
 };
 }
 
+function cleanDigits(val) {
+  if (!val) return '';
+  return String(val).replace(/\D/g, '');
+}
+
+function normalizeSupplierName(name) {
+  if (!name) return '';
+  let str = String(name)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+  // Remove corporate entity suffixes
+  str = str
+    .replace(/\b(s\.?\s*a\.?\s*s\.?|sociedad por acciones simplificada)\b/gi, ' ')
+    .replace(/\b(s\.?\s*a\.?|sociedad anonima)\b/gi, ' ')
+    .replace(/\b(ltda\.?|limitada)\b/gi, ' ')
+    .replace(/\b(e\.?\s*u\.?|empresa unipersonal)\b/gi, ' ')
+    .replace(/\b(s\.?\s*en\s*c\.?)\b/gi, ' ')
+    .replace(/\b(cia\.?|compania|corp\.?|inc\.?)\b/gi, ' ')
+    .replace(/\b(sucursal colombia)\b/gi, ' ')
+    .replace(/[^a-z0-9]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // Strip trailing 's' if word > 5 chars (e.g. tuberias -> tuberia)
+  if (str.endsWith('s') && str.length > 5) {
+    str = str.slice(0, -1);
+  }
+  return str;
+}
+
+function levenshteinDist(a, b) {
+  const m = a.length, n = b.length;
+  const d = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) d[i][0] = i;
+  for (let j = 0; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+    }
+  }
+  return d[m][n];
+}
+
+function isSupplierMatch(nameA, nameB) {
+  const nA = normalizeSupplierName(nameA);
+  const nB = normalizeSupplierName(nameB);
+  if (!nA || !nB) return false;
+  if (nA === nB) return true;
+
+  if (nA + 's' === nB || nB + 's' === nA) return true;
+
+  if (nA.includes(nB) || nB.includes(nA)) {
+    const minLen = Math.min(nA.length, nB.length);
+    const maxLen = Math.max(nA.length, nB.length);
+    if (minLen / maxLen >= 0.7) return true;
+  }
+
+  const maxLen = Math.max(nA.length, nB.length);
+  const dist = levenshteinDist(nA, nB);
+  if (maxLen >= 5 && dist <= 1) return true;
+  if (maxLen >= 8 && dist <= 2) return true;
+
+  return false;
+}
+
 class ERPStore {
   constructor(dbPath = DEFAULT_DB_PATH, options = {}) {
     this.dbPath = dbPath;
@@ -758,6 +826,69 @@ class ERPStore {
     return removed;
   }
 
+  findMatchingContact(name, vat = '') {
+    const list = this.data.contacts || [];
+    const cleanVat = cleanDigits(vat);
+
+    // 1. Check NIT / VAT if provided and length >= 6
+    if (cleanVat && cleanVat.length >= 6) {
+      const vatMatch = list.find((c) => {
+        const cVat = cleanDigits(c.vat);
+        if (!cVat || cVat.length < 6) return false;
+        return cVat === cleanVat || cVat.startsWith(cleanVat) || cleanVat.startsWith(cVat);
+      });
+      if (vatMatch) return vatMatch;
+    }
+
+    // 2. Fuzzy name comparison
+    if (!name || !String(name).trim()) return null;
+    return (
+      list.find((c) => isSupplierMatch(c.name, name) || (c.company_name && isSupplierMatch(c.company_name, name))) ||
+      null
+    );
+  }
+
+  async resolveOrCreateSupplier(supplierName, supplierVat = '') {
+    const cleanName = String(supplierName || '').trim();
+    if (!cleanName && !supplierVat) return null;
+
+    let matched = this.findMatchingContact(cleanName, supplierVat);
+    if (matched) {
+      // If contact didn't have VAT but now we have one from invoice scan, enrich it
+      if (!matched.vat && supplierVat) {
+        matched.vat = String(supplierVat).trim();
+        this.save();
+        if (this.supabase) {
+          try {
+            await this.supabase.savePartner(matched);
+          } catch (e) {
+            /* ignore */
+          }
+        }
+      }
+      return matched;
+    }
+
+    // Automatically create new supplier contact!
+    const newContact = await this.saveContact({
+      name: cleanName || 'Proveedor General',
+      company_name: cleanName,
+      is_company: true,
+      doc_type: 'NIT',
+      vat: supplierVat ? String(supplierVat).trim() : '',
+      customer_rank: 0,
+      supplier_rank: 1,
+      category_ids: ['Proveedor'],
+      city: 'Pereira',
+      state_name: 'Risaralda',
+      country: 'Colombia',
+      payment_term: '30 Días',
+      notes: 'Proveedor creado automáticamente desde escaneo de factura de compra.'
+    });
+
+    return newContact;
+  }
+
   // ==================== GASTOS (hr.expense) ====================
   async saveExpense(payload) {
     if (!payload || typeof payload !== 'object') throw new Error('Datos de gasto inválidos.');
@@ -775,7 +906,12 @@ class ERPStore {
     const totalAmount = round2(untaxed + taxAmount);
 
     const product = this.data.products.find((p) => Number(p.id) === Number(payload.product_id));
-    const partner = this.data.contacts.find((c) => Number(c.id) === Number(payload.partner_id));
+    let partner = this.data.contacts.find((c) => Number(c.id) === Number(payload.partner_id));
+    if (!partner && (payload.partner_name || payload.supplier_name || payload.supplier_vat)) {
+      const suppName = payload.partner_name || payload.supplier_name || '';
+      const suppVat = payload.supplier_vat || payload.vat || '';
+      partner = await this.resolveOrCreateSupplier(suppName, suppVat);
+    }
 
     if (payload.id) {
       const idx = this.data.expenses.findIndex((e) => Number(e.id) === Number(payload.id));

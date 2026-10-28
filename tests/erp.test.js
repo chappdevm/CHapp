@@ -1136,4 +1136,71 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.ok(jsText.includes('btnExpensesBannerNew'), 'Expenses banner must include New Manual Expense button');
     assert.ok(jsText.includes('btnExpensesBannerScan'), 'Expenses banner must include AI camera scan button');
   });
+
+  it('Module 2 (Gastos & Proveedores IA): auto-creación de proveedor y fuzzy matching riguroso para variaciones de razón social (ej: Tuberia vs Tuberia SAS)', async () => {
+    // 1. Gasto con nuevo proveedor "Tubería"
+    const exp1 = await req('/api/expenses', 'POST', {
+      name: 'Tubos estructurales 2 pulgadas',
+      partner_name: 'Tubería',
+      supplier_vat: '900.555.444-1',
+      receipt_ref: 'FAC-001',
+      total_amount: 320000,
+      quantity: 1,
+      price_unit: 320000
+    });
+    assert.equal(exp1.status, 200);
+    assert.ok(exp1.json.ok);
+    assert.ok(exp1.json.expense.partner_id > 0, 'Must link to auto-created contact');
+    const partnerId = exp1.json.expense.partner_id;
+
+    // Verificar que el proveedor fue creado en contactos con rol Proveedor
+    const createdContact = exp1.json.state.contacts.find((c) => Number(c.id) === Number(partnerId));
+    assert.ok(createdContact, 'Supplier must exist in contacts list');
+    assert.equal(createdContact.supplier_rank, 1, 'Supplier must have supplier_rank = 1');
+    assert.equal(createdContact.customer_rank, 0, 'Supplier must have customer_rank = 0');
+    assert.equal(createdContact.is_company, true);
+    assert.equal(createdContact.vat, '900.555.444-1');
+
+    const contactCountBefore = exp1.json.state.contacts.length;
+
+    // 2. Segundo gasto con variación "TUBERIA S.A.S." (misma empresa con sufijo comercial y mayúsculas)
+    const exp2 = await req('/api/expenses', 'POST', {
+      name: 'Codos y uniones PVC',
+      partner_name: 'TUBERIA S.A.S.',
+      receipt_ref: 'FAC-002',
+      total_amount: 150000,
+      quantity: 1,
+      price_unit: 150000
+    });
+    assert.equal(exp2.status, 200);
+    assert.ok(exp2.json.ok);
+    assert.equal(exp2.json.expense.partner_id, partnerId, 'Fuzzy matching must recognize TUBERIA S.A.S. as existing Tubería');
+    assert.equal(exp2.json.state.contacts.length, contactCountBefore, 'Must NOT create duplicate contact for TUBERIA S.A.S.');
+
+    // 3. Tercer gasto con variación plural "Tuberías"
+    const exp3 = await req('/api/expenses', 'POST', {
+      name: 'Abrazaderas galvanizadas',
+      partner_name: 'Tuberías',
+      receipt_ref: 'FAC-003',
+      total_amount: 80000,
+      quantity: 1,
+      price_unit: 80000
+    });
+    assert.equal(exp3.status, 200);
+    assert.equal(exp3.json.expense.partner_id, partnerId, 'Must recognize Tuberías as existing Tubería');
+    assert.equal(exp3.json.state.contacts.length, contactCountBefore, 'Must NOT create duplicate contact for Tuberías');
+
+    // 4. Gasto con un proveedor verdaderamente distinto ("Ferretería El Tornillo")
+    const exp4 = await req('/api/expenses', 'POST', {
+      name: 'Tornillos autorroscantes',
+      partner_name: 'Ferretería El Tornillo',
+      receipt_ref: 'FAC-004',
+      total_amount: 45000,
+      quantity: 1,
+      price_unit: 45000
+    });
+    assert.equal(exp4.status, 200);
+    assert.notEqual(exp4.json.expense.partner_id, partnerId, 'Different supplier must get new partner_id');
+    assert.equal(exp4.json.state.contacts.length, contactCountBefore + 1, 'Must create new contact for Ferretería El Tornillo');
+  });
 });
