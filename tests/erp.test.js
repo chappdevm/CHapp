@@ -1247,4 +1247,18 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.ok(jsText.includes('id="expenseItemsTable"'), 'Debe existir tabla estructurada de artículos del gasto');
     assert.ok(jsText.includes('btnAddExpenseItem'), 'Debe existir botón para agregar artículos');
   });
+  it('Trazabilidad e Identificadores: navegación entre módulos conserva retorno y muestra códigos reales (EXP, INV, SO, etc.) en vez de #IDs', async () => {
+    // 1. Verificar settings de la empresa
+    const bootRes = await req('/api/bootstrap', 'GET');
+    assert.equal(bootRes.status, 200);
+    assert.ok(!bootRes.json.data.settings.company_name.includes('GH'), 'Company name must not contain GH');
+
+    // 2. Frontend verification
+    const jsText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
+    assert.ok(jsText.includes('function getRecordIdentifier(appId, submenu, recordId)'), 'Must define getRecordIdentifier');
+    assert.ok(!jsText.includes("recLabel = state.activeRecordId === 'new' ? 'Nuevo' : `#${state.activeRecordId}`;"), 'Must not fallback to bare #id in breadcrumbs');
+    assert.ok(jsText.includes('crumbTraceReturn'), 'Must provide crumbTraceReturn breadcrumb for navigation traceability');
+    assert.ok(jsText.includes('state.navStack'), 'Must support state.navStack for returning to originating module');
+    assert.ok(jsText.includes('btnGoToOriginDoc'), 'Must support jumping to origin document');
+  });
 });

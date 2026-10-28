@@ -3,14 +3,14 @@
     "version": "20.0.1.0",
     "based_on": "Odoo 20 Enterprise",
     "sequences": {
-      "contact": 3,
+      "contact": 5,
       "product": 3,
-      "expense": 2,
-      "sale": 2,
-      "move_inv": 2,
+      "expense": 3,
+      "sale": 4,
+      "move_inv": 5,
       "move_bill": 1,
       "move_misc": 1,
-      "payment": 1,
+      "payment": 5,
       "account": 12,
       "tax": 5
     }
@@ -38,15 +38,15 @@
     "active_user": {
       "id": 1,
       "name": "Administrador CHapp",
-      "email": "chappdevm@gmail.com",
-      "role": "Administrador General"
+      "role": "Administrador General",
+      "email": "chappdevm@gmail.com"
     },
     "users": [
       {
         "id": 1,
         "name": "Administrador CHapp",
-        "email": "chappdevm@gmail.com",
         "role": "Administrador General",
+        "email": "chappdevm@gmail.com",
         "active": true
       }
     ]
@@ -79,6 +79,62 @@
       "active": true,
       "created_at": "2026-10-26T21:32:05.921676+00:00",
       "chatter": []
+    },
+    {
+      "id": 3,
+      "name": "Prueba",
+      "is_company": false,
+      "company_name": "",
+      "doc_type": "CC",
+      "vat": "15645646",
+      "function": "Cliente Corporativo",
+      "street": "",
+      "city": "Pereira",
+      "state_name": "Risaralda",
+      "country": "Colombia",
+      "email": "572772",
+      "phone": "",
+      "mobile": "477",
+      "website": "",
+      "customer_rank": 1,
+      "supplier_rank": 0,
+      "category_ids": [
+        "Cliente"
+      ],
+      "payment_term": "Contado",
+      "color": 4,
+      "notes": "52725",
+      "active": true,
+      "created_at": "2026-10-27T21:20:51.489814+00:00",
+      "chatter": []
+    },
+    {
+      "id": 4,
+      "name": "COMERCIAL CORTEZA S.A.S.",
+      "is_company": true,
+      "company_name": "COMERCIAL CORTEZA S.A.S.",
+      "doc_type": "NIT",
+      "vat": "901.458.077-1",
+      "function": "Empresa",
+      "street": "",
+      "city": "Pereira",
+      "state_name": "Risaralda",
+      "country": "Colombia",
+      "email": "",
+      "phone": "",
+      "mobile": "",
+      "website": "",
+      "customer_rank": 0,
+      "supplier_rank": 1,
+      "category_ids": [
+        "Proveedor"
+      ],
+      "payment_term": "30 Días",
+      "color": 5,
+      "notes": "Proveedor creado automáticamente desde escaneo de factura de compra.",
+      "active": true,
+      "created_at": "2026-10-28T14:45:02.64843+00:00",
+      "chatter": []
     }
   ],
   "products": [
@@ -97,6 +153,31 @@
     }
   ],
   "expenses": [
+    {
+      "id": 2,
+      "reference": "EXP/2026/0002",
+      "name": "Divisiones de baño y perfiles de aluminio",
+      "employee_name": "Administrador CHapp",
+      "department": "Operaciones & Proyectos",
+      "product_id": 1,
+      "product_name": "Servicio Auditoria Live",
+      "date": "2026-09-08",
+      "payment_mode": "company_account",
+      "quantity": 1,
+      "price_unit": 378000,
+      "tax_rate": 0,
+      "untaxed_amount": 378000,
+      "tax_amount": 0,
+      "total_amount": 378000,
+      "partner_id": 4,
+      "partner_name": "COMERCIAL CORTEZA S.A.S.",
+      "receipt_ref": "FECC 83624",
+      "notes": "NIT: 901.458.077-1. División de baño nave natural, jamba natural, nave anolok, tubular T98, sillar anolok, cabezal anolok",
+      "state": "draft",
+      "move_id": null,
+      "payment_id": null,
+      "chatter": []
+    },
     {
       "id": 1,
       "reference": "EXP/2026/0001",
@@ -124,6 +205,78 @@
     }
   ],
   "sales": [
+    {
+      "id": 3,
+      "name": "S00003",
+      "partner_id": 3,
+      "partner_name": "Prueba",
+      "date_order": "2026-10-28",
+      "validity_date": "2026-11-27",
+      "salesperson": "Administrador CHapp",
+      "payment_term": "Contado",
+      "state": "sale",
+      "invoice_status": "to invoice",
+      "amount_untaxed": 2700000,
+      "amount_tax": 513000,
+      "amount_total": 3213000,
+      "notes": "Condiciones de pago y entrega según cotización.",
+      "invoice_ids": [],
+      "lines": [
+        {
+          "id": 137,
+          "product_id": 1,
+          "product_name": "Servicio Auditoria Live",
+          "description": "Servicio Auditoria Live",
+          "quantity": 12,
+          "uom": "Unidad",
+          "price_unit": 225000,
+          "discount": 0,
+          "tax_rate": 19,
+          "subtotal": 2700000,
+          "tax_amount": 513000,
+          "total": 3213000
+        }
+      ],
+      "chatter": []
+    },
+    {
+      "id": 2,
+      "name": "S00002",
+      "partner_id": 3,
+      "partner_name": "Prueba",
+      "date_order": "2026-10-27",
+      "validity_date": "2026-11-26",
+      "salesperson": "Administrador CHapp",
+      "payment_term": "Contado",
+      "state": "sale",
+      "invoice_status": "invoiced",
+      "amount_untaxed": 300000,
+      "amount_tax": 57000,
+      "amount_total": 357000,
+      "notes": "Condiciones de pago y entrega según cotización.",
+      "invoice_ids": [
+        4,
+        3,
+        2
+      ],
+      "lines": [
+        {
+          "id": 116,
+          "product_id": 1,
+          "product_name": "Servicio Auditoria Live",
+          "description": "Servicio Auditoria Live",
+          "quantity": 1,
+          "uom": "Unidad",
+          "price_unit": 300000,
+          "discount": 0,
+          "tax_rate": 19,
+          "subtotal": 300000,
+          "tax_amount": 57000,
+          "total": 357000
+        }
+      ],
+      "chatter": []
+    },
     {
       "id": 1,
       "name": "S00001",
@@ -316,6 +469,183 @@
     ],
     "moves": [
       {
+        "id": 4,
+        "name": "INV/2026/0004",
+        "move_type": "out_invoice",
+        "journal_id": 1,
+        "journal_code": "INV",
+        "journal_name": "Facturas de Clientes",
+        "partner_id": 3,
+        "partner_name": "Prueba",
+        "invoice_date": "2026-10-28",
+        "invoice_date_due": "2026-11-27",
+        "ref": "INV/2026/0002",
+        "origin": "S00002",
+        "state": "cancel",
+        "payment_state": "not_paid",
+        "amount_untaxed": 120168.07,
+        "amount_tax": 22831.93,
+        "amount_total": 143000,
+        "amount_residual": 0,
+        "lines": [
+          {
+            "id": 1,
+            "product_id": null,
+            "name": "INV/2026/0002",
+            "account_code": "413501",
+            "account_name": "Ingresos por Servicios de Software y Consultoría",
+            "quantity": 1,
+            "price_unit": 120168.07,
+            "tax_rate": 19,
+            "subtotal": 120168.07,
+            "tax_amount": 22831.93,
+            "total": 143000
+          }
+        ],
+        "journal_items": [
+          {
+            "account_code": "130505",
+            "account_name": "Clientes Nacionales (Cuentas por Cobrar)",
+            "label": "Prueba",
+            "debit": 143000,
+            "credit": 0
+          },
+          {
+            "account_code": "413501",
+            "account_name": "Ingresos por Servicios de Software y Consultoría",
+            "label": "Ingresos por facturación",
+            "debit": 0,
+            "credit": 120168.07
+          },
+          {
+            "account_code": "240801",
+            "account_name": "IVA Generado en Ventas (19%)",
+            "label": "IVA Generado",
+            "debit": 0,
+            "credit": 22831.93
+          }
+        ],
+        "chatter": []
+      },
+      {
+        "id": 3,
+        "name": "INV/2026/0003",
+        "move_type": "out_invoice",
+        "journal_id": 1,
+        "journal_code": "INV",
+        "journal_name": "Facturas de Clientes",
+        "partner_id": 3,
+        "partner_name": "Prueba",
+        "invoice_date": "2026-10-28",
+        "invoice_date_due": "2026-11-27",
+        "ref": "INV/2026/0002",
+        "origin": "S00002",
+        "state": "cancel",
+        "payment_state": "not_paid",
+        "amount_untaxed": 126050.42,
+        "amount_tax": 23949.58,
+        "amount_total": 150000,
+        "amount_residual": 0,
+        "lines": [
+          {
+            "id": 1,
+            "product_id": null,
+            "name": "INV/2026/0002",
+            "account_code": "413501",
+            "account_name": "Ingresos por Servicios de Software y Consultoría",
+            "quantity": 1,
+            "price_unit": 126050.42,
+            "tax_rate": 19,
+            "subtotal": 126050.42,
+            "tax_amount": 23949.58,
+            "total": 150000
+          }
+        ],
+        "journal_items": [
+          {
+            "account_code": "130505",
+            "account_name": "Clientes Nacionales (Cuentas por Cobrar)",
+            "label": "Prueba",
+            "debit": 150000,
+            "credit": 0
+          },
+          {
+            "account_code": "413501",
+            "account_name": "Ingresos por Servicios de Software y Consultoría",
+            "label": "Ingresos por facturación",
+            "debit": 0,
+            "credit": 126050.42
+          },
+          {
+            "account_code": "240801",
+            "account_name": "IVA Generado en Ventas (19%)",
+            "label": "IVA Generado",
+            "debit": 0,
+            "credit": 23949.58
+          }
+        ],
+        "chatter": []
+      },
+      {
+        "id": 2,
+        "name": "INV/2026/0002",
+        "move_type": "out_invoice",
+        "journal_id": 1,
+        "journal_code": "INV",
+        "journal_name": "Facturas de Clientes",
+        "partner_id": 3,
+        "partner_name": "Prueba",
+        "invoice_date": "2026-10-27",
+        "invoice_date_due": "2026-11-26",
+        "ref": "S00002",
+        "origin": "S00002",
+        "state": "posted",
+        "payment_state": "paid",
+        "amount_untaxed": 300000,
+        "amount_tax": 57000,
+        "amount_total": 357000,
+        "amount_residual": 0,
+        "lines": [
+          {
+            "id": 1,
+            "product_id": null,
+            "name": "S00002",
+            "account_code": "413501",
+            "account_name": "Ingresos por Servicios de Software y Consultoría",
+            "quantity": 1,
+            "price_unit": 300000,
+            "tax_rate": 19,
+            "subtotal": 300000,
+            "tax_amount": 57000,
+            "total": 357000
+          }
+        ],
+        "journal_items": [
+          {
+            "account_code": "130505",
+            "account_name": "Clientes Nacionales (Cuentas por Cobrar)",
+            "label": "Prueba",
+            "debit": 357000,
+            "credit": 0
+          },
+          {
+            "account_code": "413501",
+            "account_name": "Ingresos por Servicios de Software y Consultoría",
+            "label": "Ingresos por facturación",
+            "debit": 0,
+            "credit": 300000
+          },
+          {
+            "account_code": "240801",
+            "account_name": "IVA Generado en Ventas (19%)",
+            "label": "IVA Generado",
+            "debit": 0,
+            "credit": 57000
+          }
+        ],
+        "chatter": []
+      },
+      {
         "id": 1,
         "name": "INV/2026/0001",
         "move_type": "out_invoice",
@@ -375,6 +705,63 @@
         "chatter": []
       }
     ],
-    "payments": []
+    "payments": [
+      {
+        "id": 4,
+        "name": "PAY/2026/0004",
+        "payment_type": "inbound",
+        "partner_id": 3,
+        "partner_name": "Prueba",
+        "amount": 143000,
+        "date": "2026-10-28",
+        "journal_code": "CSH1",
+        "journal_name": "Caja General Efectivo",
+        "ref": "INV/2026/0002",
+        "move_id": 2,
+        "state": "posted"
+      },
+      {
+        "id": 3,
+        "name": "PAY/2026/0003",
+        "payment_type": "inbound",
+        "partner_id": 3,
+        "partner_name": "Prueba",
+        "amount": 7000,
+        "date": "2026-10-28",
+        "journal_code": "CSH1",
+        "journal_name": "Caja General Efectivo",
+        "ref": "INV/2026/0002",
+        "move_id": 2,
+        "state": "posted"
+      },
+      {
+        "id": 2,
+        "name": "PAY/2026/0002",
+        "payment_type": "inbound",
+        "partner_id": 3,
+        "partner_name": "Prueba",
+        "amount": 7000,
+        "date": "2026-10-28",
+        "journal_code": "CSH1",
+        "journal_name": "Caja General Efectivo",
+        "ref": "INV/2026/0002",
+        "move_id": 2,
+        "state": "posted"
+      },
+      {
+        "id": 1,
+        "name": "PAY/2026/0001",
+        "payment_type": "inbound",
+        "partner_id": 3,
+        "partner_name": "Prueba",
+        "amount": 200000,
+        "date": "2026-10-27",
+        "journal_code": "CSH1",
+        "journal_name": "Caja General Efectivo",
+        "ref": "INV/2026/0002",
+        "move_id": 2,
+        "state": "posted"
+      }
+    ]
   }
 }

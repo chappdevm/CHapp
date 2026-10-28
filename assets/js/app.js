@@ -195,7 +195,8 @@
     }
 
     const compEl = document.getElementById('systrayCompanyName');
-    if (compEl) compEl.textContent = settings.company_name || 'CH Aluminios';
+    const compName = (!settings.company_name || settings.company_name === 'GH Aluminios') ? 'CH Aluminios' : settings.company_name;
+    if (compEl) compEl.textContent = compName;
 
     const user = settings.active_user || { name: 'Administrador CHapp' };
     const userEl = document.getElementById('systrayUserName');
@@ -287,6 +288,13 @@
   function openApp(appId, opts = {}) {
     const app = APPS.find((a) => a.id === appId);
     if (!app) return openHomeMenu();
+
+    if (opts.returnTo) {
+      state.navStack = state.navStack || [];
+      state.navStack.push(opts.returnTo);
+    } else if (opts.isDirectNav) {
+      state.navStack = [];
+    }
 
     state.currentApp = app.id;
     state.submenu = opts.submenu || app.defaultSubmenu;
@@ -526,6 +534,38 @@
     dialog.showModal();
   }
 
+  function getRecordIdentifier(appId, submenu, recordId) {
+    if (recordId === 'new' || recordId === null || recordId === undefined) return 'Nuevo';
+    const idNum = Number(recordId);
+    if (appId === 'expenses') {
+      const exp = (state.data.expenses || []).find((e) => Number(e.id) === idNum);
+      return exp ? (exp.reference || `EXP/2026/${String(exp.id).padStart(4, '0')}`) : `EXP #${recordId}`;
+    }
+    if (appId === 'accounting') {
+      const move = (state.data.accounting?.moves || []).find((m) => Number(m.id) === idNum);
+      if (move) {
+        if (move.name && move.name !== 'Borrador') return move.name;
+        if (move.ref) return `${move.move_type === 'in_invoice' ? 'BILL' : 'INV'} (${move.ref})`;
+        return move.move_type === 'in_invoice' ? `BILL/2026/${String(move.id).padStart(4, '0')}` : `INV/2026/${String(move.id).padStart(4, '0')}`;
+      }
+      return `Factura #${recordId}`;
+    }
+    if (appId === 'sales') {
+      if (submenu === 'products') {
+        const prod = (state.data.products || []).find((p) => Number(p.id) === idNum);
+        if (prod) return prod.default_code ? `[${prod.default_code}] ${prod.name}` : prod.name;
+        return `Producto #${recordId}`;
+      }
+      const sale = (state.data.sales || []).find((s) => Number(s.id) === idNum);
+      return sale ? (sale.name || `SO/2026/${String(sale.id).padStart(4, '0')}`) : `Pedido #${recordId}`;
+    }
+    if (appId === 'contacts') {
+      const cont = (state.data.contacts || []).find((c) => Number(c.id) === idNum);
+      return cont ? cont.name : `Contacto #${recordId}`;
+    }
+    return String(recordId);
+  }
+
   function renderControlPanel() {
     const app = APPS.find((a) => a.id === state.currentApp);
     const sub = (app.submenus && app.submenus.length > 0) ? (app.submenus.find((s) => s.id === state.submenu) || app.submenus[0]) : null;
@@ -567,21 +607,27 @@
       actionBtns.innerHTML = `<button type="button" class="btn btn-primary" id="btnCpNewRecord"${productAttr}>${newRecordLabel}</button>`;
     }
 
-    // Breadcrumbs
+    // Breadcrumbs con trazabilidad de origen e identificadores de documento
     let crumbHtml = '';
-    if (state.currentApp !== 'expenses') {
-      crumbHtml = `<span class="o_breadcrumb_link" id="crumbRoot">${esc(app.name)}</span>`;
+    const returnTarget = (state.navStack && state.navStack.length > 0) ? state.navStack[state.navStack.length - 1] : null;
+    if (returnTarget) {
+      const retApp = APPS.find((a) => a.id === returnTarget.app);
+      const retLabel = returnTarget.recordId ? getRecordIdentifier(returnTarget.app, returnTarget.submenu, returnTarget.recordId) : (retApp ? retApp.name : 'Volver');
+      crumbHtml += `<span class="o_breadcrumb_link" id="crumbTraceReturn" style="display: inline-flex; align-items: center; gap: 4px; color: var(--o-primary); cursor: pointer; font-weight: 600;" title="Regresar a ${esc(retLabel)}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg> ${esc(retLabel)}</span> <span>/</span> `;
+    }
+
+    if (state.currentApp !== 'expenses' || returnTarget) {
+      crumbHtml += `<span class="o_breadcrumb_link" id="crumbRoot">${esc(app.name)}</span>`;
       if (sub) {
         crumbHtml += ` <span>/</span> <span class="${state.viewType === 'form' ? 'o_breadcrumb_link' : ''}" id="crumbSub">${esc(sub.label)}</span>`;
       }
+    } else if (state.viewType === 'form') {
+      crumbHtml += `<span class="o_breadcrumb_link" id="crumbRoot">${esc(app.name)}</span>`;
     }
+
     if (state.viewType === 'form') {
-      let recLabel = state.activeRecordId === 'new' ? 'Nuevo' : `#${state.activeRecordId}`;
-      if (state.currentApp === 'sales' && state.submenu === 'products' && state.activeRecordId !== 'new') {
-        const prod = (state.data.products || []).find((p) => Number(p.id) === Number(state.activeRecordId));
-        if (prod && prod.name) recLabel = prod.name;
-      }
-      crumbHtml += (crumbHtml ? ` <span>/</span> ` : '') + `<span>${esc(recLabel)}</span>`;
+      const recLabel = getRecordIdentifier(state.currentApp, state.submenu, state.activeRecordId);
+      crumbHtml += (crumbHtml ? ` <span>/</span> ` : '') + `<span style="font-weight: 700; color: var(--o-text);">${esc(recLabel)}</span>`;
     }
     breadcrumbs.innerHTML = crumbHtml;
 
@@ -663,9 +709,37 @@
     const backBtn = document.getElementById('btnCpBackToList');
     if (backBtn) {
       backBtn.addEventListener('click', () => {
+        if (state.navStack && state.navStack.length > 0) {
+          const prev = state.navStack.pop();
+          openApp(prev.app, {
+            submenu: prev.submenu,
+            viewType: prev.viewType,
+            recordId: prev.recordId,
+            partnerFilter: prev.partnerFilter,
+            skipReturnPush: true
+          });
+          return;
+        }
         state.activeRecordId = null;
+        state.formDraft = null;
         state.viewType = app.defaultView;
         renderModuleWorkspace();
+      });
+    }
+
+    const traceReturnBtn = document.getElementById('crumbTraceReturn');
+    if (traceReturnBtn) {
+      traceReturnBtn.addEventListener('click', () => {
+        if (state.navStack && state.navStack.length > 0) {
+          const prev = state.navStack.pop();
+          openApp(prev.app, {
+            submenu: prev.submenu,
+            viewType: prev.viewType,
+            recordId: prev.recordId,
+            partnerFilter: prev.partnerFilter,
+            skipReturnPush: true
+          });
+        }
       });
     }
 
@@ -1297,7 +1371,7 @@
     if (newSaleBtn) {
       newSaleBtn.addEventListener('click', () => {
         state.formDraft = { partner_id: existing.id };
-        openApp('sales', { submenu: 'all', viewType: 'form', recordId: 'new' });
+        openApp('sales', { submenu: 'all', viewType: 'form', recordId: 'new', returnTo: { app: 'contacts', submenu: state.submenu, viewType: 'form', recordId: existing.id } });
       });
     }
 
@@ -1511,7 +1585,9 @@
       btn.addEventListener('click', async (ev) => {
         ev.stopPropagation();
         const id = Number(btn.getAttribute('data-del-id'));
-        if (!confirm(`¿Estás seguro de eliminar el gasto #${id}?`)) return;
+        const expRec = (state.data.expenses || []).find((e) => Number(e.id) === id);
+        const expIdStr = expRec ? (expRec.reference || ('EXP/2026/' + String(expRec.id).padStart(4, '0'))) : ('#' + id);
+        if (!confirm(`¿Estás seguro de eliminar el gasto ${expIdStr}?`)) return;
         try {
           await apiCall(`/api/expenses/${id}`, 'DELETE');
           showToast('Gasto eliminado.');
@@ -1586,8 +1662,9 @@
               }
               <button type="button" class="btn btn-secondary" id="btnCancelExpense">Volver</button>
             </div>
-            <div style="font-weight: 600; color: var(--o-muted); font-size: 0.9rem;">
-              ${isNew ? 'Registro de Gasto' : esc(existing.reference)}
+            <div style="font-weight: 600; color: var(--o-muted); font-size: 0.9rem; display: flex; align-items: center; gap: 8px;">
+              <span>${isNew ? 'Registro de Gasto' : esc(existing.reference)}</span>
+              ${!isNew && existing.move_id ? `<button type="button" class="btn btn-sm btn-secondary" id="btnExpenseBillLink" style="padding: 2px 8px; font-size: 0.8rem;">Ver Factura Proveedor (${esc(existing.bill_name || 'BILL')})</button>` : ''}
             </div>
           </div>
 
@@ -1887,6 +1964,18 @@
       });
     };
 
+    const expBillBtn = document.getElementById('btnExpenseBillLink');
+    if (expBillBtn && existing.move_id) {
+      expBillBtn.addEventListener('click', () => {
+        openApp('accounting', {
+          submenu: 'in_invoice',
+          viewType: 'form',
+          recordId: existing.move_id,
+          returnTo: { app: 'expenses', submenu: state.submenu, viewType: 'form', recordId: existing.id }
+        });
+      });
+    }
+
     const formScanBtn = document.getElementById('btnFormScanAi');
     if (formScanBtn) formScanBtn.addEventListener('click', openCameraForForm);
 
@@ -1896,6 +1985,17 @@
     const cancelBtn = document.getElementById('btnCancelExpense');
     if (cancelBtn) {
       cancelBtn.addEventListener('click', () => {
+        if (state.navStack && state.navStack.length > 0) {
+          const prev = state.navStack.pop();
+          openApp(prev.app, {
+            submenu: prev.submenu,
+            viewType: prev.viewType,
+            recordId: prev.recordId,
+            partnerFilter: prev.partnerFilter,
+            skipReturnPush: true
+          });
+          return;
+        }
         state.activeRecordId = null;
         state.formDraft = null;
         state.viewType = 'list';
@@ -1906,7 +2006,7 @@
     const delBtn = document.getElementById('btnDeleteFormExpense');
     if (delBtn) {
       delBtn.addEventListener('click', async () => {
-        if (!confirm(`¿Estás seguro de eliminar el gasto #${existing.id}?`)) return;
+        if (!confirm(`¿Estás seguro de eliminar el gasto ${existing.reference || ('EXP/2026/' + String(existing.id).padStart(4, '0'))}?`)) return;
         try {
           await apiCall(`/api/expenses/${existing.id}`, 'DELETE');
           showToast('Gasto eliminado.');
@@ -3520,7 +3620,7 @@
               state.formDraft = null;
               showToast(`Factura ${res.invoice ? res.invoice.name : ''} generada exitosamente.`);
               if (res.invoice) {
-                openApp('accounting', { submenu: 'out_invoice', viewType: 'form', recordId: res.invoice.id });
+                openApp('accounting', { submenu: 'out_invoice', viewType: 'form', recordId: res.invoice.id, returnTo: { app: 'sales', submenu: state.submenu, viewType: 'form', recordId: state.activeRecordId } });
               } else {
                 renderModuleWorkspace();
               }
@@ -3548,14 +3648,14 @@
       openInvBtn.addEventListener('click', () => {
         if (existing.invoice_ids.length === 1) {
           const invId = existing.invoice_ids[0];
-          openApp('accounting', { submenu: 'out_invoice', viewType: 'form', recordId: invId });
+          openApp('accounting', { submenu: 'out_invoice', viewType: 'form', recordId: invId, returnTo: { app: 'sales', submenu: state.submenu, viewType: 'form', recordId: state.activeRecordId } });
         } else {
           const panel = container.querySelector('.o_linked_invoices_panel');
           if (panel) {
             panel.scrollIntoView({ behavior: 'smooth' });
           } else {
             const invId = existing.invoice_ids[existing.invoice_ids.length - 1];
-            openApp('accounting', { submenu: 'out_invoice', viewType: 'form', recordId: invId });
+            openApp('accounting', { submenu: 'out_invoice', viewType: 'form', recordId: invId, returnTo: { app: 'sales', submenu: state.submenu, viewType: 'form', recordId: state.activeRecordId } });
           }
         }
       });
@@ -3565,7 +3665,7 @@
       row.addEventListener('click', () => {
         const moveId = Number(row.getAttribute('data-invoice-id'));
         if (moveId) {
-          openApp('accounting', { submenu: 'out_invoice', viewType: 'form', recordId: moveId });
+          openApp('accounting', { submenu: 'out_invoice', viewType: 'form', recordId: moveId, returnTo: { app: 'sales', submenu: state.submenu, viewType: 'form', recordId: state.activeRecordId } });
         }
       });
     });
@@ -3575,7 +3675,7 @@
         e.stopPropagation();
         const moveId = Number(btn.getAttribute('data-invoice-id'));
         if (moveId) {
-          openApp('accounting', { submenu: 'out_invoice', viewType: 'form', recordId: moveId });
+          openApp('accounting', { submenu: 'out_invoice', viewType: 'form', recordId: moveId, returnTo: { app: 'sales', submenu: state.submenu, viewType: 'form', recordId: state.activeRecordId } });
         }
       });
     });
@@ -4352,6 +4452,17 @@
                 <label for="fMoveRef">Referencia / Orden de Compra</label>
                 <input type="text" id="fMoveRef" class="o_input" value="${esc(draft.ref || '')}" ${!isEditable ? 'readonly' : ''} />
               </div>
+              ${
+                existing.origin
+                  ? `<div class="o_field_row">
+                      <label>Documento de Origen</label>
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="o_badge o_badge_info" style="font-size: 0.85rem; padding: 4px 8px;">${esc(existing.origin)}</span>
+                        <button type="button" class="btn btn-sm btn-secondary" id="btnGoToOriginDoc">Ver Origen</button>
+                      </div>
+                    </div>`
+                  : ''
+              }
               <div class="o_field_row">
                 <label for="fMoveDate">Fecha Contable / Factura</label>
                 <input type="date" id="fMoveDate" class="o_input" value="${esc(draft.invoice_date)}" ${!isEditable ? 'readonly' : ''} />
@@ -4885,7 +4996,7 @@
     return `
       <aside class="o_chatter" aria-label="Historial y notas del documento">
         <div class="o_chatter_header">
-          <span>Historial y Auditoría</span>
+          <span>Historial y Auditoría ${record.reference || record.name ? `— <strong>${esc(record.reference || record.name)}</strong>` : ''}</span>
           <span class="o_badge o_badge_muted">${msgs.length} evento(s)</span>
         </div>
         <div class="o_chatter_composer">
