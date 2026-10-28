@@ -1637,6 +1637,30 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     const buf3 = parsePdfBuffer('JVBERi0xLjQK');
     assert.ok(Buffer.isBuffer(buf3));
     assert.equal(buf3.toString('utf8', 0, 5), '%PDF-');
+
+    // 5. Test Baileys persistent session saving, restoring, and clean unlinking
+    const { saveWhatsAppSession, loadWhatsAppSession, deleteWhatsAppSession } = require('../server/supabase');
+    assert.ok(typeof saveWhatsAppSession === 'function');
+    assert.ok(typeof loadWhatsAppSession === 'function');
+    assert.ok(typeof deleteWhatsAppSession === 'function');
+
+    const mockFiles = {
+      'creds.json': JSON.stringify({ me: { id: '573119876543:1@s.whatsapp.net' } }),
+      'pre-key-1.json': JSON.stringify({ key: 'mock-key-data' })
+    };
+    const savedOk = await saveWhatsAppSession({ connectedNumber: '573119876543', files: mockFiles });
+    if (savedOk) {
+      const loadedSession = await loadWhatsAppSession();
+      assert.ok(loadedSession, 'Loaded session must exist in Supabase');
+      assert.equal(loadedSession.connectedNumber, '573119876543');
+      assert.ok(loadedSession.files['creds.json']);
+
+      // Clean unlinking
+      const deletedOk = await deleteWhatsAppSession();
+      assert.ok(deletedOk, 'deleteWhatsAppSession must succeed');
+      const loadedAfterDelete = await loadWhatsAppSession();
+      assert.equal(loadedAfterDelete, null, 'Session in Supabase must be cleanly removed on unlink');
+    }
   });
 
   it('Module 3 (Ventas): Pedidos de venta confirmados bloquean edición de cliente y productos, y se remueven instrucciones bancarias de representaciones gráficas', async () => {

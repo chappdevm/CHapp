@@ -706,7 +706,7 @@ class SupabasePersistence {
           ? callPostgrest('/account_payment?select=*&order=id.desc')
           : Promise.resolve({ ok: false, status: 404 }),
         this.tableSupport.res_config_settings !== false
-          ? callPostgrest('/res_config_settings?select=*&limit=1')
+          ? callPostgrest('/res_config_settings?id=eq.1&select=*&limit=1')
           : Promise.resolve({ ok: false, status: 404 })
       ]);
 
@@ -1019,6 +1019,52 @@ class SupabasePersistence {
   }
 }
 
+
+async function saveWhatsAppSession(sessionData) {
+  if (!isSupabaseConfigured()) return false;
+  try {
+    const res = await callPostgrest('/res_config_settings', {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+      body: {
+        id: 999,
+        company_name: '__WHATSAPP_SESSION__',
+        active_user: sessionData,
+        updated_at: new Date().toISOString()
+      }
+    });
+    return Boolean(res.ok);
+  } catch (e) {
+    console.warn('[Supabase] Error guardando sesión de WhatsApp:', e.message);
+    return false;
+  }
+}
+
+async function loadWhatsAppSession() {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const res = await callPostgrest('/res_config_settings?id=eq.999&select=active_user&limit=1');
+    if (res.ok && Array.isArray(res.data) && res.data[0]?.active_user) {
+      return res.data[0].active_user;
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function deleteWhatsAppSession() {
+  if (!isSupabaseConfigured()) return false;
+  try {
+    const res = await callPostgrest('/res_config_settings?id=eq.999', {
+      method: 'DELETE'
+    });
+    return Boolean(res.ok);
+  } catch (e) {
+    return false;
+  }
+}
+
 module.exports = {
   DEFAULT_SUPABASE_URL,
   DEFAULT_SUPABASE_SERVICE_ROLE_KEY,
@@ -1045,6 +1091,11 @@ module.exports = {
   deserializeAccountMove,
   serializePayment,
   deserializePayment,
+
+
   serializeSettings,
-  deserializeSettings
+  deserializeSettings,
+  saveWhatsAppSession,
+  loadWhatsAppSession,
+  deleteWhatsAppSession
 };

@@ -3,6 +3,11 @@ const fs = require('fs');
 const os = require('os');
 const QRCode = require('qrcode');
 const pino = require('pino');
+const {
+  saveWhatsAppSession,
+  loadWhatsAppSession,
+  deleteWhatsAppSession
+} = require('./supabase');
 
 let makeWASocket, DisconnectReason, useMultiFileAuthState, Browsers;
 let baileysLoadError = null;
@@ -78,6 +83,7 @@ class BaileysManager {
     this.connectedNumber = null;
     this.isStarting = false;
     this.reconnectTimeout = null;
+    this.saveDebounceTimeout = null;
     this.authDir = this.resolveAuthDir();
   }
 
@@ -98,6 +104,135 @@ class BaileysManager {
       } catch (e2) {}
     }
     return authDir;
+  }
+
+  backupAuthFiles() {
+    try {
+      if (!fs.existsSync(this.authDir)) return null;
+      const entries = fs.readdirSync(this.authDir);
+      const files = {};
+      for (const file of entries) {
+        if (file.endsWith('.json')) {
+          const fullPath = path.join(this.authDir, file);
+          try {
+            files[file] = fs.readFileSync(fullPath, 'utf8');
+          } catch (e) {}
+        }
+      }
+      if (!files['creds.json']) return null;
+      return files;
+    } catch (err) {
+      console.warn('[Baileys] Error leyendo authDir para backup:', err.message);
+      return null;
+    }
+  }
+
+  restoreAuthFiles(files) {
+    try {
+      if (!files || typeof files !== 'object' || !files['creds.json']) return false;
+      if (!fs.existsSync(this.authDir)) {
+        fs.mkdirSync(this.authDir, { recursive: true });
+      }
+      for (const [file, content] of Object.entries(files)) {
+        if (typeof content === 'string' && file.endsWith('.json')) {
+          const fullPath = path.join(this.authDir, file);
+          fs.writeFileSync(fullPath, content, 'utf8');
+        }
+      }
+      return true;
+    } catch (err) {
+      console.warn('[Baileys] Error restaurando authDir desde backup:', err.message);
+      return false;
+    }
+  }
+
+  async persistSession() {
+    const files = this.backupAuthFiles();
+    if (!files || !files['creds.json']) return false;
+    try {
+      const ok = await saveWhatsAppSession({
+        connectedNumber: this.connectedNumber,
+        files,
+        savedAt: new Date().toISOString()
+      });
+      if (ok) {
+        console.log(`[Baileys] 💾 Sesión guardada de forma persistente (+${this.connectedNumber || 'OK'}).`);
+      }
+      return ok;
+    } catch (err) {
+      console.warn('[Baileys] Error persistiendo sesión en Supabase:', err.message);
+      return false;
+    }
+  }
+
+  async restoreSessionFromRemote() {
+    const localCreds = path.join(this.authDir, 'creds.json');
+    if (fs.existsSync(localCreds)) {
+      try {
+        const raw = fs.readFileSync(localCreds, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (parsed?.me?.id) {
+          this.connectedNumber = parsed.me.id.split(':')[0].replace(/\D/g, '');
+        }
+        return true;
+      } catch (e) {}
+    }
+
+    try {
+      const remoteSession = await loadWhatsAppSession();
+      if (remoteSession && remoteSession.files && remoteSession.files['creds.json']) {
+        const restored = this.restoreAuthFiles(remoteSession.files);
+        if (restored) {
+          if (remoteSession.connectedNumber) {
+            this.connectedNumber = remoteSession.connectedNumber;
+          }
+          console.log(`[Baileys] 🔄 Sesión restaurada de la base de datos (+${this.connectedNumber || ''}).`);
+          return true;
+        }
+      }
+    } catch (err) {
+      console.warn('[Baileys] Error cargando sesión remota:', err.message);
+    }
+    return false;
+  }
+
+  async clearSavedSession() {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+    if (this.saveDebounceTimeout) {
+      clearTimeout(this.saveDebounceTimeout);
+      this.saveDebounceTimeout = null;
+    }
+    if (this.socket) {
+      try {
+        this.socket.ev.removeAllListeners('connection.update');
+        this.socket.ev.removeAllListeners('creds.update');
+        this.socket.end(undefined);
+      } catch (e) {}
+      this.socket = null;
+    }
+
+    // 1. Limpiar directorio local
+    try {
+      if (fs.existsSync(this.authDir)) {
+        fs.rmSync(this.authDir, { recursive: true, force: true });
+      }
+    } catch (e) {}
+
+    // 2. Limpiar sesión en Supabase
+    try {
+      await deleteWhatsAppSession();
+    } catch (e) {}
+
+    // 3. Resetear memoria
+    this.status = 'DESCONECTADO';
+    this.connectedNumber = null;
+    this.qrRaw = null;
+    this.qrDataUrl = null;
+    this.isStarting = false;
+    console.log('[Baileys] 🗑️ Sesión desvinculada y limpiada tanto local como remotamente.');
   }
 
   getStatus() {
@@ -126,6 +261,9 @@ class BaileysManager {
     }
 
     this.authDir = this.resolveAuthDir();
+
+    // Intentar restaurar sesión de Supabase si en este contenedor aún no existe
+    await this.restoreSessionFromRemote();
 
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
@@ -180,6 +318,11 @@ class BaileysManager {
         sock.ev.on('creds.update', async () => {
           try {
             await saveCreds();
+            // Guardar credenciales de forma persistente con debounce
+            if (this.saveDebounceTimeout) clearTimeout(this.saveDebounceTimeout);
+            this.saveDebounceTimeout = setTimeout(() => {
+              this.persistSession().catch(() => {});
+            }, 1500);
           } catch (err) {
             console.error('[Baileys] Error guardando credenciales:', err.message);
           }
@@ -209,12 +352,14 @@ class BaileysManager {
             this.connectedNumber = userJid.split(':')[0].replace(/\D/g, '');
             console.log(`[Baileys] ✅ WhatsApp conectado exitosamente como: +${this.connectedNumber}`);
             clearTimeout(timer);
+            await this.persistSession();
             finish();
           }
 
           if (connection === 'close') {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
-            const shouldReconnect = statusCode !== DisconnectReason?.loggedOut;
+            const isLoggedOut = statusCode === DisconnectReason?.loggedOut || statusCode === 401 || statusCode === 403;
+            const shouldReconnect = statusCode !== DisconnectReason?.loggedOut && !isLoggedOut;
             console.log(`[Baileys] 🔌 Conexión cerrada (código: ${statusCode}). Reintentar: ${shouldReconnect}`);
 
             this.socket = null;
@@ -228,11 +373,8 @@ class BaileysManager {
                 this.init(5000).catch((e) => console.error('[Baileys] Error reintentando conexión:', e));
               }, 3500);
             } else {
-              this.status = 'DESCONECTADO';
-              this.connectedNumber = null;
-              try {
-                fs.rmSync(this.authDir, { recursive: true, force: true });
-              } catch (rmErr) {}
+              // Si se desvinculó (logout / teléfono anterior), limpiar local y remoto
+              await this.clearSavedSession();
             }
           }
         });
@@ -246,25 +388,7 @@ class BaileysManager {
   }
 
   async disconnect() {
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout);
-      this.reconnectTimeout = null;
-    }
-    if (this.socket) {
-      try {
-        this.socket.ev.removeAllListeners('connection.update');
-        this.socket.ev.removeAllListeners('creds.update');
-        this.socket.end(undefined);
-      } catch (e) {}
-      this.socket = null;
-    }
-    this.status = 'DESCONECTADO';
-    this.qrRaw = null;
-    this.qrDataUrl = null;
-    this.connectedNumber = null;
-    try {
-      fs.rmSync(this.authDir, { recursive: true, force: true });
-    } catch (e) {}
+    await this.clearSavedSession();
     return { ok: true, status: 'DESCONECTADO' };
   }
 
@@ -322,6 +446,9 @@ class BaileysManager {
 }
 
 const baileysManager = new BaileysManager();
+
+// Intentar restaurar sesión guardada de forma asíncrona al iniciar
+baileysManager.restoreSessionFromRemote().catch(() => {});
 
 module.exports = {
   baileysManager,
