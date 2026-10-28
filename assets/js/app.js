@@ -2745,21 +2745,37 @@
 
   
   let cachedLogoDataUrl = '';
+  if (typeof window !== 'undefined' && typeof fetch === 'function') {
+    fetch('/assets/icons/logo.png')
+      .then((r) => (r.ok ? r.blob() : null))
+      .then((blob) => {
+        if (!blob) return;
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          if (reader.result && typeof reader.result === 'string') {
+            cachedLogoDataUrl = reader.result;
+          }
+        };
+        reader.readAsDataURL(blob);
+      })
+      .catch(() => {});
+  }
+
   function getLogoDataUrl() {
     if (cachedLogoDataUrl) return cachedLogoDataUrl;
     try {
-      const brandImg = document.getElementById('navbarBrandIcon') || document.querySelector('.o_home_menu_logo');
-      if (brandImg && brandImg.complete && brandImg.naturalWidth > 0) {
+      const homeLogo = document.querySelector('.o_home_menu_logo');
+      if (homeLogo && homeLogo.complete && homeLogo.naturalWidth > 0) {
         const canvas = document.createElement('canvas');
-        canvas.width = brandImg.naturalWidth;
-        canvas.height = brandImg.naturalHeight;
+        canvas.width = homeLogo.naturalWidth;
+        canvas.height = homeLogo.naturalHeight;
         const ctx = canvas.getContext('2d');
-        ctx.drawImage(brandImg, 0, 0);
+        ctx.drawImage(homeLogo, 0, 0);
         cachedLogoDataUrl = canvas.toDataURL('image/png');
         return cachedLogoDataUrl;
       }
     } catch (_) {}
-    return '';
+    return cachedLogoDataUrl || '';
   }
 
   function renderInvoicePdfSheetHtml(invoice) {
@@ -2843,13 +2859,18 @@
       return sum + (gross * (Number(l.discount || 0) / 100));
     }, 0);
 
+    const logoData = typeof getLogoDataUrl === 'function' ? getLogoDataUrl() : '';
+    const logoSrc = logoData && logoData.startsWith('data:') ? logoData : '/assets/icons/logo.png';
+
     return `
       <div class="o_pdf_sheet" id="invoicePdfSheet">
         ${watermarkHtml}
 
         <div class="o_pdf_brand_header">
+          <div class="o_pdf_logo_col">
+            <img src="${logoSrc}" alt="CH Aluminios" class="o_pdf_company_logo" onerror="if(!this.src.startsWith('data:'))this.style.display='none'" />
+          </div>
           <div class="o_pdf_company_info">
-            <img src="/assets/icons/logo.png" alt="CH Aluminios" class="o_pdf_company_logo" onerror="this.style.display='none'" />
             <h2>${esc(company.company_name || 'CH Aluminios')}</h2>
             <p><strong>NIT:</strong> ${esc(company.company_vat || '900.876.543-1')} · <span>${esc(company.fiscal_regime || 'Responsable de IVA - Régimen Ordinario')}</span></p>
             <p>${esc(company.company_address || 'Cra. 7 #18-45')} · ${esc(company.company_city || 'Pereira')}, ${esc(company.company_country || 'Colombia')}</p>
@@ -3093,8 +3114,11 @@
         targetEl.style.border = 'none';
         const logoData = getLogoDataUrl();
         const logoImg = targetEl.querySelector('.o_pdf_company_logo');
-        if (logoImg && logoData && logoData.startsWith('data:')) {
-          logoImg.src = logoData;
+        if (logoImg) {
+          logoImg.style.display = 'block';
+          if (logoData && logoData.startsWith('data:')) {
+            logoImg.src = logoData;
+          }
         }
 
         const opt = {
@@ -3120,7 +3144,7 @@
     const logoData = getLogoDataUrl();
     if (logoData && logoData.startsWith('data:')) {
       sheetHtml = sheetHtml.replace('src="/assets/icons/logo.png"', 'src="' + logoData + '"');
-      sheetHtml = sheetHtml.replace('onerror="this.style.display=\'none\'"', '');
+      sheetHtml = sheetHtml.replace(/onerror="[^"]*"/g, '');
     } else if (window.location && window.location.origin) {
       sheetHtml = sheetHtml.replace('src="/assets/icons/logo.png"', 'src="' + window.location.origin + '/assets/icons/logo.png"');
     }
@@ -3202,18 +3226,38 @@
     .o_pdf_brand_header {
       position: relative;
       z-index: 2;
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
+      display: grid;
+      grid-template-columns: 200px 1fr 270px;
+      align-items: center;
       border-bottom: 2.5px solid #074073;
       padding-bottom: 0.85rem;
       margin-bottom: 0.75rem;
-      gap: 1rem;
+      gap: 1.25rem;
     }
-    .o_pdf_company_info { flex: 1; }
-    .o_pdf_company_logo { max-height: 54px; max-width: 170px; object-fit: contain; margin-bottom: 0.4rem; display: block; }
-    .o_pdf_company_info h2 { font-size: 1.35rem; font-weight: 800; color: #074073; margin: 0 0 0.25rem 0; letter-spacing: 0.01em; }
-    .o_pdf_company_info p { margin: 0.15rem 0; font-size: 0.77rem; color: #4b5563; }
+    .o_pdf_logo_col {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+    }
+    .o_pdf_company_logo {
+      max-height: 110px;
+      max-width: 100%;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      margin: 0 auto;
+      display: block;
+    }
+    .o_pdf_company_info {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 0 0.25rem;
+    }
+    .o_pdf_company_info h2 { font-size: 1.45rem; font-weight: 800; color: #074073; margin: 0 0 0.3rem 0; letter-spacing: 0.01em; }
+    .o_pdf_company_info p { margin: 0.18rem 0; font-size: 0.78rem; color: #4b5563; line-height: 1.4; }
     .o_pdf_company_info p strong { color: #074073; }
     .o_pdf_doc_box {
       background: rgba(248, 250, 252, 0.85);
@@ -3221,7 +3265,7 @@
       border-radius: 8px;
       padding: 0.75rem 1rem;
       text-align: center;
-      min-width: 195px;
+      width: 100%;
       box-shadow: 0 2px 4px rgba(7, 64, 115, 0.08);
     }
     .doc_type_title {
@@ -3422,12 +3466,26 @@
         max-width: 100% !important;
         background: #ffffff !important;
       }
+      .o_pdf_brand_header {
+        display: grid !important;
+        grid-template-columns: 180px 1fr 260px !important;
+        align-items: center !important;
+        gap: 1rem !important;
+      }
+      .o_pdf_logo_col {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+      }
       .o_pdf_company_logo {
         display: block !important;
-        max-height: 54px !important;
-        max-width: 170px !important;
+        max-height: 110px !important;
+        max-width: 100% !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
+      }
+      .o_pdf_doc_box {
+        width: 100% !important;
       }
       .o_pdf_watermark {
         -webkit-print-color-adjust: exact !important;
@@ -3536,13 +3594,18 @@
       return sum + (gross * (Number(l.discount || 0) / 100));
     }, 0);
 
+    const logoData = typeof getLogoDataUrl === 'function' ? getLogoDataUrl() : '';
+    const logoSrc = logoData && logoData.startsWith('data:') ? logoData : '/assets/icons/logo.png';
+
     return `
       <div class="o_pdf_sheet" id="salePdfSheet">
         ${watermarkHtml}
 
         <div class="o_pdf_brand_header">
+          <div class="o_pdf_logo_col">
+            <img src="${logoSrc}" alt="CH Aluminios" class="o_pdf_company_logo" onerror="if(!this.src.startsWith('data:'))this.style.display='none'" />
+          </div>
           <div class="o_pdf_company_info">
-            <img src="/assets/icons/logo.png" alt="CH Aluminios" class="o_pdf_company_logo" onerror="this.style.display='none'" />
             <h2>${esc(company.company_name || 'CH Aluminios')}</h2>
             <p><strong>NIT:</strong> ${esc(company.company_vat || '900.876.543-1')} · <span>${esc(company.fiscal_regime || 'Responsable de IVA - Régimen Ordinario')}</span></p>
             <p>${esc(company.company_address || 'Cra. 7 #18-45')} · ${esc(company.company_city || 'Pereira')}, ${esc(company.company_country || 'Colombia')}</p>
@@ -3702,8 +3765,11 @@
         targetEl.style.border = 'none';
         const logoData = getLogoDataUrl();
         const logoImg = targetEl.querySelector('.o_pdf_company_logo');
-        if (logoImg && logoData && logoData.startsWith('data:')) {
-          logoImg.src = logoData;
+        if (logoImg) {
+          logoImg.style.display = 'block';
+          if (logoData && logoData.startsWith('data:')) {
+            logoImg.src = logoData;
+          }
         }
 
         const opt = {
@@ -3729,7 +3795,7 @@
     const logoData = getLogoDataUrl();
     if (logoData && logoData.startsWith('data:')) {
       sheetHtml = sheetHtml.replace('src="/assets/icons/logo.png"', 'src="' + logoData + '"');
-      sheetHtml = sheetHtml.replace('onerror="this.style.display=\'none\'"', '');
+      sheetHtml = sheetHtml.replace(/onerror="[^"]*"/g, '');
     } else if (typeof window !== 'undefined' && window.location && window.location.origin) {
       sheetHtml = sheetHtml.replace('src="/assets/icons/logo.png"', 'src="' + window.location.origin + '/assets/icons/logo.png"');
     }
@@ -3781,23 +3847,45 @@
     .o_pdf_watermark.is-paid { color: #059669; }
     .o_pdf_watermark.is-cancel { color: #cb2f2f; }
     .o_pdf_brand_header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 1.5rem;
-      margin-bottom: 1.25rem;
       position: relative;
       z-index: 2;
+      display: grid;
+      grid-template-columns: 200px 1fr 270px;
+      align-items: center;
+      gap: 1.25rem;
+      border-bottom: 2.5px solid #074073;
+      padding-bottom: 0.85rem;
+      margin-bottom: 1.25rem;
     }
-    .o_pdf_company_info { flex: 1; }
-    .o_pdf_company_logo { max-height: 52px; max-width: 170px; object-fit: contain; margin-bottom: 0.5rem; display: block; }
-    .o_pdf_company_info h2 { margin: 0 0 0.25rem 0; font-size: 1.3rem; font-weight: 800; color: #074073; }
-    .o_pdf_company_info p { margin: 0 0 0.2rem 0; font-size: 0.78rem; color: #475569; }
+    .o_pdf_logo_col {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+    }
+    .o_pdf_company_logo {
+      max-height: 110px;
+      max-width: 100%;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      margin: 0 auto;
+      display: block;
+    }
+    .o_pdf_company_info {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 0 0.25rem;
+    }
+    .o_pdf_company_info h2 { margin: 0 0 0.3rem 0; font-size: 1.45rem; font-weight: 800; color: #074073; }
+    .o_pdf_company_info p { margin: 0 0 0.2rem 0; font-size: 0.78rem; color: #475569; line-height: 1.4; }
     .o_pdf_doc_box {
       border: 2px solid #074073;
       border-radius: 8px;
       padding: 0.85rem 1.15rem;
-      min-width: 220px;
+      width: 100%;
       text-align: center;
       background: #f0f7fc;
       position: relative;
@@ -3866,6 +3954,27 @@
     @media print {
       body { background: #ffffff !important; padding: 0 !important; }
       .o_pdf_sheet { border: none !important; box-shadow: none !important; padding: 0 !important; max-width: 100% !important; }
+      .o_pdf_brand_header {
+        display: grid !important;
+        grid-template-columns: 180px 1fr 260px !important;
+        align-items: center !important;
+        gap: 1rem !important;
+      }
+      .o_pdf_logo_col {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+      }
+      .o_pdf_company_logo {
+        display: block !important;
+        max-height: 110px !important;
+        max-width: 100% !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .o_pdf_doc_box {
+        width: 100% !important;
+      }
     }
   </style>
 </head>
@@ -4024,8 +4133,11 @@
     targetEl.style.border = 'none';
     const logoData = getLogoDataUrl();
     const logoImg = targetEl.querySelector('.o_pdf_company_logo');
-    if (logoImg && logoData && logoData.startsWith('data:')) {
-      logoImg.src = logoData;
+    if (logoImg) {
+      logoImg.style.display = 'block';
+      if (logoData && logoData.startsWith('data:')) {
+        logoImg.src = logoData;
+      }
     }
 
     const opt = {

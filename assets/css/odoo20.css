@@ -2679,43 +2679,57 @@ dialog.o_dialog::backdrop {
   letter-spacing: 0.06em;
 }
 
-/* Encabezado Corporativo y Logo */
+/* Encabezado Corporativo y Logo (3 Columnas: Logo, Empresa, Documento) */
 .o_pdf_brand_header {
   position: relative;
   z-index: 2;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: 200px 1fr 270px;
+  align-items: center;
   border-bottom: 2.5px solid #074073;
   padding-bottom: 0.85rem;
   margin-bottom: 0.75rem;
-  gap: 1rem;
+  gap: 1.25rem;
 }
 
-.o_pdf_company_info {
-  flex: 1;
+.o_pdf_logo_col {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
 }
 
 .o_pdf_company_logo {
-  max-height: 54px;
-  max-width: 170px;
+  max-height: 110px;
+  max-width: 100%;
+  width: auto;
+  height: auto;
   object-fit: contain;
-  margin-bottom: 0.4rem;
+  margin: 0 auto;
   display: block;
 }
 
+.o_pdf_company_info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 0.25rem;
+}
+
 .o_pdf_company_info h2 {
-  font-size: 1.35rem;
+  font-size: 1.45rem;
   font-weight: 800;
   color: #074073;
-  margin-bottom: 0.25rem;
+  margin: 0 0 0.3rem 0;
   letter-spacing: 0.01em;
 }
 
 .o_pdf_company_info p {
-  margin: 0.15rem 0;
-  font-size: 0.77rem;
+  margin: 0.18rem 0;
+  font-size: 0.78rem;
   color: #4b5563;
+  line-height: 1.4;
 }
 
 .o_pdf_company_info p strong {
@@ -2729,7 +2743,7 @@ dialog.o_dialog::backdrop {
   border-radius: 8px;
   padding: 0.75rem 1rem;
   text-align: center;
-  min-width: 195px;
+  width: 100%;
   box-shadow: 0 2px 4px rgba(7, 64, 115, 0.08);
 }
 
@@ -3156,6 +3170,27 @@ dialog.o_dialog::backdrop {
   .o_pdf_bottom_grid, .o_pdf_signatures_section, .o_pdf_legal_footer {
     page-break-inside: avoid;
     break-inside: avoid;
+  }
+  .o_pdf_brand_header {
+    display: grid !important;
+    grid-template-columns: 180px 1fr 260px !important;
+    align-items: center !important;
+    gap: 1rem !important;
+  }
+  .o_pdf_logo_col {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  .o_pdf_company_logo {
+    display: block !important;
+    max-height: 110px !important;
+    max-width: 100% !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .o_pdf_doc_box {
+    width: 100% !important;
   }
 }
 

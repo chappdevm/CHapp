@@ -975,6 +975,7 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.ok(cssText.includes('.o_pdf_watermark.is-overdue'), 'CSS debe soportar marca de agua is-overdue');
     assert.ok(cssText.includes('.o_pdf_stamp'), 'CSS debe definir sellos de estado .o_pdf_stamp');
     assert.ok(cssText.includes('.o_pdf_company_logo'), 'CSS debe definir estilos para el logo empresarial');
+    assert.ok(cssText.includes('.o_pdf_logo_col'), 'CSS debe definir columna dedicada para el logo empresarial');
     assert.ok(cssText.includes('.o_pdf_resolution_bar'), 'CSS debe definir la barra de resolución');
     assert.ok(cssText.includes('.o_pdf_amount_words'), 'CSS debe definir contenedor de total en letras');
     assert.ok(cssText.includes('.o_pdf_bank_info'), 'CSS debe definir instrucciones bancarias');
@@ -1061,7 +1062,10 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     const paidHtml = renderInvoicePdfSheetHtml(mockInvoice);
     assert.ok(paidHtml.includes('class="o_pdf_watermark is-paid">PAGADA</div>'), 'Debe incluir marca de agua PAGADA');
     assert.ok(paidHtml.includes('class="o_pdf_stamp is-paid"'), 'Debe incluir sello oficial PAGADA');
+    assert.ok(paidHtml.includes('class="o_pdf_logo_col"'), 'Debe incluir columna dedicada para el logo');
     assert.ok(paidHtml.includes('src="/assets/icons/logo.png"'), 'Debe mostrar el logo empresarial');
+    assert.ok(paidHtml.includes('class="o_pdf_company_info"'), 'Debe incluir columna de información de la empresa');
+    assert.ok(paidHtml.includes('class="o_pdf_doc_box"'), 'Debe incluir recuadro de documento');
     assert.ok(paidHtml.includes('CH Aluminios'), 'Debe incluir el nombre de la empresa');
     assert.ok(paidHtml.includes('900.876.543-1'), 'Debe incluir NIT emisor');
     assert.ok(paidHtml.includes('Arquitectura y Vidrios SAS'), 'Debe incluir nombre del cliente');
@@ -1517,6 +1521,9 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.ok(draftHtml.includes('$ 1.071.000'), 'Debe mostrar el total calculado');
     assert.ok(draftHtml.includes('SON: UN MILLÓN SETENTA Y UN MIL PESOS M/CTE'), 'Debe mostrar el total en letras');
     assert.ok(draftHtml.includes('Esta cotización comercial es una propuesta informativa'), 'Debe tener pie legal de cotización');
+    assert.ok(draftHtml.includes('class="o_pdf_logo_col"'), 'Cotización debe incluir columna de logo');
+    assert.ok(draftHtml.includes('class="o_pdf_company_info"'), 'Cotización debe incluir datos de empresa en columna central');
+    assert.ok(draftHtml.includes('class="o_pdf_doc_box"'), 'Cotización debe incluir recuadro de documento');
     assert.ok(!draftHtml.includes('Instrucciones de Pago / Consignación'), 'Cotización no debe tener bloque de instrucciones de pago');
 
     // 4. Probar renderizado en estado Confirmado (sale)
@@ -1526,6 +1533,9 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
       state: 'sale'
     };
     const saleHtml = renderSalePdfSheetHtml(mockConfirmedOrder);
+    assert.ok(saleHtml.includes('class="o_pdf_logo_col"'), 'Pedido de venta debe incluir columna de logo');
+    assert.ok(saleHtml.includes('class="o_pdf_company_info"'), 'Pedido de venta debe incluir datos de empresa en columna central');
+    assert.ok(saleHtml.includes('class="o_pdf_doc_box"'), 'Pedido de venta debe incluir recuadro de documento');
     assert.ok(saleHtml.includes('Pedido de Venta'), 'Debe decir Pedido de Venta cuando está confirmado');
     assert.ok(saleHtml.includes('PEDIDO CONFIRMADO'), 'Marca de agua debe decir PEDIDO CONFIRMADO');
     assert.ok(!saleHtml.includes('Instrucciones de Pago / Consignación'), 'Pedido de venta no debe tener bloque de instrucciones de pago');
