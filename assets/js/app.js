@@ -65,13 +65,7 @@
       xmlid: 'base.menu_administration',
       defaultSubmenu: 'general',
       defaultView: 'form',
-      submenus: [
-        { id: 'general', label: 'Ajustes Generales' },
-        { id: 'sales', label: 'Ventas' },
-        { id: 'accounting', label: 'Contabilidad' },
-        { id: 'expenses', label: 'Gastos' },
-        { id: 'users', label: 'Usuarios y Sistema' }
-      ]
+      submenus: []
     }
   ];
 
@@ -337,6 +331,10 @@
   function renderSubmenus(app) {
     const nav = document.getElementById('navbarSubmenus');
     if (!nav) return;
+    if (app.id === 'settings' || !app.submenus || !app.submenus.length) {
+      nav.innerHTML = '';
+      return;
+    }
     nav.innerHTML = app.submenus
       .map(
         (sub) => `
@@ -6092,7 +6090,6 @@
               <button type="button" class="btn btn-action" id="btnSaveSettings">Guardar Ajustes</button>
               <button type="button" class="btn btn-secondary" id="btnBackHomeFromSettings">Volver al Panel Principal</button>
             </div>
-            <span style="font-size: 0.8rem; color: var(--o-text-muted);">CHapp ERP Enterprise (${esc(state.data.meta.version)})</span>
           </div>
 
           ${contentHtml}
@@ -6103,7 +6100,6 @@
     container.querySelectorAll('[data-set-tab]').forEach((b) => {
       b.addEventListener('click', () => {
         state.submenu = b.getAttribute('data-set-tab');
-        renderSubmenus(APPS.find((a) => a.id === 'settings'));
         renderSettingsModule();
       });
     });

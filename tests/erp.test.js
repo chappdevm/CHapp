@@ -1550,5 +1550,9 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.equal(expensesUpdate.status, 200);
     assert.equal(expensesUpdate.json.settings.expense_approval_required, false);
     assert.equal(expensesUpdate.json.settings.quotation_validity_days, 45, 'Quotation validity days must remain intact');
+
+    // 4. Verify suppression of redundant top navbar in Settings and removal of Enterprise label
+    assert.ok(!jsText.includes('CHapp ERP Enterprise'), 'Settings must not display Enterprise version label');
+    assert.ok(jsText.includes("app.id === 'settings' || !app.submenus || !app.submenus.length"), 'Navbar submenus must be suppressed in Settings');
   });
 });
