@@ -9,7 +9,7 @@
     "test": "node --test tests/erp.test.js tests/supabase.test.js"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "20.x"
   },
   "keywords": [
     "erp",
