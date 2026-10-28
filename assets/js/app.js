@@ -3227,7 +3227,7 @@
       position: relative;
       z-index: 2;
       display: grid;
-      grid-template-columns: 200px 1fr 270px;
+      grid-template-columns: 240px 1fr 275px;
       align-items: center;
       border-bottom: 2.5px solid #074073;
       padding-bottom: 0.85rem;
@@ -3242,10 +3242,10 @@
       height: 100%;
     }
     .o_pdf_company_logo {
-      max-height: 110px;
+      max-height: 180px;
       max-width: 100%;
       width: auto;
-      height: auto;
+      height: 175px;
       object-fit: contain;
       margin: 0 auto;
       display: block;
@@ -3468,7 +3468,7 @@
       }
       .o_pdf_brand_header {
         display: grid !important;
-        grid-template-columns: 180px 1fr 260px !important;
+        grid-template-columns: 210px 1fr 265px !important;
         align-items: center !important;
         gap: 1rem !important;
       }
@@ -3479,7 +3479,8 @@
       }
       .o_pdf_company_logo {
         display: block !important;
-        max-height: 110px !important;
+        max-height: 165px !important;
+        height: 160px !important;
         max-width: 100% !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
@@ -3850,7 +3851,7 @@
       position: relative;
       z-index: 2;
       display: grid;
-      grid-template-columns: 200px 1fr 270px;
+      grid-template-columns: 240px 1fr 275px;
       align-items: center;
       gap: 1.25rem;
       border-bottom: 2.5px solid #074073;
@@ -3865,10 +3866,10 @@
       height: 100%;
     }
     .o_pdf_company_logo {
-      max-height: 110px;
+      max-height: 180px;
       max-width: 100%;
       width: auto;
-      height: auto;
+      height: 175px;
       object-fit: contain;
       margin: 0 auto;
       display: block;
@@ -3956,7 +3957,7 @@
       .o_pdf_sheet { border: none !important; box-shadow: none !important; padding: 0 !important; max-width: 100% !important; }
       .o_pdf_brand_header {
         display: grid !important;
-        grid-template-columns: 180px 1fr 260px !important;
+        grid-template-columns: 210px 1fr 265px !important;
         align-items: center !important;
         gap: 1rem !important;
       }
@@ -3967,7 +3968,8 @@
       }
       .o_pdf_company_logo {
         display: block !important;
-        max-height: 110px !important;
+        max-height: 165px !important;
+        height: 160px !important;
         max-width: 100% !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
