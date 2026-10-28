@@ -49,6 +49,26 @@ try {
 
 loadBaileys().catch(() => {});
 
+function parsePdfBuffer(pdfInput) {
+  if (Buffer.isBuffer(pdfInput)) {
+    return pdfInput;
+  }
+  if (typeof pdfInput === 'string') {
+    let clean = pdfInput.trim();
+    // jsPDF output('datauristring') format: "data:application/pdf;filename=...;base64,JVBER..."
+    // Standard data URI format: "data:application/pdf;base64,JVBER..."
+    if (clean.includes(';base64,')) {
+      clean = clean.split(';base64,').pop();
+    } else if (clean.startsWith('data:')) {
+      clean = clean.replace(/^data:[^,]+,/, '');
+    }
+    clean = clean.replace(/\s+/g, '');
+    const buf = Buffer.from(clean, 'base64');
+    return buf;
+  }
+  throw new Error('Formato de PDF inválido para enviar.');
+}
+
 class BaileysManager {
   constructor() {
     this.socket = null;
@@ -265,15 +285,11 @@ class BaileysManager {
     }
 
     const jid = `${clean}@s.whatsapp.net`;
+    const buffer = parsePdfBuffer(pdfInput);
 
-    let buffer;
-    if (Buffer.isBuffer(pdfInput)) {
-      buffer = pdfInput;
-    } else if (typeof pdfInput === 'string') {
-      const base64Data = pdfInput.replace(/^data:application\/pdf;base64,/, '');
-      buffer = Buffer.from(base64Data, 'base64');
-    } else {
-      throw new Error('Formato de PDF inválido para enviar.');
+    let finalFilename = filename || 'documento.pdf';
+    if (!finalFilename.toLowerCase().endsWith('.pdf')) {
+      finalFilename += '.pdf';
     }
 
     try {
@@ -284,7 +300,7 @@ class BaileysManager {
       const msg = await this.socket.sendMessage(jid, {
         document: buffer,
         mimetype: 'application/pdf',
-        fileName: filename,
+        fileName: finalFilename,
         caption: caption || ''
       });
 
@@ -296,7 +312,7 @@ class BaileysManager {
         ok: true,
         to: clean,
         messageId: msg?.key?.id,
-        filename
+        filename: finalFilename
       };
     } catch (err) {
       console.error('[Baileys] Error enviando PDF a ' + jid + ':', err);
@@ -309,5 +325,6 @@ const baileysManager = new BaileysManager();
 
 module.exports = {
   baileysManager,
-  BaileysManager
+  BaileysManager,
+  parsePdfBuffer
 };

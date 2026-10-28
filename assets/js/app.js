@@ -4252,7 +4252,10 @@
     };
 
     try {
-      const dataUri = await window.html2pdf().set(opt).from(targetEl).output('datauristring');
+      let dataUri = await window.html2pdf().set(opt).from(targetEl).output('datauristring');
+      if (typeof dataUri === 'string' && dataUri.includes(';base64,')) {
+        dataUri = dataUri.split(';base64,').pop();
+      }
       return dataUri;
     } finally {
       if (!container && targetEl && targetEl.parentElement === document.body) {

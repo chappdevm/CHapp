@@ -1615,10 +1615,28 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.equal(failSendRes.status, 400);
     assert.ok(failSendRes.json.error.includes('número celular'), 'Must reject sending if client has no registered phone number');
 
-    // 4. Test BaileysManager unit methods
-    const { baileysManager } = require('../server/baileys');
+    // 4. Test BaileysManager unit methods and PDF buffer parser
+    const { baileysManager, parsePdfBuffer } = require('../server/baileys');
     assert.ok(typeof baileysManager.getStatus === 'function');
     assert.ok(typeof baileysManager.sendPdf === 'function');
+    assert.ok(typeof parsePdfBuffer === 'function');
+
+    // Test that jsPDF output('datauristring') format is properly decoded without corrupting header
+    const sampleJsPdfDataUri = 'data:application/pdf;filename=Cotizacion_S00001.pdf;base64,JVBERi0xLjMKMSAwIG9iajw8L1R5cGUvQ2F0YWxvZz4+ZW5kb2Jq';
+    const buf1 = parsePdfBuffer(sampleJsPdfDataUri);
+    assert.ok(Buffer.isBuffer(buf1));
+    assert.equal(buf1.toString('utf8', 0, 5), '%PDF-');
+
+    // Test standard data URI format
+    const sampleStandardDataUri = 'data:application/pdf;base64,JVBERi0xLjQK';
+    const buf2 = parsePdfBuffer(sampleStandardDataUri);
+    assert.ok(Buffer.isBuffer(buf2));
+    assert.equal(buf2.toString('utf8', 0, 5), '%PDF-');
+
+    // Test raw base64
+    const buf3 = parsePdfBuffer('JVBERi0xLjQK');
+    assert.ok(Buffer.isBuffer(buf3));
+    assert.equal(buf3.toString('utf8', 0, 5), '%PDF-');
   });
 
   it('Module 3 (Ventas): Pedidos de venta confirmados bloquean edición de cliente y productos, y se remueven instrucciones bancarias de representaciones gráficas', async () => {
