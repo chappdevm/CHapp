@@ -1203,4 +1203,48 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.notEqual(exp4.json.expense.partner_id, partnerId, 'Different supplier must get new partner_id');
     assert.equal(exp4.json.state.contacts.length, contactCountBefore + 1, 'Must create new contact for Ferretería El Tornillo');
   });
+  it('Gastos & Contabilidad: auto-generación de factura proveedor (BILL) con tabla de artículos, NIT bajo proveedor, y tablero contable simplificado', async () => {
+    // 1. Crear gasto con múltiples artículos en la tabla
+    const expRes = await req('/api/expenses', 'POST', {
+      name: 'Compra de Insumos Metalmecánicos',
+      partner_name: 'Soluciones Industriales SAS',
+      supplier_vat: '901.888.777-3',
+      receipt_ref: 'FAC-7701',
+      date: '2026-10-28',
+      items: [
+        { description: 'Platinas de Acero 1/4', quantity: 10, price_unit: 25000, subtotal: 250000 },
+        { description: 'Electrodos 6013 1/8', quantity: 2, price_unit: 45000, subtotal: 90000 }
+      ]
+    });
+
+    assert.equal(expRes.status, 200);
+    assert.ok(expRes.json.ok);
+    const exp = expRes.json.expense;
+    assert.equal(exp.total_amount, 340000);
+    assert.equal(exp.supplier_vat, '901.888.777-3');
+    assert.equal(exp.items.length, 2);
+    assert.ok(exp.move_id > 0, 'Expense must link to automatically generated vendor bill');
+
+    // 2. Verificar que la factura de proveedor (BILL) existe, está publicada y pagada de una
+    const bill = expRes.json.state.accounting.moves.find((m) => Number(m.id) === Number(exp.move_id));
+    assert.ok(bill, 'Vendor bill must exist in accounting moves');
+    assert.equal(bill.move_type, 'in_invoice', 'Vendor bill must be move_type in_invoice');
+    assert.equal(bill.state, 'posted', 'Vendor bill must be auto-posted');
+    assert.equal(bill.amount_total, 340000);
+    assert.equal(bill.payment_state, 'paid', 'Vendor bill must be paid automatically since proveedores se paga de una');
+    assert.equal(bill.amount_residual, 0, 'Vendor bill residual must be 0');
+    assert.equal(bill.lines.length, 2, 'Vendor bill must have 2 lines from the items table');
+    assert.equal(bill.lines[0].name, 'Platinas de Acero 1/4');
+    assert.equal(bill.lines[0].quantity, 10);
+    assert.equal(bill.lines[0].price_unit, 25000);
+
+    // 3. Frontend checks
+    const jsText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
+    assert.ok(jsText.includes("defaultSubmenu: 'dashboard'"), 'Contabilidad debe abrir por defecto en el tablero');
+    assert.ok(jsText.includes('<span class="o_stat_label">Total de Ingresos</span>'), 'Tarjeta debe llamarse Total de Ingresos');
+    assert.ok(!jsText.includes('<span class="o_stat_label">Cuentas por Pagar (Proveedores)</span>'), 'Tarjeta de Cuentas por Pagar debe eliminarse del banner');
+    assert.ok(jsText.includes('id="fExpPartnerVat"'), 'NIT debe tener campo debajo de proveedor');
+    assert.ok(jsText.includes('id="expenseItemsTable"'), 'Debe existir tabla estructurada de artículos del gasto');
+    assert.ok(jsText.includes('btnAddExpenseItem'), 'Debe existir botón para agregar artículos');
+  });
 });

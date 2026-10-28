@@ -36,17 +36,25 @@ async function analyzeInvoiceImage(base64Image, mimeType = 'image/jpeg') {
   const prompt = `Analiza esta imagen de una factura, recibo o comprobante de compra o gasto de un proveedor.
 Extrae la información contable y responde EXCLUSIVAMENTE con un JSON válido (sin formato markdown ni texto adicional) con la siguiente estructura:
 {
-  "name": "Descripción clara del gasto o compra (ej: Perfiles de Aluminio, Almuerzo de trabajo, Ferretería)",
+  "name": "Descripción clara y global del gasto (ej: Materiales de Ferretería, Repuestos, Gasolina)",
   "supplier_name": "Nombre o Razón Social del Proveedor / Establecimiento emisor",
-  "supplier_vat": "NIT o Documento del proveedor si está visible (ej: 900.123.456-7)",
+  "supplier_vat": "NIT o Documento de identificación del proveedor si está visible (ej: 900.123.456-7)",
   "reference": "Número de factura o comprobante (ej: FE-1234, FACT-890, REC-45)",
   "date": "Fecha de la factura en formato YYYY-MM-DD (ej: 2026-10-27). Si no tiene año pon 2026",
   "category": "Una de: Materiales, Herramientas, Transporte, Alimentación, Servicios, Mantenimiento, General",
   "total_amount": 0,
   "tax_amount": 0,
-  "notes": "Detalle breve de los artículos o servicios adquiridos"
+  "items": [
+    {
+      "description": "Descripción o nombre del producto/artículo",
+      "quantity": 1,
+      "price_unit": 0,
+      "subtotal": 0
+    }
+  ],
+  "notes": "Observaciones generales de la factura (NO incluir la lista de artículos ni el NIT aquí)"
 }
-Nota: total_amount debe ser un número entero o decimal en pesos colombianos, sin símbolos de moneda.`;
+Nota: total_amount y los subtotales/precios deben ser números en pesos colombianos, sin símbolos de moneda. Si la factura tiene varios productos o ítems detallados, extráelos todos en el arreglo 'items'.`;
 
   const models = ['gemini-3.5-flash', 'gemini-3.7-flash', 'gemini-flash-latest', 'gemini-3.8-flash'];
   let lastError = null;

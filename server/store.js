@@ -901,7 +901,36 @@ class ERPStore {
     if (!Number.isFinite(priceUnit) || priceUnit < 0) throw new Error('El valor unitario no puede ser negativo.');
 
     const taxRate = Number(payload.tax_rate ?? 0);
-    const untaxed = round2(quantity * priceUnit);
+
+    // Artículos estructurados del gasto (en tabla con descripción, cantidad, valor unitario y subtotal)
+    const rawItems = Array.isArray(payload.items) && payload.items.length > 0 ? payload.items : null;
+    let items = [];
+    if (rawItems) {
+      items = rawItems.map((it, idx) => {
+        const q = Math.max(0.001, Number(it.quantity ?? 1) || 1);
+        const p = Math.max(0, Number(it.price_unit ?? 0) || 0);
+        return {
+          id: it.id || idx + 1,
+          description: String(it.description || it.name || name).trim(),
+          quantity: q,
+          price_unit: p,
+          subtotal: round2(it.subtotal !== undefined ? Number(it.subtotal) : q * p)
+        };
+      });
+    } else {
+      items = [
+        {
+          id: 1,
+          description: name,
+          quantity,
+          price_unit: priceUnit,
+          subtotal: round2(quantity * priceUnit)
+        }
+      ];
+    }
+
+    const itemsSum = round2(items.reduce((s, it) => s + it.subtotal, 0));
+    const untaxed = itemsSum > 0 ? itemsSum : round2(quantity * priceUnit);
     const taxAmount = round2(untaxed * (taxRate / 100));
     const totalAmount = round2(untaxed + taxAmount);
 
@@ -911,6 +940,10 @@ class ERPStore {
       const suppName = payload.partner_name || payload.supplier_name || '';
       const suppVat = payload.supplier_vat || payload.vat || '';
       partner = await this.resolveOrCreateSupplier(suppName, suppVat);
+    }
+    const suppVat = String(payload.supplier_vat || payload.vat || (partner ? partner.vat : '') || '').trim();
+    if (partner && suppVat && !partner.vat) {
+      partner.vat = suppVat;
     }
 
     if (payload.id) {
@@ -934,9 +967,11 @@ class ERPStore {
         total_amount: totalAmount,
         partner_id: partner ? partner.id : existing.partner_id,
         partner_name: partner ? partner.name : String(payload.partner_name || existing.partner_name || ''),
+        supplier_vat: suppVat || existing.supplier_vat || (partner ? partner.vat : '') || '',
         analytic_account: String(payload.analytic_account ?? existing.analytic_account).trim(),
         receipt_ref: String(payload.receipt_ref ?? existing.receipt_ref).trim(),
-        notes: String(payload.notes ?? existing.notes).trim()
+        notes: String(payload.notes ?? existing.notes).trim(),
+        items
       };
       updated.chatter = [
         ...(existing.chatter || []),
@@ -978,17 +1013,73 @@ class ERPStore {
       currency: this.data.settings.currency || 'COP',
       partner_id: partner ? partner.id : null,
       partner_name: partner ? partner.name : String(payload.partner_name || 'Proveedor General'),
+      supplier_vat: suppVat || (partner ? partner.vat : '') || '',
       analytic_account: String(payload.analytic_account || 'General').trim(),
       receipt_ref: String(payload.receipt_ref || '').trim(),
       notes: String(payload.notes || '').trim(),
       state: 'draft',
       refuse_reason: '',
       move_id: null,
+      bill_id: null,
+      bill_name: null,
       payment_id: null,
+      items,
       chatter: [
         { id: Date.now(), author: this.getActiveAuthor(), date: this.formatNowShort(), text: `Gasto ${reference} creado en estado Borrador.` }
       ]
     };
+
+    // Generar automáticamente la factura de proveedor asociada (BILL) con los datos del gasto y sus artículos
+    try {
+      const billLines = items.map((it, idx) => ({
+        id: idx + 1,
+        name: it.description,
+        quantity: it.quantity,
+        price_unit: it.price_unit,
+        discount: 0,
+        tax_rate: taxRate,
+        subtotal: it.subtotal,
+        tax_amount: round2(it.subtotal * (taxRate / 100))
+      }));
+
+      const vendorBill = await this.saveAccountMove({
+        move_type: 'in_invoice',
+        partner_id: newExpense.partner_id,
+        partner_name: newExpense.partner_name,
+        invoice_date: newExpense.date,
+        invoice_date_due: newExpense.date,
+        ref: newExpense.receipt_ref || newExpense.reference,
+        origin: `Gasto ${newExpense.reference}`,
+        lines: billLines,
+        auto_post: true
+      });
+
+      if (vendorBill && vendorBill.id) {
+        // Pagar automáticamente la factura de proveedor ("todo lo de proveedores se paga de una")
+        try {
+          await this.transitionAccountMove(vendorBill.id, 'register_payment', {
+            amount: vendorBill.amount_total,
+            journal_code: 'BNK1',
+            date: newExpense.date,
+            ref: `Pago automático gasto ${newExpense.reference}`
+          });
+        } catch (payErr) {
+          // Log pero sin bloquear
+        }
+        newExpense.move_id = vendorBill.id;
+        newExpense.bill_id = vendorBill.id;
+        newExpense.bill_name = vendorBill.name;
+        newExpense.chatter.push({
+          id: Date.now() + 1,
+          author: this.getActiveAuthor(),
+          date: this.formatNowShort(),
+          text: `Factura de proveedor asociada ${vendorBill.name} generada y pagada automáticamente.`
+        });
+      }
+    } catch (billErr) {
+      console.warn('[saveExpense] Error generando factura de proveedor asociada:', billErr.message);
+    }
+
     this.data.expenses.unshift(newExpense);
     this.save();
     if (this.supabase) {

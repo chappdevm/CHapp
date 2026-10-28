@@ -49,7 +49,7 @@
       name: 'Contabilidad',
       icon: '/assets/icons/accounting.png',
       xmlid: 'account.menu_finance',
-      defaultSubmenu: 'out_invoice',
+      defaultSubmenu: 'dashboard',
       defaultView: 'list',
       submenus: [
         { id: 'dashboard', label: 'Tablero' },
@@ -462,8 +462,11 @@
             total_amount: Number(res.data.total_amount || 0),
             price_unit: Number(res.data.total_amount || 0),
             quantity: 1,
-            notes: (res.data.supplier_vat ? ('NIT: ' + res.data.supplier_vat + '. ') : '') + (res.data.notes || ''),
-            receipt_image: base64Data
+            notes: res.data.notes || '',
+            receipt_image: base64Data,
+            items: Array.isArray(res.data.items) && res.data.items.length > 0 ? res.data.items : [
+              { description: res.data.name || 'Gasto proveedor', quantity: 1, price_unit: Number(res.data.total_amount || 0), subtotal: Number(res.data.total_amount || 0) }
+            ]
           };
           renderModuleWorkspace();
         }
@@ -1449,7 +1452,10 @@
                       (e) => `
                 <tr data-expense-id="${e.id}" style="cursor: pointer;">
                   <th>${esc(e.reference)}</th>
-                  <td><strong>${esc(e.partner_name || 'Proveedor General')}</strong></td>
+                  <td>
+                    <strong>${esc(e.partner_name || 'Proveedor General')}</strong>
+                    ${(e.supplier_vat) ? `<div style="font-size: 0.78rem; color: var(--o-muted); margin-top: 2px;">NIT: ${esc(e.supplier_vat)}</div>` : ''}
+                  </td>
                   <td>${esc(e.name)}</td>
                   <td>${esc(e.date)}</td>
                   <td>${esc(e.receipt_ref || '—')}</td>
@@ -1607,6 +1613,10 @@
                 </div>
               </div>
               <div class="o_field_row">
+                <label for="fExpPartnerVat">NIT / Identificación Proveedor</label>
+                <input type="text" id="fExpPartnerVat" class="o_input" value="${esc(existing.supplier_vat || ((state.data.contacts || []).find((c) => Number(c.id) === Number(existing.partner_id)) || {}).vat || '')}" placeholder="Ej. 900.123.456-7" />
+              </div>
+              <div class="o_field_row">
                 <label for="fExpReceipt">N° Factura / Soporte</label>
                 <input type="text" id="fExpReceipt" class="o_input" value="${esc(existing.receipt_ref || '')}" placeholder="Ej. FE-1234, REC-90" />
               </div>
@@ -1631,15 +1641,6 @@
                 </select>
               </div>
               <div class="o_field_row">
-                <label for="fExpTax">Impuesto IVA (%)</label>
-                <select id="fExpTax" class="o_select">
-                  <option value="" ${existing.tax_rate === '' || existing.tax_rate === undefined || existing.tax_rate === null ? 'selected disabled' : ''}>— Seleccione IVA —</option>
-                  <option value="0" ${existing.tax_rate === 0 ? 'selected' : ''}>IVA 0% (Exento)</option>
-                  <option value="5" ${existing.tax_rate === 5 ? 'selected' : ''}>IVA 5%</option>
-                  <option value="19" ${existing.tax_rate === 19 ? 'selected' : ''}>IVA 19%</option>
-                </select>
-              </div>
-              <div class="o_field_row">
                 <label for="fExpPayMode">Forma de Pago</label>
                 <select id="fExpPayMode" class="o_select">
                   <option value="" ${!existing.payment_mode ? 'selected disabled' : ''}>— Seleccione Forma de Pago —</option>
@@ -1653,9 +1654,48 @@
               </div>
             </div>
 
+            <div style="display: none;" aria-hidden="true">
+                <select id="fExpTax">
+                  <option value="" ${existing.tax_rate === '' || existing.tax_rate === undefined || existing.tax_rate === null ? 'selected disabled' : ''}>— Seleccione IVA —</option>
+                  <option value="0" ${existing.tax_rate === 0 ? 'selected' : ''}>IVA 0% (Exento)</option>
+                  <option value="5" ${existing.tax_rate === 5 ? 'selected' : ''}>IVA 5%</option>
+                  <option value="19" ${existing.tax_rate === 19 ? 'selected' : ''}>IVA 19%</option>
+                </select>
+              </div>
+
+            <!-- Tabla estructurada de Artículos / Productos -->
+            <div style="margin-top: 1.25rem; border-top: 1px solid var(--o-border); padding-top: 1rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
+                <div>
+                  <h4 style="margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--o-text);">Productos / Artículos Adquiridos</h4>
+                  <span style="font-size: 0.8rem; color: var(--o-muted);">Detalle de ítems con cantidad, valor unitario y subtotal</span>
+                </div>
+                <button type="button" class="btn btn-sm btn-secondary" id="btnAddExpenseItem" style="display: inline-flex; align-items: center; gap: 4px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                  Agregar Producto / Artículo
+                </button>
+              </div>
+
+              <div tabindex="0" role="region" aria-label="Tabla de productos del gasto" class="table-wrapper" style="margin-bottom: 0.75rem;">
+                <table class="o_list_table" id="expenseItemsTable" style="--label-2: 'Cantidad'; --label-3: 'Valor Unit.'; --label-4: 'Subtotal'; --label-5: 'Acción';">
+                  <thead>
+                    <tr>
+                      <th>Descripción del Producto / Artículo</th>
+                      <th style="width: 100px;">Cantidad</th>
+                      <th style="width: 160px;">Valor Unitario ($)</th>
+                      <th class="text-end" style="width: 160px;">Subtotal ($)</th>
+                      <th style="width: 50px;"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="expenseItemsTbody">
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
             <div class="o_field_row" style="margin-top: 0.5rem;">
-              <label for="fExpNotes">Notas / Artículos Detallados</label>
-              <textarea id="fExpNotes" class="o_textarea" rows="2" placeholder="Detalle de ítems, observaciones, etc.">${esc(existing.notes || '')}</textarea>
+              <label for="fExpNotes">Notas / Observaciones Generales</label>
+              <textarea id="fExpNotes" class="o_textarea" rows="2" placeholder="Observaciones generales (el NIT y los artículos ya tienen sus campos correspondientes)">${esc(existing.notes || '')}</textarea>
             </div>
 
             <!-- Foto o Soporte de la Factura -->
@@ -1684,6 +1724,106 @@
 
     wireChatterEvents('expenses', existing.id);
 
+    // Initial items list for the table
+    let expenseItems = Array.isArray(existing.items) && existing.items.length > 0
+      ? [...existing.items]
+      : (draft && Array.isArray(draft.items) && draft.items.length > 0
+          ? [...draft.items]
+          : [{ description: existing.name || '', quantity: existing.quantity || 1, price_unit: existing.price_unit || existing.total_amount || 0, subtotal: existing.total_amount || 0 }]);
+
+    const renderExpenseItems = () => {
+      const tbody = document.getElementById('expenseItemsTbody');
+      if (!tbody) return;
+      tbody.innerHTML = expenseItems.map((it, idx) => {
+        const sub = Math.round((Number(it.quantity || 1) * Number(it.price_unit || 0)) * 100) / 100;
+        return `
+          <tr data-item-idx="${idx}">
+            <td>
+              <input type="text" class="o_input exp-item-desc" data-idx="${idx}" value="${esc(it.description || '')}" placeholder="Ej. Tubo PVC, Almuerzo, Cable..." />
+            </td>
+            <td>
+              <input type="number" class="o_input exp-item-qty" data-idx="${idx}" min="1" step="any" value="${Number(it.quantity || 1)}" />
+            </td>
+            <td>
+              <input type="number" class="o_input exp-item-price" data-idx="${idx}" min="0" step="any" value="${Number(it.price_unit || 0)}" />
+            </td>
+            <td class="text-end">
+              <strong class="exp-item-subtotal">${formatMoney(sub)}</strong>
+            </td>
+            <td class="text-center">
+              ${expenseItems.length > 1 ? `<button type="button" class="btn btn-sm btn-danger btn-remove-exp-item" data-idx="${idx}" title="Quitar ítem">Quitar</button>` : ''}
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      // Wire row inputs
+      tbody.querySelectorAll('.exp-item-desc').forEach(input => {
+        input.addEventListener('input', (e) => {
+          const idx = Number(e.target.dataset.idx);
+          if (expenseItems[idx]) expenseItems[idx].description = e.target.value;
+        });
+      });
+
+      tbody.querySelectorAll('.exp-item-qty, .exp-item-price').forEach(input => {
+        input.addEventListener('input', (e) => {
+          const idx = Number(e.target.dataset.idx);
+          const row = tbody.querySelector(`tr[data-item-idx="${idx}"]`);
+          if (!row || !expenseItems[idx]) return;
+          const qty = Number(row.querySelector('.exp-item-qty').value || 1);
+          const price = Number(row.querySelector('.exp-item-price').value || 0);
+          expenseItems[idx].quantity = qty;
+          expenseItems[idx].price_unit = price;
+          const sub = Math.round(qty * price * 100) / 100;
+          expenseItems[idx].subtotal = sub;
+          row.querySelector('.exp-item-subtotal').textContent = formatMoney(sub);
+          recalcExpenseTotal();
+        });
+      });
+
+      tbody.querySelectorAll('.btn-remove-exp-item').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const idx = Number(e.currentTarget.dataset.idx);
+          expenseItems.splice(idx, 1);
+          renderExpenseItems();
+          recalcExpenseTotal();
+        });
+      });
+    };
+
+    const recalcExpenseTotal = () => {
+      const sum = expenseItems.reduce((acc, it) => acc + (Number(it.quantity || 1) * Number(it.price_unit || 0)), 0);
+      const totalInput = document.getElementById('fExpTotal');
+      if (totalInput) totalInput.value = Math.round(sum * 100) / 100;
+    };
+
+    renderExpenseItems();
+
+    const btnAddItem = document.getElementById('btnAddExpenseItem');
+    if (btnAddItem) {
+      btnAddItem.addEventListener('click', () => {
+        expenseItems.push({ description: '', quantity: 1, price_unit: 0, subtotal: 0 });
+        renderExpenseItems();
+      });
+    }
+
+    // Auto fill NIT and Name when partner select changes
+    const partnerSelect = document.getElementById('fExpPartner');
+    if (partnerSelect) {
+      partnerSelect.addEventListener('change', (e) => {
+        const p = (state.data.contacts || []).find((c) => Number(c.id) === Number(e.target.value));
+        if (p) {
+          const nameInput = document.getElementById('fExpPartnerName');
+          if (nameInput) nameInput.value = p.name;
+          const vatInput = document.getElementById('fExpPartnerVat');
+          if (vatInput) vatInput.value = p.vat || '';
+          existing.partner_id = p.id;
+          existing.partner_name = p.name;
+          existing.supplier_vat = p.vat || '';
+        }
+      });
+    }
+
     const openCameraForForm = () => {
       openExpenseCameraDialog((scannedData, imageBase64, matched) => {
         if (scannedData.name) document.getElementById('fExpName').value = scannedData.name;
@@ -1691,24 +1831,51 @@
           const pSel = document.getElementById('fExpPartner');
           if (pSel) pSel.value = String(matched.id);
           document.getElementById('fExpPartnerName').value = matched.name;
+          document.getElementById('fExpPartnerVat').value = matched.vat || '';
           existing.partner_id = matched.id;
           existing.partner_name = matched.name;
+          existing.supplier_vat = matched.vat || '';
         } else if (scannedData.supplier_name) {
           const pSel = document.getElementById('fExpPartner');
           if (pSel) pSel.value = '';
           document.getElementById('fExpPartnerName').value = scannedData.supplier_name;
           existing.partner_name = scannedData.supplier_name;
+          if (scannedData.supplier_vat) {
+            document.getElementById('fExpPartnerVat').value = scannedData.supplier_vat;
+            existing.supplier_vat = scannedData.supplier_vat;
+          }
         }
-        if (scannedData.supplier_vat) {
+        if (scannedData.supplier_vat && !matched) {
+          document.getElementById('fExpPartnerVat').value = scannedData.supplier_vat;
           existing.supplier_vat = scannedData.supplier_vat;
         }
         if (scannedData.reference) document.getElementById('fExpReceipt').value = scannedData.reference;
         if (scannedData.date) document.getElementById('fExpDate').value = scannedData.date;
         if (scannedData.total_amount) document.getElementById('fExpTotal').value = scannedData.total_amount;
-        if (scannedData.notes || scannedData.supplier_vat) {
-          const nitText = scannedData.supplier_vat ? `NIT: ${scannedData.supplier_vat}. ` : '';
-          document.getElementById('fExpNotes').value = nitText + (scannedData.notes || '');
+        if (scannedData.notes) {
+          document.getElementById('fExpNotes').value = scannedData.notes;
         }
+
+        // Load items from AI scan
+        if (Array.isArray(scannedData.items) && scannedData.items.length > 0) {
+          expenseItems = scannedData.items.map(it => ({
+            description: it.description || it.name || '',
+            quantity: Number(it.quantity || 1),
+            price_unit: Number(it.price_unit || 0),
+            subtotal: Number(it.subtotal || ((Number(it.quantity || 1)) * Number(it.price_unit || 0)))
+          }));
+          renderExpenseItems();
+          recalcExpenseTotal();
+        } else if (scannedData.name || scannedData.total_amount) {
+          expenseItems = [{
+            description: scannedData.name || 'Gasto proveedor',
+            quantity: 1,
+            price_unit: Number(scannedData.total_amount || 0),
+            subtotal: Number(scannedData.total_amount || 0)
+          }];
+          renderExpenseItems();
+        }
+
         if (imageBase64) {
           existing.receipt_image = imageBase64;
           const wrap = document.getElementById('formReceiptPreviewWrap');
@@ -1767,12 +1934,6 @@
           return;
         }
 
-        const expTaxVal = document.getElementById('fExpTax').value;
-        if (expTaxVal === '') {
-          showToast('Debe seleccionar la tarifa de IVA.', true);
-          return;
-        }
-
         const partnerVal = document.getElementById('fExpPartner').value;
         const partnerNameInput = document.getElementById('fExpPartnerName').value.trim();
         const matchedPartner = partnerVal
@@ -1781,6 +1942,16 @@
 
         const prodVal = document.getElementById('fExpProduct').value;
         const defaultProd = (state.data.products || [])[0];
+        const suppVatInput = document.getElementById('fExpPartnerVat') ? document.getElementById('fExpPartnerVat').value.trim() : '';
+
+        // Collect items from table
+        const cleanItems = expenseItems.filter(it => it.description || it.price_unit > 0).map((it, idx) => ({
+          id: idx + 1,
+          description: it.description || name,
+          quantity: Number(it.quantity || 1),
+          price_unit: Number(it.price_unit || 0),
+          subtotal: Math.round((Number(it.quantity || 1) * Number(it.price_unit || 0)) * 100) / 100
+        }));
 
         const payload = {
           id: isNew ? undefined : existing.id,
@@ -1793,23 +1964,24 @@
             : (defaultProd ? defaultProd.name : 'Gasto General'),
           partner_id: matchedPartner ? matchedPartner.id : (existing.partner_id || null),
           partner_name: partnerNameInput || (matchedPartner ? matchedPartner.name : ''),
-          supplier_vat: existing.supplier_vat || '',
+          supplier_vat: suppVatInput || existing.supplier_vat || '',
           date: document.getElementById('fExpDate').value,
           receipt_ref: document.getElementById('fExpReceipt').value.trim(),
           quantity: 1,
           price_unit: totalAmount,
-          tax_rate: Number(expTaxVal || 0),
+          tax_rate: 0,
           untaxed_amount: totalAmount,
           tax_amount: 0,
           total_amount: totalAmount,
           payment_mode: document.getElementById('fExpPayMode').value || 'company_account',
           notes: document.getElementById('fExpNotes').value.trim(),
-          receipt_image: existing.receipt_image || ''
+          receipt_image: existing.receipt_image || '',
+          items: cleanItems.length > 0 ? cleanItems : [{ id: 1, description: name, quantity: 1, price_unit: totalAmount, subtotal: totalAmount }]
         };
 
         try {
           await apiCall('/api/expenses', 'POST', payload);
-          showToast('Gasto guardado exitosamente.');
+          showToast('Gasto guardado exitosamente y factura de proveedor generada.');
           state.activeRecordId = null;
           state.formDraft = null;
           state.viewType = 'list';
@@ -3709,7 +3881,7 @@
       container.innerHTML = `
         <div class="o_dashboard_banner">
           <div class="o_stat_card">
-            <span class="o_stat_label">Facturación Clientes Publicada</span>
+            <span class="o_stat_label">Total de Ingresos</span>
             <span class="o_stat_value">${formatMoney(kpis.invoiced_revenue || 0)}</span>
             <span class="o_stat_sub">Ingresos operacionales causados</span>
           </div>
@@ -3717,11 +3889,6 @@
             <span class="o_stat_label">Cartera por Cobrar (Clientes)</span>
             <span class="o_stat_value">${formatMoney(kpis.receivables_residual || 0)}</span>
             <span class="o_stat_sub">${outUnpaid.length} factura(s) pendiente(s) de cobro</span>
-          </div>
-          <div class="o_stat_card">
-            <span class="o_stat_label">Cuentas por Pagar (Proveedores)</span>
-            <span class="o_stat_value">${formatMoney(kpis.payables_residual || 0)}</span>
-            <span class="o_stat_sub">${inUnpaid.length} factura(s) por pagar</span>
           </div>
         </div>
 
