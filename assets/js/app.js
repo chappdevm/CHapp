@@ -55,9 +55,7 @@
         { id: 'dashboard', label: 'Tablero' },
         { id: 'out_invoice', label: 'Facturas Clientes' },
         { id: 'in_invoice', label: 'Facturas Proveedores' },
-        { id: 'payments', label: 'Pagos' },
-        { id: 'entries', label: 'Asientos Contables' },
-        { id: 'accounts', label: 'Plan de Cuentas' }
+        { id: 'payments', label: 'Pagos' }
       ]
     },
     {
