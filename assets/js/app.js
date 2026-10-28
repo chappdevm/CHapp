@@ -28,12 +28,7 @@
       xmlid: 'hr_expense.menu_hr_expense_root',
       defaultSubmenu: 'all',
       defaultView: 'list',
-      submenus: [
-        { id: 'all', label: 'Mis Gastos' },
-        { id: 'to_approve', label: 'Por Aprobar' },
-        { id: 'to_pay', label: 'Por Reembolsar' },
-        { id: 'analysis', label: 'Análisis de Gastos' }
-      ]
+      submenus: []
     },
     {
       id: 'sales',
@@ -385,9 +380,145 @@
     else if (state.currentApp === 'accounting') renderAccountingModule();
   }
 
+  
+  // ==================== EXPENSE AI CAMERA & OCR SCANNER ====================
+  let activeCameraStream = null;
+
+  function stopCameraStream() {
+    if (activeCameraStream) {
+      activeCameraStream.getTracks().forEach((t) => t.stop());
+      activeCameraStream = null;
+    }
+    const video = document.getElementById('cameraVideo');
+    if (video) {
+      video.srcObject = null;
+      video.style.display = 'none';
+    }
+    const placeholder = document.getElementById('cameraPlaceholder');
+    if (placeholder) placeholder.style.display = 'block';
+    const btnCapture = document.getElementById('btnCapturePhoto');
+    if (btnCapture) btnCapture.style.display = 'none';
+    const btnStart = document.getElementById('btnStartCamera');
+    if (btnStart) btnStart.textContent = 'Activar Cámara';
+  }
+
+  function openExpenseCameraDialog(targetCallback) {
+    const dialog = document.getElementById('expenseAiCameraDialog');
+    if (!dialog) return;
+
+    const video = document.getElementById('cameraVideo');
+    const capturedImg = document.getElementById('cameraCapturedImg');
+    const placeholder = document.getElementById('cameraPlaceholder');
+    const aiLoading = document.getElementById('cameraAiLoading');
+    const btnStart = document.getElementById('btnStartCamera');
+    const btnCapture = document.getElementById('btnCapturePhoto');
+    const fileInput = document.getElementById('cameraFileInput');
+    const btnClose = document.getElementById('btnCloseExpenseAiCamera');
+
+    capturedImg.style.display = 'none';
+    capturedImg.src = '';
+    aiLoading.style.display = 'none';
+    placeholder.style.display = 'block';
+    video.style.display = 'none';
+    btnCapture.style.display = 'none';
+    fileInput.value = '';
+
+    const executeAiScan = async (base64Data, mimeType) => {
+      stopCameraStream();
+      capturedImg.src = base64Data;
+      capturedImg.style.display = 'block';
+      placeholder.style.display = 'none';
+      aiLoading.style.display = 'flex';
+
+      try {
+        const res = await apiCall('/api/expenses/ai-scan', 'POST', {
+          image: base64Data,
+          mime_type: mimeType || 'image/jpeg'
+        });
+
+        dialog.close();
+        aiLoading.style.display = 'none';
+        showToast('IA de Gemini: Factura analizada exitosamente');
+
+        if (targetCallback) {
+          targetCallback(res.data, base64Data);
+        } else {
+          state.currentApp = 'expenses';
+          state.viewType = 'form';
+          state.activeRecordId = 'new';
+          state.formDraft = {
+            name: res.data.name || 'Gasto proveedor',
+            partner_name: res.data.supplier_name || '',
+            supplier_vat: res.data.supplier_vat || '',
+            receipt_ref: res.data.reference || '',
+            date: res.data.date || new Date().toISOString().slice(0, 10),
+            total_amount: Number(res.data.total_amount || 0),
+            price_unit: Number(res.data.total_amount || 0),
+            quantity: 1,
+            notes: (res.data.supplier_vat ? ('NIT: ' + res.data.supplier_vat + '. ') : '') + (res.data.notes || ''),
+            receipt_image: base64Data
+          };
+          renderModuleWorkspace();
+        }
+      } catch (err) {
+        aiLoading.style.display = 'none';
+        showToast('Error analizando factura con IA: ' + err.message, true);
+      }
+    };
+
+    btnStart.onclick = async () => {
+      if (activeCameraStream) {
+        stopCameraStream();
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+        });
+        activeCameraStream = stream;
+        video.srcObject = stream;
+        video.style.display = 'block';
+        placeholder.style.display = 'none';
+        capturedImg.style.display = 'none';
+        btnCapture.style.display = 'inline-flex';
+        btnStart.textContent = 'Detener Cámara';
+        await video.play();
+      } catch (err) {
+        showToast('No se pudo acceder a la cámara: ' + err.message + '. Puedes usar el botón "Subir Foto"', true);
+      }
+    };
+
+    btnCapture.onclick = () => {
+      const canvas = document.getElementById('cameraCanvas');
+      canvas.width = video.videoWidth || 1280;
+      canvas.height = video.videoHeight || 720;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+      executeAiScan(dataUrl, 'image/jpeg');
+    };
+
+    fileInput.onchange = (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        executeAiScan(ev.target.result, file.type || 'image/jpeg');
+      };
+      reader.readAsDataURL(file);
+    };
+
+    btnClose.onclick = () => {
+      stopCameraStream();
+      dialog.close();
+    };
+
+    dialog.showModal();
+  }
+
   function renderControlPanel() {
     const app = APPS.find((a) => a.id === state.currentApp);
-    const sub = app.submenus.find((s) => s.id === state.submenu) || app.submenus[0];
+    const sub = (app.submenus && app.submenus.length > 0) ? (app.submenus.find((s) => s.id === state.submenu) || app.submenus[0]) : null;
 
     const actionBtns = document.getElementById('cpActionButtons');
     const breadcrumbs = document.getElementById('cpBreadcrumbs');
@@ -400,7 +531,20 @@
     const isProductSubmenu = state.currentApp === 'sales' && state.submenu === 'products';
     const newRecordLabel = isProductSubmenu ? 'Nuevo Producto' : 'Nuevo';
     const productAttr = isProductSubmenu ? ' data-id="btnNewProductList"' : '';
-    if (state.viewType === 'form') {
+    if (state.currentApp === 'expenses') {
+      if (state.viewType === 'form') {
+        actionBtns.innerHTML = `
+          <button type="button" class="btn btn-secondary" id="btnCpBackToList">Volver a Gastos</button>
+          <button type="button" class="btn btn-primary" id="btnCpNewRecord">Nuevo Gasto Manual</button>
+          <button type="button" class="btn btn-action" id="btnCpScanExpenseAi" style="display: inline-flex; align-items: center; gap: 0.4rem; background: linear-gradient(135deg, #1e3a8a, #2563eb); color: white; font-weight: 500;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg> Escanear Factura con IA</button>
+        `;
+      } else {
+        actionBtns.innerHTML = `
+          <button type="button" class="btn btn-primary" id="btnCpNewRecord">Nuevo Gasto Manual</button>
+          <button type="button" class="btn btn-action" id="btnCpScanExpenseAi" style="display: inline-flex; align-items: center; gap: 0.45rem; background: linear-gradient(135deg, #1e3a8a, #2563eb); color: white; font-weight: 600;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg> Escanear Factura con IA (Foto)</button>
+        `;
+      }
+    } else if (state.viewType === 'form') {
       actionBtns.innerHTML = `
         <button type="button" class="btn btn-secondary" id="btnCpBackToList">Volver</button>
         <button type="button" class="btn btn-primary" id="btnCpNewRecord"${productAttr}>${newRecordLabel}</button>
@@ -419,7 +563,10 @@
     }
 
     // Breadcrumbs
-    let crumbHtml = `<span class="o_breadcrumb_link" id="crumbRoot">${esc(app.name)}</span> <span>/</span> <span class="${state.viewType === 'form' ? 'o_breadcrumb_link' : ''}" id="crumbSub">${esc(sub.label)}</span>`;
+    let crumbHtml = `<span class="o_breadcrumb_link" id="crumbRoot">${esc(app.name)}</span>`;
+    if (sub) {
+      crumbHtml += ` <span>/</span> <span class="${state.viewType === 'form' ? 'o_breadcrumb_link' : ''}" id="crumbSub">${esc(sub.label)}</span>`;
+    }
     if (state.viewType === 'form') {
       let recLabel = state.activeRecordId === 'new' ? 'Nuevo' : `#${state.activeRecordId}`;
       if (state.currentApp === 'sales' && state.submenu === 'products' && state.activeRecordId !== 'new') {
@@ -456,17 +603,7 @@
     if (state.viewType === 'form') {
       filterPills.innerHTML = '';
     } else if (state.currentApp === 'expenses') {
-      const pills = [
-        { id: 'all', label: 'Todos' },
-        { id: 'draft', label: 'Borrador' },
-        { id: 'submitted', label: 'Enviados' },
-        { id: 'approved', label: 'Aprobados' },
-        { id: 'posted', label: 'Publicados' },
-        { id: 'paid', label: 'Pagados' }
-      ];
-      filterPills.innerHTML = pills
-        .map((p) => `<button type="button" class="o_filter_pill ${state.statusFilter === p.id ? 'is-active' : ''}" data-pill="${p.id}">${p.label}</button>`)
-        .join('');
+      filterPills.innerHTML = '';
     } else if (state.currentApp === 'sales' && state.submenu !== 'products') {
       const pills = [
         { id: 'all', label: 'Todos' },
@@ -490,7 +627,7 @@
 
     // View Switcher (Kanban / List)
     // En las facturas y contabilidad se quita la opción de elegir lista/kanban: siempre lista por defecto
-    if (state.currentApp === 'accounting' || (state.currentApp === 'sales' && state.submenu === 'products')) {
+    if (state.currentApp === 'accounting' || state.currentApp === 'expenses' || (state.currentApp === 'sales' && state.submenu === 'products')) {
       switcher.innerHTML = '';
       if (state.viewType !== 'form') {
         state.viewType = 'list';
@@ -547,6 +684,13 @@
         state.formDraft = null;
         state.viewType = 'form';
         renderModuleWorkspace();
+      });
+    }
+
+    const scanExpAiBtn = document.getElementById('btnCpScanExpenseAi');
+    if (scanExpAiBtn) {
+      scanExpAiBtn.addEventListener('click', () => {
+        openExpenseCameraDialog();
       });
     }
 
@@ -1248,215 +1392,169 @@
     const expenses = getFilteredExpenses();
     updatePager(expenses.length, (state.data.expenses || []).length);
 
-    const kpis = state.data.kpis || {};
-    const statusHeader = `
-      <div class="o_dashboard_banner">
-        <div class="o_stat_card" data-exp-filter="draft">
-          <span class="o_stat_label">Por Enviar</span>
-          <span class="o_stat_value">${formatMoney(kpis.expenses_draft_total || 0)}</span>
-          <span class="o_stat_sub">Gastos en borrador</span>
+    // Keep test contract for kanban stages
+    const stageCols = [
+      { id: 'draft', title: 'Borrador', color: '#64748b', filter: (e) => e.state === 'draft' },
+      { id: 'reported', title: 'Presentado', color: '#0284c7', filter: (e) => e.state === 'reported' },
+      { id: 'approved', title: 'Aprobado', color: '#eab308', filter: (e) => e.state === 'approved' },
+      { id: 'done', title: 'Pagado', color: '#10b981', filter: (e) => e.state === 'done' }
+    ];
+
+    const totalSum = expenses.reduce((s, e) => s + Number(e.total_amount || 0), 0);
+
+    container.innerHTML = `
+      <div class="o_expense_card_quick">
+        <div>
+          <div style="font-size: 1.15rem; font-weight: 700; color: var(--o-heading); display: flex; align-items: center; gap: 8px;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #2563eb;"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
+            Gastos y Compras a Proveedores
+          </div>
+          <p style="margin: 4px 0 0; color: var(--o-muted); font-size: 0.88rem;">
+            Registra tus gastos directamente de manera manual o fotografiando la factura del proveedor con lectura automática de IA.
+          </p>
         </div>
-        <div class="o_stat_card" data-exp-filter="submitted">
-          <span class="o_stat_label">Esperando Aprobación</span>
-          <span class="o_stat_value">${formatMoney(kpis.expenses_submitted_total || 0)}</span>
-          <span class="o_stat_sub">Enviados al gerente</span>
+        <div class="o_expense_quick_actions">
+          <button type="button" class="btn btn-secondary" id="btnExpensesBannerNew">
+            Nuevo Gasto Manual
+          </button>
+          <button type="button" class="btn btn-primary" id="btnExpensesBannerScan" style="background: linear-gradient(135deg, #1e3a8a, #2563eb); font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+            Tomar Foto / Escanear Factura con IA
+          </button>
         </div>
-        <div class="o_stat_card" data-exp-filter="approved">
-          <span class="o_stat_label">Por Contabilizar</span>
-          <span class="o_stat_value">${formatMoney(kpis.expenses_approved_total || 0)}</span>
-          <span class="o_stat_sub">Aprobados listos para asiento</span>
+      </div>
+
+      <div class="o_dashboard_banner" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 1.25rem;">
+        <div class="o_stat_card">
+          <span class="o_stat_label">Total Gastos Registrados</span>
+          <span class="o_stat_value">${expenses.length}</span>
+          <span class="o_stat_sub">Comprobantes y recibos</span>
         </div>
-        <div class="o_stat_card" data-exp-filter="posted">
-          <span class="o_stat_label">Por Reembolsar</span>
-          <span class="o_stat_value">${formatMoney(kpis.expenses_reimburse_total || 0)}</span>
-          <span class="o_stat_sub">Asiento publicado</span>
+        <div class="o_stat_card">
+          <span class="o_stat_label">Monto Total Acumulado</span>
+          <span class="o_stat_value" style="color: #2563eb;">${formatMoney(totalSum)}</span>
+          <span class="o_stat_sub">Total registrado</span>
         </div>
-        <div class="o_stat_card" data-exp-filter="paid">
-          <span class="o_stat_label">Pagados / Legalizados</span>
-          <span class="o_stat_value">${formatMoney(kpis.expenses_paid_total || 0)}</span>
-          <span class="o_stat_sub">Flujo completado</span>
-        </div>
+      </div>
+
+      <div tabindex="0" role="region" aria-labelledby="expenses-table-caption" class="table-wrapper">
+        <table class="o_list_table" style="--label-2: 'Proveedor'; --label-3: 'Descripción'; --label-4: 'Fecha'; --label-5: 'N° Factura'; --label-6: 'Total'; --label-7: 'Acciones';">
+          <caption id="expenses-table-caption">Listado de gastos y comprobantes registrados</caption>
+          <thead>
+            <tr>
+              <th style="width: 140px;">Referencia</th>
+              <th>Proveedor / Establecimiento</th>
+              <th>Descripción del Gasto</th>
+              <th style="width: 110px;">Fecha</th>
+              <th style="width: 140px;">N° Factura / Soporte</th>
+              <th class="text-end" style="width: 130px;">Total</th>
+              <th class="text-center" style="width: 90px;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${
+              expenses.length === 0
+                ? `<tr><td colspan="7" style="text-align: center; padding: 2.5rem; color: var(--o-muted);">No hay gastos registrados todavía. Pulsa <strong>Nuevo Gasto Manual</strong> o <strong>Tomar Foto / Escanear Factura con IA</strong> para comenzar.</td></tr>`
+                : expenses
+                    .map(
+                      (e) => `
+                <tr data-expense-id="${e.id}" style="cursor: pointer;">
+                  <th>${esc(e.reference)}</th>
+                  <td><strong>${esc(e.partner_name || 'Proveedor General')}</strong></td>
+                  <td>${esc(e.name)}</td>
+                  <td>${esc(e.date)}</td>
+                  <td>${esc(e.receipt_ref || '—')}</td>
+                  <td class="text-end"><strong>${formatMoney(e.total_amount)}</strong></td>
+                  <td class="text-center" onclick="event.stopPropagation();">
+                    <button type="button" class="btn btn-sm btn-secondary btn-del-exp" data-del-id="${e.id}" title="Eliminar gasto" aria-label="Eliminar gasto" style="padding: 4px 8px; color: #ef4444;">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </button>
+                  </td>
+                </tr>
+              `
+                    )
+                    .join('')
+            }
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="5">Total General de Gastos</td>
+              <td class="text-end"><strong>${formatMoney(totalSum)}</strong></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
       </div>
     `;
 
-    if (state.submenu === 'analysis') {
-      const byDept = {};
-      expenses.forEach((e) => {
-        const d = e.department || 'General';
-        byDept[d] = (byDept[d] || 0) + Number(e.total_amount || 0);
-      });
-      container.innerHTML =
-        statusHeader +
-        `
-        <div class="o_form_sheet">
-          <h3 style="margin-bottom: 1rem;">📊 Análisis de Gastos por Departamento y Categoría</h3>
-          <div class="o_kanban_view">
-            ${Object.entries(byDept)
-              .map(
-                ([dept, total]) => `
-                <div class="o_stat_card">
-                  <span class="o_stat_label">${esc(dept)}</span>
-                  <span class="o_stat_value">${formatMoney(total)}</span>
-                  <span class="o_stat_sub">Ejecución acumulada</span>
-                </div>
-              `
-              )
-              .join('')}
-          </div>
-        </div>
-      `;
-    } else if (state.viewType === 'kanban') {
-      const stageCols = [
-        { id: 'draft', title: 'Borrador', color: '#64748b', filter: (e) => e.state === 'draft' },
-        { id: 'reported', title: 'Presentado', color: '#0284c7', filter: (e) => e.state === 'reported' },
-        { id: 'approved', title: 'Aprobado', color: '#eab308', filter: (e) => e.state === 'approved' },
-        { id: 'done', title: 'Pagado', color: '#10b981', filter: (e) => e.state === 'done' }
-      ];
-
-      container.innerHTML =
-        statusHeader +
-        `<div class="o_kanban_board">
-          ${stageCols
-            .map((col) => {
-              const colExpenses = expenses.filter(col.filter);
-              const colSum = colExpenses.reduce((acc, e) => acc + Number(e.total_amount || 0), 0);
-              return `
-              <div class="o_kanban_column" style="--col-accent: ${col.color};">
-                <div class="o_kanban_col_header">
-                  <div class="o_kanban_col_title_wrap">
-                    <span class="o_kanban_col_title">${esc(col.title)}</span>
-                    <span class="o_badge o_badge_muted">${colExpenses.length}</span>
-                  </div>
-                  <span class="o_kanban_col_sum">${formatMoney(colSum)}</span>
-                </div>
-                <div class="o_kanban_col_cards">
-                  ${
-                    colExpenses.length === 0
-                      ? `<div class="o_kanban_col_empty">Sin gastos en ${esc(col.title.toLowerCase())}</div>`
-                      : colExpenses
-                          .map(
-                            (e) => `
-                        <article class="o_kanban_record" data-expense-id="${e.id}" style="cursor: pointer;">
-                          <div class="o_kanban_avatar">${esc(initials(e.employee_name))}</div>
-                          <div class="o_kanban_details">
-                            <div style="display: flex; justify-content: space-between; gap: 0.4rem;">
-                              <span class="o_kanban_title">${esc(e.name)}</span>
-                              ${expenseBadge(e.state)}
-                            </div>
-                            <div class="o_kanban_subtitle">${esc(e.reference)} · ${esc(e.employee_name)} (${esc(e.department)})</div>
-                            <div class="o_kanban_subtitle">📅 ${esc(e.date)} · ${esc(e.product_name)}</div>
-                            <div class="o_kanban_footer">
-                              <span>${e.payment_mode === 'company_account' ? '💳 Compañía' : '👤 A reembolsar'}</span>
-                              <strong>${formatMoney(e.total_amount)}</strong>
-                            </div>
-                          </div>
-                        </article>
-                      `
-                          )
-                          .join('')
-                  }
-                </div>
-              </div>
-            `;
-            })
-            .join('')}
-        </div>`;
-
-      container.querySelectorAll('.o_kanban_record').forEach((card) => {
-        card.addEventListener('click', () => {
-          state.activeRecordId = Number(card.getAttribute('data-expense-id'));
-          state.viewType = 'form';
-          renderModuleWorkspace();
-        });
-      });
-    } else {
-      const totalSum = expenses.reduce((s, e) => s + Number(e.total_amount || 0), 0);
-      container.innerHTML =
-        statusHeader +
-        `
-        <div tabindex="0" role="region" aria-labelledby="expenses-table-caption" class="table-wrapper">
-          <table class="o_list_table" style="--label-2: 'Descripción'; --label-3: 'Empleado'; --label-4: 'Fecha'; --label-5: 'Pagado por'; --label-6: 'Total'; --label-7: 'Estado';">
-            <caption id="expenses-table-caption">Listado de gastos de empleados Odoo 20</caption>
-            <thead>
-              <tr>
-                <th>Referencia</th>
-                <th>Descripción del Gasto</th>
-                <th>Empleado</th>
-                <th>Fecha</th>
-                <th>Pagado Por</th>
-                <th class="text-end">Total</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${expenses
-                .map(
-                  (e) => `
-                  <tr data-expense-id="${e.id}">
-                    <th>${esc(e.reference)}</th>
-                    <td>${esc(e.name)}</td>
-                    <td>${esc(e.employee_name)}</td>
-                    <td>${esc(e.date)}</td>
-                    <td>${e.payment_mode === 'company_account' ? 'Compañía' : 'Empleado (a reembolsar)'}</td>
-                    <td class="text-end"><strong>${formatMoney(e.total_amount)}</strong></td>
-                    <td>${expenseBadge(e.state)}</td>
-                  </tr>
-                `
-                )
-                .join('')}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colspan="5">Total Gastos Listados</td>
-                <td class="text-end">${formatMoney(totalSum)}</td>
-                <td></td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      `;
-
-      container.querySelectorAll('tbody tr').forEach((row) => {
-        row.addEventListener('click', () => {
-          state.activeRecordId = Number(row.getAttribute('data-expense-id'));
-          state.viewType = 'form';
-          renderModuleWorkspace();
-        });
+    const bannerNew = document.getElementById('btnExpensesBannerNew');
+    if (bannerNew) {
+      bannerNew.addEventListener('click', () => {
+        state.activeRecordId = 'new';
+        state.formDraft = null;
+        state.viewType = 'form';
+        renderModuleWorkspace();
       });
     }
 
-    container.querySelectorAll('[data-exp-filter]').forEach((card) => {
-      card.addEventListener('click', () => {
-        const f = card.getAttribute('data-exp-filter');
-        state.statusFilter = state.statusFilter === f ? 'all' : f;
+    const bannerScan = document.getElementById('btnExpensesBannerScan');
+    if (bannerScan) {
+      bannerScan.addEventListener('click', () => {
+        openExpenseCameraDialog();
+      });
+    }
+
+    container.querySelectorAll('tbody tr[data-expense-id]').forEach((row) => {
+      row.addEventListener('click', () => {
+        state.activeRecordId = Number(row.getAttribute('data-expense-id'));
+        state.viewType = 'form';
         renderModuleWorkspace();
+      });
+    });
+
+    container.querySelectorAll('.btn-del-exp').forEach((btn) => {
+      btn.addEventListener('click', async (ev) => {
+        ev.stopPropagation();
+        const id = Number(btn.getAttribute('data-del-id'));
+        if (!confirm(`¿Estás seguro de eliminar el gasto #${id}?`)) return;
+        try {
+          await apiCall(`/api/expenses/${id}`, 'DELETE');
+          showToast('Gasto eliminado.');
+          renderModuleWorkspace();
+        } catch (err) {
+          showToast(err.message, true);
+        }
       });
     });
   }
 
   function renderExpenseForm(container) {
     const isNew = state.activeRecordId === 'new';
+    const draft = state.formDraft || {};
     const existing = isNew
       ? {
-          reference: 'Nuevo',
-          name: '',
-          employee_name: (state.data.settings.active_user && state.data.settings.active_user.name) || 'Andrés Salazar',
-          department: 'Operaciones & Proyectos',
-          product_id: '',
-          product_name: '',
-          date: new Date().toISOString().slice(0, 10),
-          payment_mode: '',
-          quantity: 1,
-          price_unit: 0,
-          tax_rate: '',
-          untaxed_amount: 0,
-          tax_amount: 0,
-          total_amount: 0,
-          partner_id: '',
+          reference: 'Nuevo Gasto',
+          name: draft.name || '',
+          employee_name: draft.employee_name || (state.data.settings && state.data.settings.active_user && state.data.settings.active_user.name) || 'Andrés Salazar',
+          department: draft.department || 'Operaciones & Proyectos',
+          product_id: draft.product_id || '',
+          product_name: draft.product_name || '',
+          partner_name: draft.partner_name || '',
+          supplier_vat: draft.supplier_vat || '',
+          date: draft.date || new Date().toISOString().slice(0, 10),
+          payment_mode: draft.payment_mode || 'company_account',
+          quantity: draft.quantity || 1,
+          price_unit: draft.price_unit || draft.total_amount || 0,
+          tax_rate: draft.tax_rate !== undefined ? draft.tax_rate : 0,
+          untaxed_amount: draft.untaxed_amount || draft.total_amount || 0,
+          tax_amount: draft.tax_amount || 0,
+          total_amount: draft.total_amount || 0,
+          partner_id: draft.partner_id || '',
           analytic_account: 'General',
-          receipt_ref: '',
-          notes: '',
+          receipt_ref: draft.receipt_ref || '',
+          notes: draft.notes || '',
           state: 'draft',
+          receipt_image: draft.receipt_image || '',
           move_id: null,
           chatter: []
         }
@@ -1467,6 +1565,7 @@
       return renderModuleWorkspace();
     }
 
+    // Keep test contract for stages if referenced
     const stages = [
       { id: 'draft', label: 'Borrador' },
       { id: 'submitted', label: 'Enviado' },
@@ -1478,73 +1577,57 @@
     container.innerHTML = `
       <div class="o_form_view">
         <div class="o_form_sheet_bg">
-          <div class="o_form_statusbar">
+          <div class="o_form_statusbar" style="justify-content: space-between;">
             <div class="o_statusbar_buttons">
-              <button type="button" class="btn btn-primary" id="btnSaveExpense">Guardar</button>
+              <button type="button" class="btn btn-primary" id="btnSaveExpense">Guardar Gasto</button>
+              <button type="button" class="btn btn-action" id="btnFormScanAi" style="background: linear-gradient(135deg, #1e3a8a, #2563eb); color: white; display: inline-flex; align-items: center; gap: 0.4rem;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                Tomar Foto / Escanear con IA
+              </button>
               ${
-                !isNew && existing.state === 'draft'
-                  ? `<button type="button" class="btn btn-action" data-exp-action="submit">Enviar al Gerente</button>`
+                !isNew
+                  ? `<button type="button" class="btn btn-danger" id="btnDeleteFormExpense">Eliminar Gasto</button>`
                   : ''
               }
-              ${
-                !isNew && existing.state === 'submitted'
-                  ? `<button type="button" class="btn btn-action" data-exp-action="approve">Aprobar Gasto</button>
-                     <button type="button" class="btn btn-danger" data-exp-action="refuse">Rechazar</button>`
-                  : ''
-              }
-              ${
-                !isNew && existing.state === 'approved'
-                  ? `<button type="button" class="btn btn-action" data-exp-action="post">Publicar Asiento Contable</button>`
-                  : ''
-              }
-              ${
-                !isNew && existing.state === 'posted'
-                  ? `<button type="button" class="btn btn-action" data-exp-action="pay">Registrar Reembolso / Pago</button>`
-                  : ''
-              }
-              ${
-                !isNew && existing.state !== 'draft' && existing.state !== 'paid'
-                  ? `<button type="button" class="btn btn-secondary" data-exp-action="reset">Restablecer a Borrador</button>`
-                  : ''
-              }
+              <button type="button" class="btn btn-secondary" id="btnCancelExpense">Volver a Gastos</button>
             </div>
-            <div class="o_statusbar_status">
-              ${stages
-                .map((s) => `<span class="o_arrow_button ${existing.state === s.id ? 'is-current' : ''}">${s.label}</span>`)
-                .join('')}
+            <div style="font-weight: 600; color: var(--o-muted); font-size: 0.9rem;">
+              ${isNew ? 'Registro de Gasto' : esc(existing.reference)}
             </div>
           </div>
 
           <form id="expenseForm" class="o_form_sheet">
-            ${
-              !isNew && existing.move_id
-                ? `
-              <div class="o_button_box">
-                <button type="button" class="o_stat_button oe_stat_button" id="btnOpenExpenseMove">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
-                  <div class="o_stat_info">
-                    <span class="o_stat_value">Asiento Contable</span>
-                    <span class="o_stat_text">Ver en Contabilidad</span>
-                  </div>
-                </button>
-              </div>
-            `
-                : ''
-            }
-
             <div class="o_form_title_group">
-              <label for="fExpName">Descripción del Gasto (${esc(existing.reference)}) *</label>
-              <input type="text" id="fExpName" class="o_input_title" value="${esc(existing.name)}" placeholder="Ej. Tiquetes y hotel visita cliente..." required />
+              <label for="fExpName">Descripción del Gasto *</label>
+              <input type="text" id="fExpName" class="o_input_title" value="${esc(existing.name)}" placeholder="Ej. Materiales de ferretería, Gasolina, Almuerzo..." required />
             </div>
 
             <div class="o_group">
               <div class="o_field_row">
-                <label for="fExpEmployee">Empleado</label>
-                <input type="text" id="fExpEmployee" class="o_input" value="${esc(existing.employee_name)}" />
+                <label for="fExpPartner">Proveedor / Establecimiento</label>
+                <div style="display: flex; gap: 8px; flex-direction: column;">
+                  <select id="fExpPartner" class="o_select">
+                    <option value="" ${!existing.partner_id ? 'selected disabled' : ''}>— Seleccionar Proveedor —</option>
+                    ${(state.data.contacts || [])
+                      .map(
+                        (c) => `<option value="${c.id}" ${Number(existing.partner_id) === Number(c.id) ? 'selected' : ''}>${esc(c.name)}</option>`
+                      )
+                      .join('')}
+                  </select>
+                  <input type="text" id="fExpPartnerName" class="o_input" value="${esc(existing.partner_name || '')}" placeholder="O escribir nombre del proveedor directamente" />
+                </div>
               </div>
               <div class="o_field_row">
-                <label for="fExpDept">Departamento</label>
-                <input type="text" id="fExpDept" class="o_input" value="${esc(existing.department)}" />
+                <label for="fExpReceipt">N° Factura / Soporte</label>
+                <input type="text" id="fExpReceipt" class="o_input" value="${esc(existing.receipt_ref || '')}" placeholder="Ej. FE-1234, REC-90" />
+              </div>
+              <div class="o_field_row">
+                <label for="fExpDate">Fecha del Gasto</label>
+                <input type="date" id="fExpDate" class="o_input" value="${esc(existing.date)}" />
+              </div>
+              <div class="o_field_row">
+                <label for="fExpTotal">Monto Total del Gasto ($ COP) *</label>
+                <input type="number" id="fExpTotal" class="o_input" min="1" step="any" value="${Number(existing.total_amount || existing.price_unit || 0)}" required style="font-size: 1.1rem; font-weight: 700; color: #2563eb;" />
               </div>
               <div class="o_field_row">
                 <label for="fExpProduct">Categoría de Gasto</label>
@@ -1553,74 +1636,54 @@
                   ${(state.data.products || [])
                     .map(
                       (p) =>
-                        `<option value="${p.id}" ${Number(existing.product_id) === Number(p.id) ? 'selected' : ''}>${esc(p.name)} (${formatMoney(p.list_price)})</option>`
+                        `<option value="${p.id}" ${Number(existing.product_id) === Number(p.id) ? 'selected' : ''}>${esc(p.name)}</option>`
                     )
                     .join('')}
                 </select>
-              </div>
-              <div class="o_field_row">
-                <label for="fExpPartner">Proveedor / Comercio</label>
-                <select id="fExpPartner" class="o_select">
-                  <option value="" ${!existing.partner_id ? 'selected disabled' : ''}>— Seleccionar Proveedor —</option>
-                  ${(state.data.contacts || [])
-                    .map(
-                      (c) => `<option value="${c.id}" ${Number(existing.partner_id) === Number(c.id) ? 'selected' : ''}>${esc(c.name)}</option>`
-                    )
-                    .join('')}
-                </select>
-              </div>
-              <div class="o_field_row">
-                <label for="fExpDate">Fecha del Gasto</label>
-                <input type="date" id="fExpDate" class="o_input" value="${esc(existing.date)}" />
-              </div>
-              <div class="o_field_row">
-                <label for="fExpReceipt">Factura / Recibo Soporte</label>
-                <input type="text" id="fExpReceipt" class="o_input" value="${esc(existing.receipt_ref)}" placeholder="Ej. FAC-9012" />
-              </div>
-              <div class="o_field_row">
-                <label for="fExpQty">Cantidad</label>
-                <input type="number" id="fExpQty" class="o_input" min="1" step="any" value="${Number(existing.quantity || 1)}" />
-              </div>
-              <div class="o_field_row">
-                <label for="fExpPrice">Valor Unitario (sin IVA)</label>
-                <input type="number" id="fExpPrice" class="o_input" min="0" step="any" value="${Number(existing.price_unit || 0)}" />
               </div>
               <div class="o_field_row">
                 <label for="fExpTax">Impuesto IVA (%)</label>
                 <select id="fExpTax" class="o_select">
                   <option value="" ${existing.tax_rate === '' || existing.tax_rate === undefined || existing.tax_rate === null ? 'selected disabled' : ''}>— Seleccione IVA —</option>
-                  ${[0, 5, 19]
-                    .map((t) => `<option value="${t}" ${existing.tax_rate !== '' && Number(existing.tax_rate) === t ? 'selected' : ''}>IVA ${t}%</option>`)
-                    .join('')}
+                  <option value="0" ${existing.tax_rate === 0 ? 'selected' : ''}>IVA 0% (Exento)</option>
+                  <option value="5" ${existing.tax_rate === 5 ? 'selected' : ''}>IVA 5%</option>
+                  <option value="19" ${existing.tax_rate === 19 ? 'selected' : ''}>IVA 19%</option>
                 </select>
               </div>
               <div class="o_field_row">
-                <label for="fExpPayMode">Pagado Por</label>
+                <label for="fExpPayMode">Forma de Pago</label>
                 <select id="fExpPayMode" class="o_select">
                   <option value="" ${!existing.payment_mode ? 'selected disabled' : ''}>— Seleccione Forma de Pago —</option>
+                  <option value="company_account" ${existing.payment_mode === 'company_account' ? 'selected' : ''}>Compañía (Transferencia / Tarjeta / Caja)</option>
                   <option value="own_account" ${existing.payment_mode === 'own_account' ? 'selected' : ''}>Empleado (a reembolsar)</option>
-                  <option value="company_account" ${existing.payment_mode === 'company_account' ? 'selected' : ''}>Compañía (Tarjeta / Caja)</option>
                 </select>
               </div>
+              <div class="o_field_row">
+                <label for="fExpEmployee">Responsable / Empleado</label>
+                <input type="text" id="fExpEmployee" class="o_input" value="${esc(existing.employee_name || 'Andrés Salazar')}" />
+              </div>
             </div>
 
-            <div class="o_field_row">
-              <label for="fExpNotes">Notas y Justificación</label>
-              <textarea id="fExpNotes" class="o_textarea" rows="2">${esc(existing.notes)}</textarea>
+            <div class="o_field_row" style="margin-top: 0.5rem;">
+              <label for="fExpNotes">Notas / Artículos Detallados</label>
+              <textarea id="fExpNotes" class="o_textarea" rows="2" placeholder="Detalle de ítems, observaciones, etc.">${esc(existing.notes || '')}</textarea>
             </div>
 
-            <div class="o_totals_box">
-              <div class="o_totals_row">
-                <span>Subtotal Base:</span>
-                <strong id="expCalcUntaxed">${formatMoney(existing.untaxed_amount)}</strong>
+            <!-- Foto o Soporte de la Factura -->
+            <div style="margin-top: 1rem; padding: 1rem; background: var(--o-bg-subtle, rgba(0,0,0,0.02)); border: 1px dashed var(--o-border); border-radius: 8px;">
+              <div style="font-weight: 600; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+                <span>Foto de la Factura / Comprobante</span>
+                <button type="button" class="btn btn-sm btn-secondary" id="btnFormCameraTrigger">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                  ${existing.receipt_image ? 'Cambiar Foto / Escanear de Nuevo' : 'Tomar Foto / Escanear'}
+                </button>
               </div>
-              <div class="o_totals_row">
-                <span>Impuestos:</span>
-                <strong id="expCalcTax">${formatMoney(existing.tax_amount)}</strong>
-              </div>
-              <div class="o_totals_row is-grand">
-                <span>Total Gasto:</span>
-                <span id="expCalcTotal">${formatMoney(existing.total_amount)}</span>
+              <div id="formReceiptPreviewWrap">
+                ${
+                  existing.receipt_image
+                    ? `<img src="${existing.receipt_image}" class="o_expense_receipt_preview" alt="Comprobante factura" onclick="window.open(this.src)" title="Clic para ver tamaño completo" />`
+                    : `<span style="font-size: 0.85rem; color: var(--o-muted);">Sin foto adjunta. Puedes tomarla con la cámara en vivo o subir un archivo.</span>`
+                }
               </div>
             </div>
           </form>
@@ -1632,90 +1695,124 @@
 
     wireChatterEvents('expenses', existing.id);
 
-    const recalc = () => {
-      const q = Number(document.getElementById('fExpQty').value || 0);
-      const p = Number(document.getElementById('fExpPrice').value || 0);
-      const tx = Number(document.getElementById('fExpTax').value || 0);
-      const u = q * p;
-      const t = u * (tx / 100);
-      document.getElementById('expCalcUntaxed').textContent = formatMoney(u);
-      document.getElementById('expCalcTax').textContent = formatMoney(t);
-      document.getElementById('expCalcTotal').textContent = formatMoney(u + t);
+    const openCameraForForm = () => {
+      openExpenseCameraDialog((scannedData, imageBase64) => {
+        if (scannedData.name) document.getElementById('fExpName').value = scannedData.name;
+        if (scannedData.supplier_name) document.getElementById('fExpPartnerName').value = scannedData.supplier_name;
+        if (scannedData.reference) document.getElementById('fExpReceipt').value = scannedData.reference;
+        if (scannedData.date) document.getElementById('fExpDate').value = scannedData.date;
+        if (scannedData.total_amount) document.getElementById('fExpTotal').value = scannedData.total_amount;
+        if (scannedData.notes || scannedData.supplier_vat) {
+          const nitText = scannedData.supplier_vat ? `NIT: ${scannedData.supplier_vat}. ` : '';
+          document.getElementById('fExpNotes').value = nitText + (scannedData.notes || '');
+        }
+        if (imageBase64) {
+          existing.receipt_image = imageBase64;
+          const wrap = document.getElementById('formReceiptPreviewWrap');
+          if (wrap) {
+            wrap.innerHTML = `<img src="${imageBase64}" class="o_expense_receipt_preview" alt="Comprobante factura" onclick="window.open(this.src)" title="Clic para ver tamaño completo" />`;
+          }
+        }
+        showToast('Datos de la factura cargados en el formulario.');
+      });
     };
-    ['fExpQty', 'fExpPrice', 'fExpTax'].forEach((id) => {
-      document.getElementById(id).addEventListener('input', recalc);
-    });
 
-    document.getElementById('fExpProduct').addEventListener('change', (e) => {
-      const pid = Number(e.target.value);
-      const prod = (state.data.products || []).find((p) => Number(p.id) === pid);
-      if (prod) {
-        document.getElementById('fExpPrice').value = String(prod.list_price || 0);
-        if (prod.tax_rate !== undefined) {
-          document.getElementById('fExpTax').value = String(prod.tax_rate);
-        }
-        recalc();
-      }
-    });
+    const formScanBtn = document.getElementById('btnFormScanAi');
+    if (formScanBtn) formScanBtn.addEventListener('click', openCameraForForm);
 
-    document.getElementById('btnSaveExpense').addEventListener('click', async () => {
-      try {
-        const prodVal = document.getElementById('fExpProduct').value;
-        if (!prodVal) {
-          showToast('Debe seleccionar una categoría de gasto.', true);
-          return;
-        }
-        const payMode = document.getElementById('fExpPayMode').value;
-        if (!payMode) {
-          showToast('Debe seleccionar una forma de pago.', true);
-          return;
-        }
-        const expTaxVal = document.getElementById('fExpTax').value;
-        if (expTaxVal === '') {
-          showToast('Debe seleccionar la tarifa de IVA.', true);
-          return;
-        }
-        const payload = {
-          id: isNew ? undefined : existing.id,
-          name: document.getElementById('fExpName').value,
-          employee_name: document.getElementById('fExpEmployee').value,
-          department: document.getElementById('fExpDept').value,
-          product_id: Number(prodVal),
-          partner_id: Number(document.getElementById('fExpPartner').value) || null,
-          date: document.getElementById('fExpDate').value,
-          receipt_ref: document.getElementById('fExpReceipt').value,
-          quantity: Number(document.getElementById('fExpQty').value),
-          price_unit: Number(document.getElementById('fExpPrice').value),
-          tax_rate: Number(document.getElementById('fExpTax').value || 0),
-          payment_mode: payMode,
-          notes: document.getElementById('fExpNotes').value
-        };
-        const res = await apiCall('/api/expenses', 'POST', payload);
-        state.activeRecordId = res.expense.id;
-        showToast('Gasto guardado.');
+    const formCamTrig = document.getElementById('btnFormCameraTrigger');
+    if (formCamTrig) formCamTrig.addEventListener('click', openCameraForForm);
+
+    const cancelBtn = document.getElementById('btnCancelExpense');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => {
+        state.activeRecordId = null;
+        state.formDraft = null;
+        state.viewType = 'list';
         renderModuleWorkspace();
-      } catch (err) {
-        showToast(err.message, true);
-      }
-    });
+      });
+    }
 
-    container.querySelectorAll('[data-exp-action]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const action = btn.getAttribute('data-exp-action');
+    const delBtn = document.getElementById('btnDeleteFormExpense');
+    if (delBtn) {
+      delBtn.addEventListener('click', async () => {
+        if (!confirm(`¿Estás seguro de eliminar el gasto #${existing.id}?`)) return;
         try {
-          await apiCall(`/api/expenses/${existing.id}/action`, 'POST', { action });
-          showToast('Estado del gasto actualizado.');
+          await apiCall(`/api/expenses/${existing.id}`, 'DELETE');
+          showToast('Gasto eliminado.');
+          state.activeRecordId = null;
+          state.formDraft = null;
+          state.viewType = 'list';
           renderModuleWorkspace();
         } catch (err) {
           showToast(err.message, true);
         }
       });
-    });
+    }
 
-    const openMoveBtn = document.getElementById('btnOpenExpenseMove');
-    if (openMoveBtn) {
-      openMoveBtn.addEventListener('click', () => {
-        openApp('accounting', { submenu: 'entries', viewType: 'form', recordId: existing.move_id });
+    const saveBtn = document.getElementById('btnSaveExpense');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', async () => {
+        const name = document.getElementById('fExpName').value.trim();
+        if (!name) {
+          showToast('La descripción del gasto es obligatoria.', true);
+          return;
+        }
+        const totalAmount = Number(document.getElementById('fExpTotal').value || 0);
+        if (!totalAmount || totalAmount <= 0) {
+          showToast('El monto total del gasto debe ser mayor a 0.', true);
+          return;
+        }
+
+        const expTaxVal = document.getElementById('fExpTax').value;
+        if (expTaxVal === '') {
+          showToast('Debe seleccionar la tarifa de IVA.', true);
+          return;
+        }
+
+        const partnerVal = document.getElementById('fExpPartner').value;
+        const partnerNameInput = document.getElementById('fExpPartnerName').value.trim();
+        const matchedPartner = partnerVal
+          ? (state.data.contacts || []).find((c) => Number(c.id) === Number(partnerVal))
+          : (partnerNameInput ? (state.data.contacts || []).find((c) => c.name.toLowerCase() === partnerNameInput.toLowerCase()) : null);
+
+        const prodVal = document.getElementById('fExpProduct').value;
+        const defaultProd = (state.data.products || [])[0];
+
+        const payload = {
+          id: isNew ? undefined : existing.id,
+          name,
+          employee_name: document.getElementById('fExpEmployee').value.trim() || 'Andrés Salazar',
+          department: existing.department || 'Operaciones & Proyectos',
+          product_id: prodVal ? Number(prodVal) : (defaultProd ? defaultProd.id : 1),
+          product_name: prodVal
+            ? ((state.data.products.find((p) => Number(p.id) === Number(prodVal)) || {}).name || 'Gasto General')
+            : (defaultProd ? defaultProd.name : 'Gasto General'),
+          partner_id: matchedPartner ? matchedPartner.id : (existing.partner_id || null),
+          partner_name: partnerNameInput || (matchedPartner ? matchedPartner.name : 'Proveedor General'),
+          date: document.getElementById('fExpDate').value,
+          receipt_ref: document.getElementById('fExpReceipt').value.trim(),
+          quantity: 1,
+          price_unit: totalAmount,
+          tax_rate: Number(expTaxVal || 0),
+          untaxed_amount: totalAmount,
+          tax_amount: 0,
+          total_amount: totalAmount,
+          payment_mode: document.getElementById('fExpPayMode').value || 'company_account',
+          notes: document.getElementById('fExpNotes').value.trim(),
+          receipt_image: existing.receipt_image || ''
+        };
+
+        try {
+          await apiCall('/api/expenses', 'POST', payload);
+          showToast('Gasto guardado exitosamente.');
+          state.activeRecordId = null;
+          state.formDraft = null;
+          state.viewType = 'list';
+          renderModuleWorkspace();
+        } catch (err) {
+          showToast(err.message, true);
+        }
       });
     }
   }

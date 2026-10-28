@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { ERPStore } = require('./server/store');
 const { isSupabaseConfigured, getSupabaseConfig } = require('./server/supabase');
+const { analyzeInvoiceImage } = require('./server/gemini');
 
 const PORT = process.env.PORT || 3000;
 const ROOT_DIR = __dirname;
@@ -44,7 +45,7 @@ function readJsonBody(req) {
     let raw = '';
     req.on('data', (chunk) => {
       raw += chunk;
-      if (raw.length > 2 * 1024 * 1024) {
+      if (raw.length > 15 * 1024 * 1024) {
         reject(new Error('Payload demasiado grande'));
       }
     });
@@ -139,11 +140,27 @@ function createHandler(store = new ERPStore(undefined, { useSupabase: isSupabase
           return sendJson(res, 200, { ok: true, removed, state: store.getBootstrapState() });
         }
 
+        // Expenses AI Scan
+        if (method === 'POST' && pathname === '/api/expenses/ai-scan') {
+          const body = await readJsonBody(req);
+          if (!body || !body.image) {
+            return sendJson(res, 400, { ok: false, error: 'Se requiere la imagen de la factura en base64.' });
+          }
+          const parsed = await analyzeInvoiceImage(body.image, body.mime_type || 'image/jpeg');
+          return sendJson(res, 200, { ok: true, data: parsed });
+        }
+
         // Expenses
         if (method === 'POST' && pathname === '/api/expenses') {
           const body = await readJsonBody(req);
           const expense = await store.saveExpense(body);
           return sendJson(res, 200, { ok: true, expense, state: store.getBootstrapState() });
+        }
+
+        const expDeleteMatch = pathname.match(/^\/api\/expenses\/(\d+)$/);
+        if (method === 'DELETE' && expDeleteMatch) {
+          const deleted = await store.deleteExpense(Number(expDeleteMatch[1]));
+          return sendJson(res, 200, { ok: true, deleted, state: store.getBootstrapState() });
         }
 
         const expActionMatch = pathname.match(/^\/api\/expenses\/(\d+)\/action$/);

@@ -3133,3 +3133,57 @@ dialog.o_dialog::backdrop {
   }
 }
 
+
+
+/* ==================== EXPENSE AI CAMERA & SCANNER ==================== */
+.o_dialog_camera {
+  max-width: 600px;
+}
+
+.o_ai_spinner {
+  width: 44px;
+  height: 44px;
+  border: 4px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #38bdf8;
+  border-radius: 50%;
+  animation: aiSpin 0.9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes aiSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.o_expense_receipt_preview {
+  max-width: 140px;
+  max-height: 140px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--o-border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.o_expense_receipt_preview:hover {
+  transform: scale(1.05);
+}
+
+.o_expense_card_quick {
+  background: var(--o-card-bg);
+  border: 1px solid var(--o-border);
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.o_expense_quick_actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}

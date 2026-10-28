@@ -867,6 +867,17 @@ class ERPStore {
     return newExpense;
   }
 
+  async deleteExpense(id) {
+    const idx = this.data.expenses.findIndex((e) => Number(e.id) === Number(id));
+    if (idx === -1) throw new Error(`Gasto #${id} no encontrado.`);
+    const [removed] = this.data.expenses.splice(idx, 1);
+    this.save();
+    if (this.supabase) {
+      await this.supabase.deleteExpense(id);
+    }
+    return removed;
+  }
+
   async transitionExpense(id, action, extra = {}) {
     const exp = this.data.expenses.find((e) => Number(e.id) === Number(id));
     if (!exp) throw new Error('Gasto no encontrado.');

@@ -833,6 +833,17 @@ class SupabasePersistence {
     return res.data;
   }
 
+  async deleteExpense(id) {
+    if (!this.isReady()) return;
+    const res = await callPostgrest(`/hr_expense?id=eq.${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const errMsg = formatSupabaseError(`Error eliminando gasto ${id}`, res);
+      console.error(errMsg);
+      throw new Error(errMsg);
+    }
+    return res.data;
+  }
+
   async saveExpense(expense) {
     if (!this.isReady()) return;
     const payload = serializeExpense(expense);

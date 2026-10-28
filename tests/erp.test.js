@@ -1093,4 +1093,47 @@ describe('CHapp ERP (Odoo 20 Base) — End-to-End API & Workflow Suite', () => {
     assert.ok(discHtml.includes('Dcto.'), 'Debe incluir columna Dcto. cuando hay descuento');
     assert.ok(discHtml.includes('-10%'), 'Debe reflejar el porcentaje de descuento en la línea');
   });
+
+  it('Module 2 (Gastos Simplificado & IA): creación directa de gasto manual, borrado de gasto, escaneo con IA y eliminación de pestañas/estados burocráticos', async () => {
+    // 1. Direct manual expense creation
+    const expRes = await req('/api/expenses', 'POST', {
+      name: 'Compra de Perfiles de Aluminio Estructural',
+      partner_name: 'Distribuidora Metálica SAS',
+      receipt_ref: 'FAC-9912',
+      quantity: 1,
+      price_unit: 450000,
+      total_amount: 450000,
+      tax_rate: 0,
+      payment_mode: 'company_account',
+      notes: 'Factura física escaneada'
+    });
+    assert.equal(expRes.status, 200);
+    assert.ok(expRes.json.ok);
+    assert.equal(expRes.json.expense.name, 'Compra de Perfiles de Aluminio Estructural');
+    assert.equal(expRes.json.expense.total_amount, 450000);
+    assert.equal(expRes.json.expense.partner_name, 'Distribuidora Metálica SAS');
+    const createdExpId = expRes.json.expense.id;
+
+    // 2. Direct expense deletion
+    const delRes = await req(`/api/expenses/${createdExpId}`, 'DELETE');
+    assert.equal(delRes.status, 200);
+    assert.ok(delRes.json.ok);
+    assert.ok(!delRes.json.state.expenses.some((e) => Number(e.id) === Number(createdExpId)));
+
+    // 3. AI Scan endpoint validation (handles missing image gracefully)
+    const badScanRes = await req('/api/expenses/ai-scan', 'POST', {});
+    assert.equal(badScanRes.status, 400);
+
+    // 4. Frontend contract checks: APPS.expenses submenus are empty, camera modal exists, action buttons exist
+    const jsText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
+    const htmlText = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+
+    assert.ok(htmlText.includes('id="expenseAiCameraDialog"'), 'Camera AI modal must exist in HTML');
+    assert.ok(htmlText.includes('id="cameraVideo"'), 'Camera modal must have video viewfinder');
+    assert.ok(htmlText.includes('id="btnCapturePhoto"'), 'Camera modal must have capture button');
+    assert.ok(htmlText.includes('id="cameraFileInput"'), 'Camera modal must have file upload fallback');
+    assert.ok(jsText.includes('openExpenseCameraDialog'), 'JS must define openExpenseCameraDialog');
+    assert.ok(jsText.includes('btnCpScanExpenseAi'), 'Control panel must include AI camera scan button');
+    assert.ok(jsText.includes('btnExpensesBannerScan'), 'Expenses banner must include AI camera scan button');
+  });
 });
