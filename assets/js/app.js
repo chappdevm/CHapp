@@ -5854,27 +5854,233 @@
   function renderSettingsModule() {
     const container = document.getElementById('moduleContent');
     const s = state.data.settings || {};
+    const activeTab = (state.submenu && state.submenu !== 'all') ? state.submenu : 'general';
+
+    let contentHtml = '';
+
+    if (activeTab === 'general') {
+      contentHtml = `
+        <div class="o_settings_block" data-section="general">
+          <h3>Datos de la Compañía y Apariencia</h3>
+          <div class="o_group">
+            <div class="o_field_row">
+              <label for="setCompanyName">Razón Social de la Empresa</label>
+              <input type="text" id="setCompanyName" class="o_input" value="${esc(s.company_name)}" />
+            </div>
+            <div class="o_field_row">
+              <label for="setCompanyVat">NIT Tributario</label>
+              <input type="text" id="setCompanyVat" class="o_input" value="${esc(s.company_vat)}" />
+            </div>
+            <div class="o_field_row">
+              <label for="setCompanyEmail">Correo Corporativo</label>
+              <input type="email" id="setCompanyEmail" class="o_input" value="${esc(s.company_email)}" />
+            </div>
+            <div class="o_field_row">
+              <label for="setCompanyPhone">Teléfono Principal</label>
+              <input type="text" id="setCompanyPhone" class="o_input" value="${esc(s.company_phone)}" />
+            </div>
+            <div class="o_field_row">
+              <label for="setCompanyCity">Ciudad</label>
+              <input type="text" id="setCompanyCity" class="o_input" value="${esc(s.company_city || '')}" />
+            </div>
+            <div class="o_field_row">
+              <label for="setCompanyAddress">Dirección</label>
+              <input type="text" id="setCompanyAddress" class="o_input" value="${esc(s.company_address || '')}" />
+            </div>
+            <div class="o_field_row">
+              <label for="setCurrency">Moneda Funcional</label>
+              <select id="setCurrency" class="o_select">
+                <option value="" ${!s.currency ? 'selected disabled' : ''}>— Seleccione Moneda —</option>
+                <option value="COP" ${s.currency === 'COP' ? 'selected' : ''}>COP — Peso Colombiano ($)</option>
+                <option value="USD" ${s.currency === 'USD' ? 'selected' : ''}>USD — Dólar Estadounidense (US$)</option>
+                <option value="EUR" ${s.currency === 'EUR' ? 'selected' : ''}>EUR — Euro (€)</option>
+              </select>
+            </div>
+            <div class="o_field_row">
+              <label for="setTheme">Tema Visual</label>
+              <select id="setTheme" class="o_select">
+                <option value="" ${!s.theme ? 'selected disabled' : ''}>— Seleccione Tema —</option>
+                <option value="dark" ${s.theme === 'dark' ? 'selected' : ''}>Modo Oscuro (Predeterminado)</option>
+                <option value="light" ${s.theme === 'light' ? 'selected' : ''}>Modo Claro</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      `;
+    } else if (activeTab === 'sales') {
+      contentHtml = `
+        <div class="o_settings_block" data-section="sales">
+          <h3>Parámetros del Módulo de Ventas</h3>
+          <div class="o_group">
+            <div class="o_field_row">
+              <label for="setValidityDays">Validez predeterminada de cotizaciones (días)</label>
+              <input type="number" id="setValidityDays" class="o_input" value="${Number(s.quotation_validity_days || 30)}" min="1" />
+            </div>
+            <div class="o_field_row">
+              <label for="setDefaultSaleTax">IVA de Ventas por Defecto (%)</label>
+              <select id="setDefaultSaleTax" class="o_select">
+                <option value="" ${s.default_sale_tax === '' || s.default_sale_tax === undefined || s.default_sale_tax === null ? 'selected disabled' : ''}>— Seleccione IVA por Defecto —</option>
+                ${[19, 5, 0].map((t) => `<option value="${t}" ${s.default_sale_tax !== '' && Number(s.default_sale_tax) === t ? 'selected' : ''}>${t}%</option>`).join('')}
+              </select>
+            </div>
+            <div class="o_field_row">
+              <label for="setSaleTerms">Términos y Condiciones en Cotizaciones</label>
+              <input type="text" id="setSaleTerms" class="o_input" value="${esc(s.sale_terms)}" />
+            </div>
+            <div class="o_field_row">
+              <label for="setLineDiscounts">Descuentos por Línea en Cotizaciones</label>
+              <select id="setLineDiscounts" class="o_select">
+                <option value="true" ${s.enable_line_discounts !== false ? 'selected' : ''}>Habilitado (Permitir descuentos individuales por línea)</option>
+                <option value="false" ${s.enable_line_discounts === false ? 'selected' : ''}>Deshabilitado</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      `;
+    } else if (activeTab === 'accounting') {
+      contentHtml = `
+        <div class="o_settings_block" data-section="accounting">
+          <h3>Parámetros Tributarios y Contables</h3>
+          <div class="o_group">
+            <div class="o_field_row">
+              <label for="setFiscalRegime">Régimen Tributario</label>
+              <input type="text" id="setFiscalRegime" class="o_input" value="${esc(s.fiscal_regime)}" />
+            </div>
+            <div class="o_field_row">
+              <label for="setDefaultPurchaseTax">IVA de Compras por Defecto (%)</label>
+              <select id="setDefaultPurchaseTax" class="o_select">
+                ${[19, 5, 0].map((t) => `<option value="${t}" ${Number(s.default_purchase_tax ?? 19) === t ? 'selected' : ''}>${t}%</option>`).join('')}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="o_settings_block" id="blockSettingsAccounting" data-section="accounting-journals">
+          <h3>Cuentas Financieras & Medios de Pago</h3>
+          <p style="font-size: 0.84rem; color: var(--o-text-muted); margin-bottom: 0.85rem;">
+            Configure sus cuentas bancarias, billeteras móviles (Nequi, Daviplata) y cajas en efectivo para recaudos y compras.
+          </p>
+
+          <div tabindex="0" role="region" aria-label="Cuentas financieras configuradas" class="table-wrapper" style="margin-bottom: 1.25rem;">
+            <table class="o_list_table" style="--label-2: 'Código'; --label-3: 'Nombre'; --label-4: 'Tipo'; --label-5: 'Saldo';">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Nombre de la Cuenta</th>
+                  <th>Tipo</th>
+                  <th class="text-end">Saldo Actual</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${((state.data.accounting && state.data.accounting.journals) || [])
+                  .filter((j) => (j.type === 'bank' || j.type === 'cash') && j.active !== false)
+                  .map((j) => `
+                    <tr>
+                      <th><span class="o_badge ${j.code === 'NEQ' ? 'o_badge_info' : j.code === 'DVP' ? 'o_badge_danger' : 'o_badge_success'}">${esc(j.code)}</span></th>
+                      <td><strong>${esc(j.name)}</strong></td>
+                      <td>${j.type === 'bank' ? 'Banco / Billetera Digital' : 'Caja Efectivo'}</td>
+                      <td class="text-end"><strong>${formatMoney(j.balance || 0)}</strong></td>
+                    </tr>
+                  `).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <div style="background: var(--o-gray-100); border-radius: 8px; padding: 1.15rem; border: 1px solid var(--o-border-color);">
+            <h4 style="font-size: 0.95rem; margin: 0 0 0.75rem 0; font-weight: 600;">Agregar Nueva Cuenta Financiera</h4>
+            <div class="o_group" style="margin-bottom: 0.75rem;">
+              <div class="o_field_row">
+                <label for="newJournalCode">Código Corto (ej. NEQ2, BBVA, CSH2) *</label>
+                <input type="text" id="newJournalCode" class="o_input" placeholder="ej. BBVA" maxlength="6" />
+              </div>
+              <div class="o_field_row">
+                <label for="newJournalName">Nombre de la Cuenta *</label>
+                <input type="text" id="newJournalName" class="o_input" placeholder="ej. BBVA Cuenta Corriente" />
+              </div>
+              <div class="o_field_row">
+                <label for="newJournalType">Tipo de Cuenta *</label>
+                <select id="newJournalType" class="o_select">
+                  <option value="bank">Banco / Billetera Digital (Nequi, Daviplata, etc.)</option>
+                  <option value="cash">Caja Efectivo</option>
+                </select>
+              </div>
+              <div class="o_field_row">
+                <label for="newJournalBalance">Saldo Inicial ($)</label>
+                <input type="number" id="newJournalBalance" class="o_input" value="0" min="0" step="1000" />
+              </div>
+            </div>
+            <button type="button" class="btn btn-action" id="btnAddJournal">Guardar Cuenta Financiera</button>
+          </div>
+        </div>
+      `;
+    } else if (activeTab === 'expenses') {
+      contentHtml = `
+        <div class="o_settings_block" data-section="expenses">
+          <h3>Políticas y Parámetros de Gastos</h3>
+          <div class="o_group">
+            <div class="o_field_row">
+              <label for="setExpenseApproval">Aprobación Gerencial de Gastos</label>
+              <select id="setExpenseApproval" class="o_select">
+                <option value="true" ${s.expense_approval_required !== false ? 'selected' : ''}>Requerir aprobación antes de contabilizar o pagar</option>
+                <option value="false" ${s.expense_approval_required === false ? 'selected' : ''}>Aprobación automática inmediata</option>
+              </select>
+            </div>
+            <div class="o_field_row">
+              <label for="setExpenseJournal">Diario Contable Predeterminado de Gastos</label>
+              <input type="text" id="setExpenseJournal" class="o_input" value="${esc(s.expense_default_journal || 'EXJ')}" placeholder="EXJ" />
+            </div>
+          </div>
+        </div>
+      `;
+    } else if (activeTab === 'users') {
+      contentHtml = `
+        <div class="o_settings_block" data-section="users">
+          <h3>Usuarios Activos y Mantenimiento de Base de Datos</h3>
+          <div class="o_group" style="margin-bottom: 0.85rem;">
+            <div class="o_field_row">
+              <label for="setActiveUser">Usuario Activo de Sesión</label>
+              <select id="setActiveUser" class="o_select">
+                <option value="" ${!s.active_user || !s.active_user.id ? 'selected disabled' : ''}>— Seleccione Usuario Activo —</option>
+                ${(s.users || [])
+                  .map(
+                    (u) =>
+                      `<option value="${u.id}" ${s.active_user && Number(s.active_user.id) === Number(u.id) ? 'selected' : ''}>${esc(u.name)} — ${esc(u.role)}</option>`
+                  )
+                  .join('')}
+              </select>
+            </div>
+          </div>
+          <p style="font-size: 0.84rem; color: var(--o-text-muted); margin-bottom: 0.85rem;">
+            Usuarios configurados: ${(s.users || []).map((u) => `<strong>${esc(u.name)}</strong> (${esc(u.role)})`).join(' · ')}
+          </p>
+          <div style="display: flex; gap: 0.65rem; flex-wrap: wrap;">
+            <button type="button" class="btn btn-secondary" id="btnExportDbJson">Exportar Respaldo JSON</button>
+            <button type="button" class="btn btn-danger" id="btnResetDemoData">Restaurar Datos de Fábrica</button>
+          </div>
+        </div>
+      `;
+    }
 
     container.innerHTML = `
       <div class="o_settings_layout">
         <aside class="o_settings_sidebar" aria-label="Secciones de ajustes">
-          <button type="button" class="o_settings_tab ${state.submenu === 'general' ? 'is-active' : ''}" data-set-tab="general">
+          <button type="button" class="o_settings_tab ${activeTab === 'general' ? 'is-active' : ''}" data-set-tab="general">
             <img src="/assets/icons/settings.png" alt="" />
             <span>Compañía y General</span>
           </button>
-          <button type="button" class="o_settings_tab ${state.submenu === 'sales' ? 'is-active' : ''}" data-set-tab="sales">
+          <button type="button" class="o_settings_tab ${activeTab === 'sales' ? 'is-active' : ''}" data-set-tab="sales">
             <img src="/assets/icons/sales.png" alt="" />
             <span>Ventas</span>
           </button>
-          <button type="button" class="o_settings_tab ${state.submenu === 'accounting' ? 'is-active' : ''}" data-set-tab="accounting">
+          <button type="button" class="o_settings_tab ${activeTab === 'accounting' ? 'is-active' : ''}" data-set-tab="accounting">
             <img src="/assets/icons/accounting.png" alt="" />
             <span>Contabilidad</span>
           </button>
-          <button type="button" class="o_settings_tab ${state.submenu === 'expenses' ? 'is-active' : ''}" data-set-tab="expenses">
+          <button type="button" class="o_settings_tab ${activeTab === 'expenses' ? 'is-active' : ''}" data-set-tab="expenses">
             <img src="/assets/icons/expenses.png" alt="" />
             <span>Gastos</span>
           </button>
-          <button type="button" class="o_settings_tab ${state.submenu === 'users' ? 'is-active' : ''}" data-set-tab="users">
+          <button type="button" class="o_settings_tab ${activeTab === 'users' ? 'is-active' : ''}" data-set-tab="users">
             <img src="/assets/icons/contacts.png" alt="" />
             <span>Usuarios y Sistema</span>
           </button>
@@ -5889,152 +6095,7 @@
             <span style="font-size: 0.8rem; color: var(--o-text-muted);">CHapp ERP Enterprise (${esc(state.data.meta.version)})</span>
           </div>
 
-          <div class="o_settings_block">
-            <h3>Datos de la Compañía y Apariencia</h3>
-            <div class="o_group">
-              <div class="o_field_row">
-                <label for="setCompanyName">Razón Social de la Empresa</label>
-                <input type="text" id="setCompanyName" class="o_input" value="${esc(s.company_name)}" />
-              </div>
-              <div class="o_field_row">
-                <label for="setCompanyVat">NIT Tributario</label>
-                <input type="text" id="setCompanyVat" class="o_input" value="${esc(s.company_vat)}" />
-              </div>
-              <div class="o_field_row">
-                <label for="setCompanyEmail">Correo Corporativo</label>
-                <input type="email" id="setCompanyEmail" class="o_input" value="${esc(s.company_email)}" />
-              </div>
-              <div class="o_field_row">
-                <label for="setCompanyPhone">Teléfono Principal</label>
-                <input type="text" id="setCompanyPhone" class="o_input" value="${esc(s.company_phone)}" />
-              </div>
-              <div class="o_field_row">
-                <label for="setCurrency">Moneda Funcional</label>
-                <select id="setCurrency" class="o_select">
-                  <option value="" ${!s.currency ? 'selected disabled' : ''}>— Seleccione Moneda —</option>
-                  <option value="COP" ${s.currency === 'COP' ? 'selected' : ''}>COP — Peso Colombiano ($)</option>
-                  <option value="USD" ${s.currency === 'USD' ? 'selected' : ''}>USD — Dólar Estadounidense (US$)</option>
-                  <option value="EUR" ${s.currency === 'EUR' ? 'selected' : ''}>EUR — Euro (€)</option>
-                </select>
-              </div>
-              <div class="o_field_row">
-                <label for="setTheme">Tema Visual</label>
-                <select id="setTheme" class="o_select">
-                  <option value="" ${!s.theme ? 'selected disabled' : ''}>— Seleccione Tema —</option>
-                  <option value="dark" ${s.theme === 'dark' ? 'selected' : ''}>Modo Oscuro (Predeterminado)</option>
-                  <option value="light" ${s.theme === 'light' ? 'selected' : ''}>Modo Claro</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div class="o_settings_block">
-            <h3>Parámetros de Ventas, Contabilidad y Gastos</h3>
-            <div class="o_group">
-              <div class="o_field_row">
-                <label for="setValidityDays">Validez predeterminada de cotizaciones (días)</label>
-                <input type="number" id="setValidityDays" class="o_input" value="${Number(s.quotation_validity_days || 30)}" min="1" />
-              </div>
-              <div class="o_field_row">
-                <label for="setDefaultSaleTax">IVA de Ventas por Defecto (%)</label>
-                <select id="setDefaultSaleTax" class="o_select">
-                  <option value="" ${s.default_sale_tax === '' || s.default_sale_tax === undefined || s.default_sale_tax === null ? 'selected disabled' : ''}>— Seleccione IVA por Defecto —</option>
-                  ${[19, 5, 0].map((t) => `<option value="${t}" ${s.default_sale_tax !== '' && Number(s.default_sale_tax) === t ? 'selected' : ''}>${t}%</option>`).join('')}
-                </select>
-              </div>
-              <div class="o_field_row">
-                <label for="setFiscalRegime">Régimen Tributario</label>
-                <input type="text" id="setFiscalRegime" class="o_input" value="${esc(s.fiscal_regime)}" />
-              </div>
-              <div class="o_field_row">
-                <label for="setSaleTerms">Términos y Condiciones en Cotizaciones</label>
-                <input type="text" id="setSaleTerms" class="o_input" value="${esc(s.sale_terms)}" />
-              </div>
-            </div>
-          </div>
-
-          <div class="o_settings_block" id="blockSettingsAccounting">
-            <h3>Cuentas Financieras & Medios de Pago</h3>
-            <p style="font-size: 0.84rem; color: var(--o-text-muted); margin-bottom: 0.85rem;">
-              Configure sus cuentas bancarias, billeteras móviles (Nequi, Daviplata) y cajas en efectivo para recaudos y compras.
-            </p>
-
-            <div tabindex="0" role="region" aria-label="Cuentas financieras configuradas" class="table-wrapper" style="margin-bottom: 1.25rem;">
-              <table class="o_list_table" style="--label-2: 'Código'; --label-3: 'Nombre'; --label-4: 'Tipo'; --label-5: 'Saldo';">
-                <thead>
-                  <tr>
-                    <th>Código</th>
-                    <th>Nombre de la Cuenta</th>
-                    <th>Tipo</th>
-                    <th class="text-end">Saldo Actual</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${((state.data.accounting && state.data.accounting.journals) || [])
-                    .filter((j) => (j.type === 'bank' || j.type === 'cash') && j.active !== false)
-                    .map((j) => `
-                      <tr>
-                        <th><span class="o_badge ${j.code === 'NEQ' ? 'o_badge_info' : j.code === 'DVP' ? 'o_badge_danger' : 'o_badge_success'}">${esc(j.code)}</span></th>
-                        <td><strong>${esc(j.name)}</strong></td>
-                        <td>${j.type === 'bank' ? 'Banco / Billetera Digital' : 'Caja Efectivo'}</td>
-                        <td class="text-end"><strong>${formatMoney(j.balance || 0)}</strong></td>
-                      </tr>
-                    `).join('')}
-                </tbody>
-              </table>
-            </div>
-
-            <div style="background: var(--o-gray-100); border-radius: 8px; padding: 1.15rem; border: 1px solid var(--o-border-color);">
-              <h4 style="font-size: 0.95rem; margin: 0 0 0.75rem 0; font-weight: 600;">Agregar Nueva Cuenta Financiera</h4>
-              <div class="o_group" style="margin-bottom: 0.75rem;">
-                <div class="o_field_row">
-                  <label for="newJournalCode">Código Corto (ej. NEQ2, BBVA, CSH2) *</label>
-                  <input type="text" id="newJournalCode" class="o_input" placeholder="ej. BBVA" maxlength="6" />
-                </div>
-                <div class="o_field_row">
-                  <label for="newJournalName">Nombre de la Cuenta *</label>
-                  <input type="text" id="newJournalName" class="o_input" placeholder="ej. BBVA Cuenta Corriente" />
-                </div>
-                <div class="o_field_row">
-                  <label for="newJournalType">Tipo de Cuenta *</label>
-                  <select id="newJournalType" class="o_select">
-                    <option value="bank">Banco / Billetera Digital (Nequi, Daviplata, etc.)</option>
-                    <option value="cash">Caja Efectivo</option>
-                  </select>
-                </div>
-                <div class="o_field_row">
-                  <label for="newJournalBalance">Saldo Inicial ($)</label>
-                  <input type="number" id="newJournalBalance" class="o_input" value="0" min="0" step="1000" />
-                </div>
-              </div>
-              <button type="button" class="btn btn-action" id="btnAddJournal">Guardar Cuenta Financiera</button>
-            </div>
-          </div>
-
-          <div class="o_settings_block">
-            <h3>Usuarios Activos y Mantenimiento de Base de Datos</h3>
-            <div class="o_group" style="margin-bottom: 0.85rem;">
-              <div class="o_field_row">
-                <label for="setActiveUser">Usuario Activo de Sesión</label>
-                <select id="setActiveUser" class="o_select">
-                  <option value="" ${!s.active_user || !s.active_user.id ? 'selected disabled' : ''}>— Seleccione Usuario Activo —</option>
-                  ${(s.users || [])
-                    .map(
-                      (u) =>
-                        `<option value="${u.id}" ${s.active_user && Number(s.active_user.id) === Number(u.id) ? 'selected' : ''}>${esc(u.name)} — ${esc(u.role)}</option>`
-                    )
-                    .join('')}
-                </select>
-              </div>
-            </div>
-            <p style="font-size: 0.84rem; color: var(--o-text-muted); margin-bottom: 0.85rem;">
-              Usuarios configurados: ${(s.users || []).map((u) => `<strong>${esc(u.name)}</strong> (${esc(u.role)})`).join(' · ')}
-            </p>
-            <div style="display: flex; gap: 0.65rem; flex-wrap: wrap;">
-              <button type="button" class="btn btn-secondary" id="btnExportDbJson">Exportar Respaldo JSON</button>
-              <button type="button" class="btn btn-danger" id="btnResetDemoData">Restaurar Datos de Fábrica</button>
-            </div>
-          </div>
+          ${contentHtml}
         </div>
       </div>
     `;
@@ -6047,31 +6108,49 @@
       });
     });
 
-    document.getElementById('btnBackHomeFromSettings').addEventListener('click', openHomeMenu);
+    const btnBackHome = document.getElementById('btnBackHomeFromSettings');
+    if (btnBackHome) {
+      btnBackHome.addEventListener('click', openHomeMenu);
+    }
 
-    document.getElementById('btnSaveSettings').addEventListener('click', async () => {
-      try {
-        const payload = {
-          company_name: document.getElementById('setCompanyName').value,
-          company_vat: document.getElementById('setCompanyVat').value,
-          company_email: document.getElementById('setCompanyEmail').value,
-          company_phone: document.getElementById('setCompanyPhone').value,
-          currency: document.getElementById('setCurrency').value,
-          theme: document.getElementById('setTheme').value,
-          quotation_validity_days: Number(document.getElementById('setValidityDays').value || 30),
-          default_sale_tax: Number(document.getElementById('setDefaultSaleTax').value ?? 19),
-          fiscal_regime: document.getElementById('setFiscalRegime').value,
-          sale_terms: document.getElementById('setSaleTerms').value,
-          active_user_id: Number(document.getElementById('setActiveUser').value || 1)
-        };
-        const res = await apiCall('/api/settings', 'POST', payload);
-        state.data.settings = res.settings;
-        updateSystray();
-        showToast('Ajustes del sistema guardados.');
-      } catch (err) {
-        showToast(err.message, true);
-      }
-    });
+    const btnSave = document.getElementById('btnSaveSettings');
+    if (btnSave) {
+      btnSave.addEventListener('click', async () => {
+        try {
+          const payload = {};
+          const el = (id) => document.getElementById(id);
+
+          if (el('setCompanyName')) payload.company_name = el('setCompanyName').value;
+          if (el('setCompanyVat')) payload.company_vat = el('setCompanyVat').value;
+          if (el('setCompanyEmail')) payload.company_email = el('setCompanyEmail').value;
+          if (el('setCompanyPhone')) payload.company_phone = el('setCompanyPhone').value;
+          if (el('setCompanyCity')) payload.company_city = el('setCompanyCity').value;
+          if (el('setCompanyAddress')) payload.company_address = el('setCompanyAddress').value;
+          if (el('setCurrency')) payload.currency = el('setCurrency').value;
+          if (el('setTheme')) payload.theme = el('setTheme').value;
+
+          if (el('setValidityDays')) payload.quotation_validity_days = Number(el('setValidityDays').value || 30);
+          if (el('setDefaultSaleTax')) payload.default_sale_tax = Number(el('setDefaultSaleTax').value ?? 19);
+          if (el('setSaleTerms')) payload.sale_terms = el('setSaleTerms').value;
+          if (el('setLineDiscounts')) payload.enable_line_discounts = el('setLineDiscounts').value === 'true';
+
+          if (el('setFiscalRegime')) payload.fiscal_regime = el('setFiscalRegime').value;
+          if (el('setDefaultPurchaseTax')) payload.default_purchase_tax = Number(el('setDefaultPurchaseTax').value ?? 19);
+
+          if (el('setExpenseApproval')) payload.expense_approval_required = el('setExpenseApproval').value === 'true';
+          if (el('setExpenseJournal')) payload.expense_default_journal = el('setExpenseJournal').value;
+
+          if (el('setActiveUser')) payload.active_user_id = Number(el('setActiveUser').value || 1);
+
+          const res = await apiCall('/api/settings', 'POST', payload);
+          state.data.settings = res.settings;
+          updateSystray();
+          showToast('Ajustes del sistema guardados.');
+        } catch (err) {
+          showToast(err.message, true);
+        }
+      });
+    }
 
     const btnAddJournal = document.getElementById('btnAddJournal');
     if (btnAddJournal) {
@@ -6106,32 +6185,31 @@
       });
     }
 
-    if (state.submenu === 'accounting') {
-      const accBlock = document.getElementById('blockSettingsAccounting');
-      if (accBlock) {
-        accBlock.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
+    const btnExport = document.getElementById('btnExportDbJson');
+    if (btnExport) {
+      btnExport.addEventListener('click', () => {
+        const blob = new Blob([JSON.stringify(state.data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'chapp_erp_backup.json';
+        a.click();
+        URL.revokeObjectURL(url);
+      });
     }
 
-    document.getElementById('btnExportDbJson').addEventListener('click', () => {
-      const blob = new Blob([JSON.stringify(state.data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'chapp_erp_backup.json';
-      a.click();
-      URL.revokeObjectURL(url);
-    });
-
-    document.getElementById('btnResetDemoData').addEventListener('click', async () => {
-      try {
-        await apiCall('/api/reset', 'POST');
-        showToast('Datos de demostración restaurados.');
-        renderSettingsModule();
-      } catch (err) {
-        showToast(err.message, true);
-      }
-    });
+    const btnReset = document.getElementById('btnResetDemoData');
+    if (btnReset) {
+      btnReset.addEventListener('click', async () => {
+        try {
+          await apiCall('/api/reset', 'POST');
+          showToast('Datos de demostración restaurados.');
+          renderSettingsModule();
+        } catch (err) {
+          showToast(err.message, true);
+        }
+      });
+    }
   }
 
   // ==================== CHATTER COMPONENT ====================

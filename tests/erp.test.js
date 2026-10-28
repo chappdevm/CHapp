@@ -1514,4 +1514,41 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.ok(saleHtml.includes('Pedido de Venta'), 'Debe decir Pedido de Venta cuando está confirmado');
     assert.ok(saleHtml.includes('PEDIDO CONFIRMADO'), 'Marca de agua debe decir PEDIDO CONFIRMADO');
   });
+
+  it('Module 5 (Ajustes): displays settings modularly per tab (general, sales, accounting, expenses, users) instead of displaying all at once', async () => {
+    const jsText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
+
+    // 1. Verify frontend code partitions settings into independent modules
+    assert.ok(jsText.includes("if (activeTab === 'general')"), 'Settings must render General section conditionally');
+    assert.ok(jsText.includes("else if (activeTab === 'sales')"), 'Settings must render Sales section conditionally');
+    assert.ok(jsText.includes("else if (activeTab === 'accounting')"), 'Settings must render Accounting section conditionally');
+    assert.ok(jsText.includes("else if (activeTab === 'expenses')"), 'Settings must render Expenses section conditionally');
+    assert.ok(jsText.includes("else if (activeTab === 'users')"), 'Settings must render Users section conditionally');
+
+    // 2. Verify all 5 module sections exist with data-section identifiers
+    assert.ok(jsText.includes('data-section="general"'), 'General settings block must be tagged');
+    assert.ok(jsText.includes('data-section="sales"'), 'Sales settings block must be tagged');
+    assert.ok(jsText.includes('data-section="accounting"'), 'Accounting settings block must be tagged');
+    assert.ok(jsText.includes('data-section="expenses"'), 'Expenses settings block must be tagged');
+    assert.ok(jsText.includes('data-section="users"'), 'Users settings block must be tagged');
+
+    // 3. Verify backend saves individual module updates without overwriting untouched settings
+    const salesUpdate = await req('/api/settings', 'POST', {
+      quotation_validity_days: 45,
+      default_sale_tax: 19,
+      sale_terms: 'Términos de venta de prueba actualizados'
+    });
+    assert.equal(salesUpdate.status, 200);
+    assert.equal(salesUpdate.json.settings.quotation_validity_days, 45);
+    assert.equal(salesUpdate.json.settings.sale_terms, 'Términos de venta de prueba actualizados');
+    assert.ok(salesUpdate.json.settings.company_name, 'Company name must not be cleared when saving sales settings');
+
+    const expensesUpdate = await req('/api/settings', 'POST', {
+      expense_approval_required: false,
+      expense_default_journal: 'EXJ'
+    });
+    assert.equal(expensesUpdate.status, 200);
+    assert.equal(expensesUpdate.json.settings.expense_approval_required, false);
+    assert.equal(expensesUpdate.json.settings.quotation_validity_days, 45, 'Quotation validity days must remain intact');
+  });
 });
