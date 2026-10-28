@@ -606,24 +606,8 @@
     // Hide search bar on form view
     searchContainer.style.visibility = state.viewType === 'form' ? 'hidden' : 'visible';
 
-    // Quick status pills per module
-    if (state.viewType === 'form') {
-      filterPills.innerHTML = '';
-    } else if (state.currentApp === 'expenses') {
-      filterPills.innerHTML = '';
-    } else if (state.currentApp === 'sales' && state.submenu !== 'products') {
-      const pills = [
-        { id: 'all', label: 'Todos' },
-        { id: 'draft', label: 'Cotización' },
-        { id: 'sent', label: 'Enviada' },
-        { id: 'sale', label: 'Pedido de Venta' }
-      ];
-      filterPills.innerHTML = pills
-        .map((p) => `<button type="button" class="o_filter_pill ${state.statusFilter === p.id ? 'is-active' : ''}" data-pill="${p.id}">${p.label}</button>`)
-        .join('');
-    } else {
-      filterPills.innerHTML = '';
-    }
+    // Quick status pills per module (removed redundant pills for sales & expenses; navigation is handled in navbar)
+    filterPills.innerHTML = '';
 
     filterPills.querySelectorAll('.o_filter_pill').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -634,7 +618,7 @@
 
     // View Switcher (Kanban / List)
     // En las facturas y contabilidad se quita la opción de elegir lista/kanban: siempre lista por defecto
-    if (state.currentApp === 'accounting' || state.currentApp === 'expenses' || (state.currentApp === 'sales' && state.submenu === 'products')) {
+    if (state.currentApp === 'accounting' || state.currentApp === 'expenses' || state.currentApp === 'contacts' || state.currentApp === 'sales') {
       switcher.innerHTML = '';
       if (state.viewType !== 'form') {
         state.viewType = 'list';
