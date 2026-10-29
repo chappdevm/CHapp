@@ -358,13 +358,16 @@
               </div>
 
               <div tabindex="0" role="region" aria-label="Tabla de productos del gasto" class="table-wrapper" style="margin-bottom: 0.75rem;">
-                <table class="o_list_table" id="expenseItemsTable" style="--label-2: 'Cantidad'; --label-3: 'Valor Unit.'; --label-4: 'Subtotal'; --label-5: 'Acción';">
+                <table class="o_list_table" id="expenseItemsTable" style="--label-2: 'Cantidad'; --label-3: 'Valor Unit.'; --label-4: 'IVA %'; --label-5: 'IVA $'; --label-6: 'Subtotal'; --label-7: 'Total'; --label-8: 'Acción';">
                   <thead>
                     <tr>
                       <th>Descripción del Producto / Artículo</th>
-                      <th style="width: 100px;">Cantidad</th>
-                      <th style="width: 160px;">Valor Unitario ($)</th>
-                      <th class="text-end" style="width: 160px;">Subtotal ($)</th>
+                      <th style="width: 90px;">Cantidad</th>
+                      <th style="width: 130px;">Valor Unitario ($)</th>
+                      <th style="width: 80px;">IVA %</th>
+                      <th style="width: 120px;">IVA ($)</th>
+                      <th style="width: 130px;">Subtotal ($)</th>
+                      <th style="width: 130px;">Total con IVA ($)</th>
                       <th style="width: 50px;"></th>
                     </tr>
                   </thead>
@@ -372,6 +375,7 @@
                   </tbody>
                 </table>
               </div>
+              <div id="expenseItemsSummary" style="display: flex; gap: 1.25rem; justify-content: flex-end; flex-wrap: wrap; font-size: 0.9rem; margin-bottom: 0.75rem;"></div>
             </div>
 
             <div class="o_field_row" style="margin-top: 0.5rem;">
@@ -405,31 +409,63 @@
 
     wireChatterEvents('expenses', existing.id);
 
-    // Initial items list for the table
-    let expenseItems = Array.isArray(existing.items) && existing.items.length > 0
+    // Initial items list for the table (valores literales de la factura, sin recalcular)
+    const normalizeExpenseItem = (it) => {
+      const qty = Number(it.quantity || 1);
+      const price = Number(it.price_unit || 0);
+      const sub = it.subtotal !== undefined && it.subtotal !== null && it.subtotal !== '' ? Number(it.subtotal) : Math.round(qty * price * 100) / 100;
+      const rate = Number(it.tax_rate || 0);
+      const tax = it.tax_amount !== undefined && it.tax_amount !== null && it.tax_amount !== '' ? Number(it.tax_amount) : Math.round(sub * rate) / 100;
+      const total = it.total !== undefined && it.total !== null && it.total !== '' && Number(it.total) > 0 ? Number(it.total) : Math.round((sub + tax) * 100) / 100;
+      return { ...it, description: it.description || it.name || '', quantity: qty, price_unit: price, tax_rate: rate, tax_amount: tax, subtotal: sub, total };
+    };
+    let expenseItems = (Array.isArray(existing.items) && existing.items.length > 0
       ? [...existing.items]
       : (draft && Array.isArray(draft.items) && draft.items.length > 0
           ? [...draft.items]
-          : [{ description: existing.name || '', quantity: existing.quantity || 1, price_unit: existing.price_unit || existing.total_amount || 0, subtotal: existing.total_amount || 0 }]);
+          : [{ description: existing.name || '', quantity: existing.quantity || 1, price_unit: existing.price_unit || existing.total_amount || 0, subtotal: existing.total_amount || 0 }])
+    ).map(normalizeExpenseItem);
+
+    // Totales literales impresos en la factura escaneada (se conservan hasta que el usuario edite los productos)
+    let literalTotals = draft && draft.literal_totals ? { ...draft.literal_totals } : null;
+
+    const round2c = (n) => Math.round(Number(n || 0) * 100) / 100;
+
+    const renderExpenseSummary = () => {
+      const box = document.getElementById('expenseItemsSummary');
+      if (!box) return;
+      const sub = literalTotals ? literalTotals.untaxed : round2c(expenseItems.reduce((a, it) => a + Number(it.subtotal || 0), 0));
+      const tax = literalTotals ? literalTotals.tax : round2c(expenseItems.reduce((a, it) => a + Number(it.tax_amount || 0), 0));
+      const tot = literalTotals ? literalTotals.total : round2c(expenseItems.reduce((a, it) => a + Number(it.total || 0), 0));
+      box.innerHTML = `<span>Subtotal: <strong>${formatMoney(sub)}</strong></span><span>IVA: <strong>${formatMoney(tax)}</strong></span><span>Total: <strong style="color: #2563eb;">${formatMoney(tot)}</strong></span>`;
+    };
 
     const renderExpenseItems = () => {
       const tbody = document.getElementById('expenseItemsTbody');
       if (!tbody) return;
       tbody.innerHTML = expenseItems.map((it, idx) => {
-        const sub = Math.round((Number(it.quantity || 1) * Number(it.price_unit || 0)) * 100) / 100;
         return `
           <tr data-item-idx="${idx}">
             <td>
               <input type="text" class="o_input exp-item-desc" data-idx="${idx}" value="${esc(it.description || '')}" placeholder="Ej. Tubo PVC, Almuerzo, Cable..." />
             </td>
             <td>
-              <input type="number" class="o_input exp-item-qty" data-idx="${idx}" min="1" step="any" value="${Number(it.quantity || 1)}" />
+              <input type="number" class="o_input exp-item-field" data-field="quantity" data-idx="${idx}" min="0" step="any" value="${Number(it.quantity || 1)}" />
             </td>
             <td>
-              <input type="number" class="o_input exp-item-price" data-idx="${idx}" min="0" step="any" value="${Number(it.price_unit || 0)}" />
+              <input type="number" class="o_input exp-item-field" data-field="price_unit" data-idx="${idx}" min="0" step="any" value="${Number(it.price_unit || 0)}" />
             </td>
-            <td class="text-end">
-              <strong class="exp-item-subtotal">${formatMoney(sub)}</strong>
+            <td>
+              <input type="number" class="o_input exp-item-field" data-field="tax_rate" data-idx="${idx}" min="0" step="any" value="${Number(it.tax_rate || 0)}" />
+            </td>
+            <td>
+              <input type="number" class="o_input exp-item-field" data-field="tax_amount" data-idx="${idx}" min="0" step="any" value="${Number(it.tax_amount || 0)}" />
+            </td>
+            <td>
+              <input type="number" class="o_input exp-item-field" data-field="subtotal" data-idx="${idx}" min="0" step="any" value="${Number(it.subtotal || 0)}" />
+            </td>
+            <td>
+              <input type="number" class="o_input exp-item-field" data-field="total" data-idx="${idx}" min="0" step="any" value="${Number(it.total || 0)}" />
             </td>
             <td class="text-center">
               ${expenseItems.length > 1 ? `<button type="button" class="btn btn-sm btn-danger btn-remove-exp-item" data-idx="${idx}" title="Quitar ítem">Quitar</button>` : ''}
@@ -446,18 +482,31 @@
         });
       });
 
-      tbody.querySelectorAll('.exp-item-qty, .exp-item-price').forEach(input => {
+      tbody.querySelectorAll('.exp-item-field').forEach(input => {
         input.addEventListener('input', (e) => {
           const idx = Number(e.target.dataset.idx);
+          const field = e.target.dataset.field;
+          const item = expenseItems[idx];
           const row = tbody.querySelector(`tr[data-item-idx="${idx}"]`);
-          if (!row || !expenseItems[idx]) return;
-          const qty = Number(row.querySelector('.exp-item-qty').value || 1);
-          const price = Number(row.querySelector('.exp-item-price').value || 0);
-          expenseItems[idx].quantity = qty;
-          expenseItems[idx].price_unit = price;
-          const sub = Math.round(qty * price * 100) / 100;
-          expenseItems[idx].subtotal = sub;
-          row.querySelector('.exp-item-subtotal').textContent = formatMoney(sub);
+          if (!row || !item) return;
+          item[field] = Number(e.target.value || 0);
+          const setField = (f, v) => {
+            item[f] = v;
+            const el = row.querySelector(`[data-field="${f}"]`);
+            if (el) el.value = v;
+          };
+          // Recalcula solo lo derivado del campo que el usuario editó; lo demás queda literal.
+          if (field === 'quantity' || field === 'price_unit') {
+            setField('subtotal', round2c(item.quantity * item.price_unit));
+            setField('tax_amount', round2c(item.subtotal * item.tax_rate / 100));
+            setField('total', round2c(item.subtotal + item.tax_amount));
+          } else if (field === 'tax_rate') {
+            setField('tax_amount', round2c(item.subtotal * item.tax_rate / 100));
+            setField('total', round2c(item.subtotal + item.tax_amount));
+          } else if (field === 'subtotal' || field === 'tax_amount') {
+            setField('total', round2c(item.subtotal + item.tax_amount));
+          }
+          literalTotals = null;
           recalcExpenseTotal();
         });
       });
@@ -466,16 +515,19 @@
         btn.addEventListener('click', (e) => {
           const idx = Number(e.currentTarget.dataset.idx);
           expenseItems.splice(idx, 1);
+          literalTotals = null;
           renderExpenseItems();
           recalcExpenseTotal();
         });
       });
+      renderExpenseSummary();
     };
 
     const recalcExpenseTotal = () => {
-      const sum = expenseItems.reduce((acc, it) => acc + (Number(it.quantity || 1) * Number(it.price_unit || 0)), 0);
+      const sum = expenseItems.reduce((acc, it) => acc + Number(it.total || 0), 0);
       const totalInput = document.getElementById('fExpTotal');
       if (totalInput) totalInput.value = Math.round(sum * 100) / 100;
+      renderExpenseSummary();
     };
 
     renderExpenseItems();
@@ -483,7 +535,8 @@
     const btnAddItem = document.getElementById('btnAddExpenseItem');
     if (btnAddItem) {
       btnAddItem.addEventListener('click', () => {
-        expenseItems.push({ description: '', quantity: 1, price_unit: 0, subtotal: 0 });
+        expenseItems.push({ description: '', quantity: 1, price_unit: 0, tax_rate: 0, tax_amount: 0, subtotal: 0, total: 0 });
+        literalTotals = null;
         renderExpenseItems();
       });
     }
@@ -533,27 +586,30 @@
         if (scannedData.reference) document.getElementById('fExpReceipt').value = scannedData.reference;
         if (scannedData.date) document.getElementById('fExpDate').value = scannedData.date;
         if (scannedData.total_amount) document.getElementById('fExpTotal').value = scannedData.total_amount;
+        literalTotals = scannedData.total_amount
+          ? {
+              untaxed: Number(scannedData.subtotal_amount || 0) || (Number(scannedData.total_amount) - Number(scannedData.tax_amount || 0)),
+              tax: Number(scannedData.tax_amount || 0),
+              total: Number(scannedData.total_amount)
+            }
+          : null;
         if (scannedData.notes) {
           document.getElementById('fExpNotes').value = scannedData.notes;
         }
 
         // Load items from AI scan
         if (Array.isArray(scannedData.items) && scannedData.items.length > 0) {
-          expenseItems = scannedData.items.map(it => ({
-            description: it.description || it.name || '',
-            quantity: Number(it.quantity || 1),
-            price_unit: Number(it.price_unit || 0),
-            subtotal: Number(it.subtotal || ((Number(it.quantity || 1)) * Number(it.price_unit || 0)))
-          }));
+          expenseItems = scannedData.items.map(normalizeExpenseItem);
           renderExpenseItems();
-          recalcExpenseTotal();
         } else if (scannedData.name || scannedData.total_amount) {
-          expenseItems = [{
+          expenseItems = [normalizeExpenseItem({
             description: scannedData.name || 'Gasto proveedor',
             quantity: 1,
-            price_unit: Number(scannedData.total_amount || 0),
-            subtotal: Number(scannedData.total_amount || 0)
-          }];
+            price_unit: Number(scannedData.subtotal_amount || scannedData.total_amount || 0),
+            tax_amount: Number(scannedData.tax_amount || 0),
+            subtotal: Number(scannedData.subtotal_amount || scannedData.total_amount || 0),
+            total: Number(scannedData.total_amount || 0)
+          })];
           renderExpenseItems();
         }
 
@@ -648,13 +704,17 @@
           const suppVatInput = document.getElementById('fExpPartnerVat') ? document.getElementById('fExpPartnerVat').value.trim() : '';
 
           // Collect items from table
-          const cleanItems = expenseItems.filter(it => it.description || it.price_unit > 0).map((it, idx) => ({
+          const cleanItems = expenseItems.filter(it => it.description || it.price_unit > 0 || it.subtotal > 0).map((it, idx) => ({
             id: idx + 1,
             description: it.description || name,
             quantity: Number(it.quantity || 1),
             price_unit: Number(it.price_unit || 0),
-            subtotal: Math.round((Number(it.quantity || 1) * Number(it.price_unit || 0)) * 100) / 100
+            tax_rate: Number(it.tax_rate || 0),
+            tax_amount: Number(it.tax_amount || 0),
+            subtotal: Number(it.subtotal || 0),
+            total: Number(it.total || 0)
           }));
+          const useLiteral = Boolean(literalTotals && Math.abs(literalTotals.total - totalAmount) < 0.01);
 
           const payload = {
             id: isNew ? undefined : existing.id,
@@ -673,14 +733,15 @@
             quantity: 1,
             price_unit: totalAmount,
             tax_rate: 0,
-            untaxed_amount: totalAmount,
-            tax_amount: 0,
+            untaxed_amount: useLiteral ? literalTotals.untaxed : undefined,
+            tax_amount: useLiteral ? literalTotals.tax : undefined,
             total_amount: totalAmount,
+            literal_totals: useLiteral,
             journal_code: document.getElementById('fExpJournal') ? document.getElementById('fExpJournal').value : (existing.journal_code || 'CSH1'),
             payment_mode: document.getElementById('fExpPayMode').value || 'company_account',
             notes: document.getElementById('fExpNotes').value.trim(),
             receipt_image: existing.receipt_image || '',
-            items: cleanItems.length > 0 ? cleanItems : [{ id: 1, description: name, quantity: 1, price_unit: totalAmount, subtotal: totalAmount }]
+            items: cleanItems.length > 0 ? cleanItems : [{ id: 1, description: name, quantity: 1, price_unit: totalAmount, tax_rate: 0, tax_amount: 0, subtotal: totalAmount, total: totalAmount }]
           };
 
           if (!isNew && !hasExpenseDraftChanged(existing, payload)) {

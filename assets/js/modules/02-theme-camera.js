@@ -312,8 +312,15 @@
             quantity: 1,
             notes: res.data.notes || '',
             receipt_image: base64Data,
+            literal_totals: res.data.total_amount
+              ? {
+                  untaxed: Number(res.data.subtotal_amount || 0) || (Number(res.data.total_amount) - Number(res.data.tax_amount || 0)),
+                  tax: Number(res.data.tax_amount || 0),
+                  total: Number(res.data.total_amount)
+                }
+              : null,
             items: Array.isArray(res.data.items) && res.data.items.length > 0 ? res.data.items : [
-              { description: res.data.name || 'Gasto proveedor', quantity: 1, price_unit: Number(res.data.total_amount || 0), subtotal: Number(res.data.total_amount || 0) }
+              { description: res.data.name || 'Gasto proveedor', quantity: 1, price_unit: Number(res.data.subtotal_amount || res.data.total_amount || 0), tax_rate: 0, tax_amount: Number(res.data.tax_amount || 0), subtotal: Number(res.data.subtotal_amount || res.data.total_amount || 0), total: Number(res.data.total_amount || 0) }
             ]
           };
           renderModuleWorkspace();

@@ -265,6 +265,10 @@
       if (String(e.description || '').trim() !== String(p.description || '').trim()) return true;
       if (Number(e.quantity || 0) !== Number(p.quantity || 0)) return true;
       if (Number(e.price_unit || 0) !== Number(p.price_unit || 0)) return true;
+      if (Number(e.tax_rate || 0) !== Number(p.tax_rate || 0)) return true;
+      if (Number(e.tax_amount || 0) !== Number(p.tax_amount || 0)) return true;
+      if (Number(e.subtotal || 0) !== Number(p.subtotal || 0)) return true;
+      if (Number(e.total || 0) !== Number(p.total || 0)) return true;
     }
     return false;
   }
