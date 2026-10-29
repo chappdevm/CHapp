@@ -1854,6 +1854,12 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.ok(!jsTextExp.includes('>IVA ($)</th>'), 'La tabla de productos NO debe duplicar IVA con columna IVA ($)');
     assert.ok(!jsTextExp.includes('>Subtotal ($)</th>'), 'La tabla de productos NO debe mostrar columna separada Subtotal ($)');
     assert.ok(!jsTextExp.includes('>Total con IVA ($)</th>'), 'La tabla de productos NO debe mostrar columna Total con IVA ($)');
+
+    // Verificación de visualización ampliada de comprobante (lightbox) y compresión
+    assert.ok(jsTextExp.includes('function openImageLightbox('), 'Debe existir función openImageLightbox');
+    assert.ok(jsTextExp.includes('function compressImageFile('), 'Debe existir función compressImageFile');
+    assert.ok(jsTextExp.includes('openImageLightbox(this.src'), 'La imagen del comprobante debe abrirse en lightbox');
+    assert.ok(!jsTextExp.includes('onclick="window.open(this.src)"'), 'No debe usar window.open en comprobantes para evitar bloqueo del navegador');
   });
 
   it('Module 3 (Ventas): Pedidos de venta confirmados bloquean edición de cliente y productos, y se remueven instrucciones bancarias de representaciones gráficas', async () => {

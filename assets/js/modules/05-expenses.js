@@ -393,7 +393,7 @@
               <div id="formReceiptPreviewWrap">
                 ${
                   existing.receipt_image
-                    ? `<img src="${existing.receipt_image}" class="o_expense_receipt_preview" alt="Comprobante factura" onclick="window.open(this.src)" title="Clic para ver tamaño completo" />`
+                    ? `<img src="${existing.receipt_image}" class="o_expense_receipt_preview" alt="Comprobante factura" onclick="openImageLightbox(this.src, 'Comprobante de Factura')" title="Clic para ver tamaño grande" />`
                     : `<span style="font-size: 0.85rem; color: var(--o-muted);">Sin foto adjunta. Puedes tomarla con la cámara en vivo o subir un archivo.</span>`
                 }
               </div>
@@ -647,7 +647,7 @@
           existing.receipt_image = imageBase64;
           const wrap = document.getElementById('formReceiptPreviewWrap');
           if (wrap) {
-            wrap.innerHTML = `<img src="${imageBase64}" class="o_expense_receipt_preview" alt="Comprobante factura" onclick="window.open(this.src)" title="Clic para ver tamaño completo" />`;
+            wrap.innerHTML = `<img src="${imageBase64}" class="o_expense_receipt_preview" alt="Comprobante factura" onclick="openImageLightbox(this.src, 'Comprobante de Factura')" title="Clic para ver tamaño grande" />`;
           }
         }
         showToast('Datos de la factura cargados en el formulario.');

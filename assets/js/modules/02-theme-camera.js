@@ -248,6 +248,91 @@
     if (btnStart) btnStart.textContent = 'Activar Cámara';
   }
 
+  function compressImageFile(file, maxWidth = 1600, maxHeight = 1600, quality = 0.85) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('No se pudo leer el archivo de imagen.'));
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('Formato de imagen inválido o no compatible.'));
+        img.onload = () => {
+          let w = img.width;
+          let h = img.height;
+          if (w > maxWidth || h > maxHeight) {
+            const ratio = Math.min(maxWidth / w, maxHeight / h);
+            w = Math.max(1, Math.round(w * ratio));
+            h = Math.max(1, Math.round(h * ratio));
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve(dataUrl);
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function openImageLightbox(src, title = 'Comprobante de Factura') {
+    if (!src) return;
+    let overlay = document.getElementById('oImageLightboxOverlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'oImageLightboxOverlay';
+      overlay.className = 'o_lightbox_overlay';
+      overlay.innerHTML = `
+        <div class="o_lightbox_backdrop"></div>
+        <div class="o_lightbox_container">
+          <div class="o_lightbox_header">
+            <span class="o_lightbox_title"></span>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" class="btn btn-sm btn-secondary btn-lightbox-download" title="Descargar imagen">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Descargar
+              </button>
+              <button type="button" class="btn btn-sm btn-secondary btn-lightbox-close" title="Cerrar (Esc)">Cerrar</button>
+            </div>
+          </div>
+          <div class="o_lightbox_body">
+            <img class="o_lightbox_img" src="" alt="Vista previa ampliada" />
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      const close = () => { overlay.style.display = 'none'; };
+      overlay.querySelector('.o_lightbox_backdrop').onclick = close;
+      overlay.querySelector('.btn-lightbox-close').onclick = close;
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && overlay.style.display === 'flex') close();
+      });
+    }
+
+    const titleEl = overlay.querySelector('.o_lightbox_title');
+    if (titleEl) titleEl.textContent = title;
+    const imgEl = overlay.querySelector('.o_lightbox_img');
+    if (imgEl) imgEl.src = src;
+
+    const downloadBtn = overlay.querySelector('.btn-lightbox-download');
+    if (downloadBtn) {
+      downloadBtn.onclick = () => {
+        const a = document.createElement('a');
+        a.href = src;
+        a.download = `comprobante_${Date.now()}.jpg`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      };
+    }
+
+    overlay.style.display = 'flex';
+  }
+  window.openImageLightbox = openImageLightbox;
+
   function openExpenseCameraDialog(targetCallback) {
     const dialog = document.getElementById('expenseAiCameraDialog');
     if (!dialog) return;
@@ -327,7 +412,31 @@
         }
       } catch (err) {
         aiLoading.style.display = 'none';
-        showToast('Error analizando factura con IA: ' + err.message, true);
+        dialog.close();
+        showToast('No se pudo extraer texto automático con IA (' + err.message + '). La imagen quedó adjunta al gasto.', true);
+
+        const fallbackData = {
+          name: 'Gasto según comprobante adjunto',
+          date: new Date().toISOString().slice(0, 10),
+          total_amount: 0,
+          items: [{ description: 'Artículo según factura adjunta', quantity: 1, price_unit: 0, tax_rate: 0, total: 0 }]
+        };
+        if (targetCallback) {
+          targetCallback(fallbackData, base64Data, null);
+        } else {
+          state.currentApp = 'expenses';
+          state.viewType = 'form';
+          state.activeRecordId = 'new';
+          state.formDraft = {
+            name: fallbackData.name,
+            date: fallbackData.date,
+            total_amount: 0,
+            quantity: 1,
+            receipt_image: base64Data,
+            items: fallbackData.items
+          };
+          renderModuleWorkspace();
+        }
       }
     };
 
@@ -363,14 +472,19 @@
       executeAiScan(dataUrl, 'image/jpeg');
     };
 
-    fileInput.onchange = (e) => {
+    fileInput.onchange = async (e) => {
       const file = e.target.files && e.target.files[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        executeAiScan(ev.target.result, file.type || 'image/jpeg');
-      };
-      reader.readAsDataURL(file);
+      try {
+        placeholder.style.display = 'none';
+        aiLoading.style.display = 'flex';
+        const compressedBase64 = await compressImageFile(file, 1600, 1600, 0.85);
+        executeAiScan(compressedBase64, 'image/jpeg');
+      } catch (err) {
+        aiLoading.style.display = 'none';
+        placeholder.style.display = 'block';
+        showToast('Error procesando imagen: ' + err.message, true);
+      }
     };
 
     btnClose.onclick = () => {
