@@ -1552,6 +1552,10 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.ok(jsText.includes('generateMonthBalanceSvg'), 'app.js debe definir generateMonthBalanceSvg');
     assert.ok(jsText.includes('generateTrendSvg'), 'app.js debe definir generateTrendSvg');
     assert.ok(jsText.includes('generateDonutSvg'), 'app.js debe definir generateDonutSvg');
+    assert.ok(jsText.includes('generateFlowDistributionDonutSvg'), 'app.js debe definir generateFlowDistributionDonutSvg');
+    assert.ok(jsText.includes('Total Recaudos'), 'app.js debe incluir Total Recaudos');
+    assert.ok(jsText.includes('Por Recaudar'), 'app.js debe incluir Por Recaudar');
+    assert.ok(jsText.includes('Margen Operativo:'), 'app.js debe incluir Margen Operativo');
     assert.ok(jsText.includes('Total Recaudado (Cobros Reales)'), 'app.js debe tener tarjeta de Total Recaudado');
     assert.ok(jsText.includes('Total Gastos / Compras'), 'app.js debe tener tarjeta de Total Gastos');
     assert.ok(jsText.includes('Balance Neto en Cajas y Bancos'), 'app.js debe tener tarjeta de Balance Neto');
@@ -2148,7 +2152,8 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
           moneyZero: formatMoney(0),
           svgBalance: generateMonthBalanceSvg({ inflow: 100000, outflow: 40000, net: 60000, margin_pct: 60 }).includes('<svg'),
           svgDonutEmpty: generateDonutSvg([], 'Total', 'Sin movimientos').includes('Sin movimientos'),
-          svgDonutPopulated: generateDonutSvg([{ name: 'Nequi', amount: 100000, percentage: 100 }], 'Total', 'Sin movimientos').includes('<svg')
+          svgDonutPopulated: generateDonutSvg([{ name: 'Nequi', amount: 100000, percentage: 100 }], 'Total', 'Sin movimientos').includes('<svg'),
+          svgFlowDonut: generateFlowDistributionDonutSvg({ collected_revenue: 100000, receivables_residual: 50000, expenses_paid_total: 40000 }).includes('#10b981')
         };
       })()
     `).runInContext(ctx);
@@ -2163,5 +2168,6 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.equal(checkResult.svgBalance, true);
     assert.equal(checkResult.svgDonutEmpty, true);
     assert.equal(checkResult.svgDonutPopulated, true);
+    assert.equal(checkResult.svgFlowDonut, true);
   });
 });

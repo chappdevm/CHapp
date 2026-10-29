@@ -27,41 +27,47 @@
     const isNetPos = Number(data.net || 0) >= 0;
 
     return `
-      <svg viewBox="0 0 600 230" style="width: 100%; height: auto; max-height: 250px; font-family: inherit;" role="img" aria-label="Gráfica comparativa de balance del mes actual">
-        <!-- Lineas de escala -->
-        <line x1="40" y1="45" x2="560" y2="45" stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" />
-        <line x1="40" y1="85" x2="560" y2="85" stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" />
-        <line x1="40" y1="125" x2="560" y2="125" stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" />
-        <line x1="40" y1="${baseY}" x2="560" y2="${baseY}" stroke="currentColor" stroke-opacity="0.25" stroke-width="1.5" />
+      <div style="position: relative; width: 100%;">
+        <!-- Badge Margen Operativo ubicado en la esquina de la sección para no chocar con las barras ni elementos -->
+        <div style="display: flex; justify-content: flex-end; padding: 0.5rem 1rem 0; margin-bottom: -6px;">
+          <span style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 9999px; background: rgba(14, 165, 233, 0.12); color: #0ea5e9; font-size: 0.8rem; font-weight: 700; border: 1px solid rgba(14, 165, 233, 0.25);">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+            Margen Operativo: ${data.margin_pct >= 0 ? '+' : ''}${data.margin_pct}%
+          </span>
+        </div>
 
-        <!-- Distintivo Margen Neto -->
-        <rect x="400" y="10" width="160" height="26" rx="13" fill="rgba(14, 165, 233, 0.12)" />
-        <text x="480" y="27" font-size="11" font-weight="700" fill="#0ea5e9" text-anchor="middle">Margen Operativo: ${data.margin_pct >= 0 ? '+' : ''}${data.margin_pct}%</text>
+        <svg viewBox="0 0 600 220" style="width: 100%; height: auto; max-height: 250px; font-family: inherit;" role="img" aria-label="Gráfica comparativa de balance del mes actual">
+          <!-- Lineas de escala -->
+          <line x1="40" y1="40" x2="560" y2="40" stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" />
+          <line x1="40" y1="80" x2="560" y2="80" stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" />
+          <line x1="40" y1="120" x2="560" y2="120" stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" />
+          <line x1="40" y1="${baseY}" x2="560" y2="${baseY}" stroke="currentColor" stroke-opacity="0.25" stroke-width="1.5" />
 
-        <!-- Barra 1: Recaudado -->
-        <g>
-          <rect x="85" y="${baseY - hInflow}" width="85" height="${hInflow}" rx="5" fill="#10b981" />
-          <text x="127" y="${Math.max(30, baseY - hInflow - 8)}" font-size="12" font-weight="700" fill="#10b981" text-anchor="middle">${formatMoney(data.inflow)}</text>
-          <text x="127" y="${baseY + 22}" font-size="12" font-weight="600" fill="var(--o-text-main)" text-anchor="middle">Recaudado</text>
-          <text x="127" y="${baseY + 38}" font-size="10" fill="var(--o-text-muted)" text-anchor="middle">Cobros Reales</text>
-        </g>
+          <!-- Barra 1: Recaudado -->
+          <g>
+            <rect x="85" y="${baseY - hInflow}" width="85" height="${hInflow}" rx="5" fill="#10b981" />
+            <text x="127" y="${Math.max(25, baseY - hInflow - 8)}" font-size="12" font-weight="700" fill="#10b981" text-anchor="middle">${formatMoney(data.inflow)}</text>
+            <text x="127" y="${baseY + 22}" font-size="12" font-weight="600" fill="var(--o-text-main)" text-anchor="middle">Recaudado</text>
+            <text x="127" y="${baseY + 38}" font-size="10" fill="var(--o-text-muted)" text-anchor="middle">Cobros Reales</text>
+          </g>
 
-        <!-- Barra 2: Gastos Pagados -->
-        <g>
-          <rect x="255" y="${baseY - hOutflow}" width="85" height="${hOutflow}" rx="5" fill="#ef4444" />
-          <text x="297" y="${Math.max(30, baseY - hOutflow - 8)}" font-size="12" font-weight="700" fill="#ef4444" text-anchor="middle">${formatMoney(data.outflow)}</text>
-          <text x="297" y="${baseY + 22}" font-size="12" font-weight="600" fill="var(--o-text-main)" text-anchor="middle">Gastos Pagados</text>
-          <text x="297" y="${baseY + 38}" font-size="10" fill="var(--o-text-muted)" text-anchor="middle">Compras / Mat.</text>
-        </g>
+          <!-- Barra 2: Gastos Pagados -->
+          <g>
+            <rect x="255" y="${baseY - hOutflow}" width="85" height="${hOutflow}" rx="5" fill="#ef4444" />
+            <text x="297" y="${Math.max(25, baseY - hOutflow - 8)}" font-size="12" font-weight="700" fill="#ef4444" text-anchor="middle">${formatMoney(data.outflow)}</text>
+            <text x="297" y="${baseY + 22}" font-size="12" font-weight="600" fill="var(--o-text-main)" text-anchor="middle">Gastos Pagados</text>
+            <text x="297" y="${baseY + 38}" font-size="10" fill="var(--o-text-muted)" text-anchor="middle">Total Gastos</text>
+          </g>
 
-        <!-- Barra 3: Balance Neto -->
-        <g>
-          <rect x="425" y="${baseY - hNet}" width="85" height="${hNet}" rx="5" fill="${isNetPos ? '#0ea5e9' : '#f59e0b'}" />
-          <text x="467" y="${Math.max(30, baseY - hNet - 8)}" font-size="12" font-weight="700" fill="${isNetPos ? '#0ea5e9' : '#f59e0b'}" text-anchor="middle">${formatMoney(data.net)}</text>
-          <text x="467" y="${baseY + 22}" font-size="12" font-weight="600" fill="var(--o-text-main)" text-anchor="middle">Balance Neto</text>
-          <text x="467" y="${baseY + 38}" font-size="10" fill="var(--o-text-muted)" text-anchor="middle">Cajas / Bancos</text>
-        </g>
-      </svg>
+          <!-- Barra 3: Balance Neto -->
+          <g>
+            <rect x="425" y="${baseY - hNet}" width="85" height="${hNet}" rx="5" fill="${isNetPos ? '#0ea5e9' : '#f59e0b'}" />
+            <text x="467" y="${Math.max(25, baseY - hNet - 8)}" font-size="12" font-weight="700" fill="${isNetPos ? '#0ea5e9' : '#f59e0b'}" text-anchor="middle">${formatMoney(data.net)}</text>
+            <text x="467" y="${baseY + 22}" font-size="12" font-weight="600" fill="var(--o-text-main)" text-anchor="middle">Balance Neto</text>
+            <text x="467" y="${baseY + 38}" font-size="10" fill="var(--o-text-muted)" text-anchor="middle">Cajas / Bancos</text>
+          </g>
+        </svg>
+      </div>
     `;
   }
 
@@ -128,6 +134,100 @@
         ${polylineSvg}
         ${dotsSvg}
       </svg>
+    `;
+  }
+
+  function generateFlowDistributionDonutSvg(kpis) {
+    const k = kpis || {};
+    const collected = Number(k.collected_revenue || 0);
+    const pending = Number(k.receivables_residual || 0);
+    const expenses = Number(k.expenses_paid_total || 0);
+    const totalVolume = collected + pending + expenses;
+
+    if (totalVolume <= 0) {
+      return `
+        <div style="background: var(--o-view-bg); border: 1px dashed var(--o-border-color); border-radius: 8px; padding: 2.5rem; text-align: center;">
+          <h4 style="font-size: 1rem; margin-bottom: 0.35rem;">Distribución General de Flujos</h4>
+          <p style="font-size: 0.85rem; color: var(--o-text-muted); margin: 0;">Sin movimientos de recaudos, cartera ni gastos registrados.</p>
+        </div>
+      `;
+    }
+
+    const pctCollected = totalVolume > 0 ? Math.round((collected / totalVolume) * 100) : 0;
+    const pctPending = totalVolume > 0 ? Math.round((pending / totalVolume) * 100) : 0;
+    const pctExpenses = totalVolume > 0 ? Math.max(0, 100 - pctCollected - pctPending) : 0;
+
+    const items = [
+      { name: 'Total Recaudos', label: 'Cobros Reales', amount: collected, percentage: pctCollected, color: '#10b981' },
+      { name: 'Por Recaudar', label: 'Cartera Clientes', amount: pending, percentage: pctPending, color: '#0ea5e9' },
+      { name: 'Gastos', label: 'Total Gastos y Compras', amount: expenses, percentage: pctExpenses, color: '#ef4444' }
+    ];
+
+    const r = 64;
+    const circ = 2 * Math.PI * r;
+    let accumulatedPct = 0;
+
+    const circlesSvg = items.filter(it => it.amount > 0).map((it) => {
+      const pct = Math.max(0, Math.min(100, Number(it.percentage || 0)));
+      const strokeDash = (pct / 100) * circ;
+      const strokeOffset = -((accumulatedPct / 100) * circ);
+      accumulatedPct += pct;
+      return `<circle cx="95" cy="95" r="${r}" fill="none" stroke="${it.color}" stroke-width="24" stroke-dasharray="${strokeDash.toFixed(2)} ${(circ - strokeDash).toFixed(2)}" stroke-dashoffset="${strokeOffset.toFixed(2)}" transform="rotate(-90 95 95)" />`;
+    }).join('');
+
+    return `
+      <div style="background: var(--o-view-bg); border: 1px solid var(--o-border-color); border-radius: 8px; padding: 1.5rem; max-width: 720px; margin: 0 auto;">
+        <div style="text-align: center; margin-bottom: 1.25rem;">
+          <h4 style="font-size: 1.05rem; margin: 0 0 0.25rem; font-weight: 700;">Distribución Global de Flujos</h4>
+          <span style="font-size: 0.82rem; color: var(--o-text-muted);">Proporción entre Recaudos Reales (Verde), Por Recaudar (Azul) y Gastos (Rojo)</span>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: center; gap: 2rem; flex-wrap: wrap;">
+          <div style="width: 190px; height: 190px; flex-shrink: 0; position: relative;">
+            <svg viewBox="0 0 190 190" style="width: 100%; height: 100%;" role="img" aria-label="Diagrama circular de distribución de flujos">
+              <circle cx="95" cy="95" r="${r}" fill="none" stroke="currentColor" stroke-opacity="0.08" stroke-width="24" />
+              ${circlesSvg}
+              <text x="95" y="88" font-size="10" font-weight="600" fill="var(--o-text-muted)" text-anchor="middle">Volumen Total</text>
+              <text x="95" y="107" font-size="12" font-weight="700" fill="var(--o-text-main)" text-anchor="middle">${formatMoney(totalVolume)}</text>
+            </svg>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 0.65rem; min-width: 270px; flex: 1;">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 0.85rem; border-radius: 6px; background: rgba(16, 185, 129, 0.08); border-left: 4px solid #10b981;">
+              <div>
+                <strong style="color: #10b981; display: block; font-size: 0.9rem;">Total Recaudos</strong>
+                <span style="font-size: 0.74rem; color: var(--o-text-muted);">Cobros Reales en Caja / Bancos</span>
+              </div>
+              <div style="text-align: right;">
+                <strong style="font-size: 0.95rem; color: #10b981;">${formatMoney(collected)}</strong>
+                <div style="font-size: 0.74rem; color: var(--o-text-muted); font-weight: 600;">${pctCollected}%</div>
+              </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 0.85rem; border-radius: 6px; background: rgba(14, 165, 233, 0.08); border-left: 4px solid #0ea5e9;">
+              <div>
+                <strong style="color: #0ea5e9; display: block; font-size: 0.9rem;">Por Recaudar</strong>
+                <span style="font-size: 0.74rem; color: var(--o-text-muted);">Cartera Pendiente por Cobrar</span>
+              </div>
+              <div style="text-align: right;">
+                <strong style="font-size: 0.95rem; color: #0ea5e9;">${formatMoney(pending)}</strong>
+                <div style="font-size: 0.74rem; color: var(--o-text-muted); font-weight: 600;">${pctPending}%</div>
+              </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 0.85rem; border-radius: 6px; background: rgba(239, 68, 68, 0.08); border-left: 4px solid #ef4444;">
+              <div>
+                <strong style="color: #ef4444; display: block; font-size: 0.9rem;">Gastos</strong>
+                <span style="font-size: 0.74rem; color: var(--o-text-muted);">Total de Gastos y Compras</span>
+              </div>
+              <div style="text-align: right;">
+                <strong style="font-size: 0.95rem; color: #ef4444;">${formatMoney(expenses)}</strong>
+                <div style="font-size: 0.74rem; color: var(--o-text-muted); font-weight: 600;">${pctExpenses}%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     `;
   }
 
@@ -270,10 +370,7 @@
             ${generateTrendSvg(kpis.monthly_financials)}
           </div>
           <div id="chartTabDistribution" style="display: none;">
-            <div class="o_donut_grid">
-              ${generateDonutSvg(kpis.inflow_by_account, 'Recaudos por Cuenta / Medio de Pago', 'Sin recaudos registrados este mes')}
-              ${generateDonutSvg(kpis.expense_breakdown, 'Gastos por Proveedor / Material', 'Sin compras registradas este mes')}
-            </div>
+            ${generateFlowDistributionDonutSvg(kpis)}
           </div>
         </div>
 

@@ -685,11 +685,18 @@ class ERPStore {
         .reduce((sum, p) => sum + Number(p.amount || 0), 0)
     );
 
-    const expensesPaidTotal = round2(
+    const totalExpensesAll = round2(
+      (this.data.expenses || [])
+        .filter((e) => e.state !== 'cancel')
+        .reduce((sum, e) => sum + Number(e.total_amount || 0), 0)
+    );
+    const paymentsOutTotal = round2(
       payments
         .filter((p) => p.payment_type === 'outbound' && p.state !== 'cancel')
         .reduce((sum, p) => sum + Number(p.amount || 0), 0)
     );
+    // El gasto siempre se asume pagado
+    const expensesPaidTotal = Math.max(totalExpensesAll, paymentsOutTotal);
 
     const netCashBalance = round2(collectedRevenue - expensesPaidTotal);
 
@@ -725,11 +732,18 @@ class ERPStore {
         .filter((p) => p.payment_type === 'inbound' && p.state !== 'cancel' && (p.date || '').startsWith(currentMonthKey))
         .reduce((sum, p) => sum + Number(p.amount || 0), 0)
     );
-    const monthOutflow = round2(
+    // Gastos del mes: toma el total de gastos ya que el gasto siempre se asume que está pagado
+    const monthExpensesTotal = round2(
+      (this.data.expenses || [])
+        .filter((e) => e.state !== 'cancel' && (e.date || '').startsWith(currentMonthKey))
+        .reduce((sum, e) => sum + Number(e.total_amount || 0), 0)
+    );
+    const monthOutPayments = round2(
       payments
         .filter((p) => p.payment_type === 'outbound' && p.state !== 'cancel' && (p.date || '').startsWith(currentMonthKey))
         .reduce((sum, p) => sum + Number(p.amount || 0), 0)
     );
+    const monthOutflow = Math.max(monthExpensesTotal, monthOutPayments);
     const monthMarginPct = monthInflow > 0 ? Math.round(((monthInflow - monthOutflow) / monthInflow) * 100) : 0;
 
     // 4. Gráfica 2: Histórico mensual últimos 6 meses
@@ -748,11 +762,17 @@ class ERPStore {
           .filter((p) => p.payment_type === 'inbound' && p.state !== 'cancel' && (p.date || '').startsWith(key))
           .reduce((sum, p) => sum + Number(p.amount || 0), 0)
       );
-      const mOut = round2(
+      const mExpensesTotal = round2(
+        (this.data.expenses || [])
+          .filter((e) => e.state !== 'cancel' && (e.date || '').startsWith(key))
+          .reduce((sum, e) => sum + Number(e.total_amount || 0), 0)
+      );
+      const mOutPayments = round2(
         payments
           .filter((p) => p.payment_type === 'outbound' && p.state !== 'cancel' && (p.date || '').startsWith(key))
           .reduce((sum, p) => sum + Number(p.amount || 0), 0)
       );
+      const mOut = Math.max(mExpensesTotal, mOutPayments);
       monthlyFinancials.push({
         key,
         label,
