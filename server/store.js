@@ -365,9 +365,13 @@ function areExpenseItemsSemanticEqual(itemsA = [], itemsB = []) {
   for (let i = 0; i < itemsA.length; i++) {
     const a = itemsA[i];
     const b = itemsB[i];
-    if (Number(a.product_id) !== Number(b.product_id)) return false;
+    if (Number(a.product_id || 0) !== Number(b.product_id || 0)) return false;
     if (Number(a.quantity) !== Number(b.quantity)) return false;
-    if (Number(a.unit_amount) !== Number(b.unit_amount)) return false;
+    if (Number(a.price_unit || 0) !== Number(b.price_unit || 0)) return false;
+    if (Number(a.subtotal || 0) !== Number(b.subtotal || 0)) return false;
+    if (Number(a.tax_rate || 0) !== Number(b.tax_rate || 0)) return false;
+    if (Number(a.tax_amount || 0) !== Number(b.tax_amount || 0)) return false;
+    if (Number(a.total || 0) !== Number(b.total || 0)) return false;
     if (String(a.description || '').trim() !== String(b.description || '').trim()) return false;
   }
   return true;
@@ -1358,16 +1362,26 @@ class ERPStore {
     // Artículos estructurados del gasto (en tabla con descripción, cantidad, valor unitario y subtotal)
     const rawItems = Array.isArray(payload.items) && payload.items.length > 0 ? payload.items : null;
     let items = [];
+    // Si el gasto viene de una factura escaneada (literal) o los artículos traen IVA propio,
+    // se respetan literalmente los valores de la factura (sin recalcular).
+    const hasItemTax = Boolean(rawItems) && rawItems.some((it) => it.tax_rate !== undefined || it.tax_amount !== undefined || it.total !== undefined);
     if (rawItems) {
       items = rawItems.map((it, idx) => {
         const q = Math.max(0.001, Number(it.quantity ?? 1) || 1);
         const p = Math.max(0, Number(it.price_unit ?? 0) || 0);
+        const sub = round2(it.subtotal !== undefined && it.subtotal !== null ? Number(it.subtotal) : q * p);
+        const itRate = it.tax_rate !== undefined && it.tax_rate !== null && it.tax_rate !== '' ? Number(it.tax_rate) : (hasItemTax ? 0 : taxRate);
+        const itTax = it.tax_amount !== undefined && it.tax_amount !== null && it.tax_amount !== '' ? round2(Number(it.tax_amount)) : round2(sub * (itRate / 100));
+        const itTotal = it.total !== undefined && it.total !== null && it.total !== '' && Number(it.total) > 0 ? round2(Number(it.total)) : round2(sub + itTax);
         return {
           id: it.id || idx + 1,
           description: String(it.description || it.name || name).trim(),
           quantity: q,
           price_unit: p,
-          subtotal: round2(it.subtotal !== undefined ? Number(it.subtotal) : q * p)
+          tax_rate: itRate,
+          tax_amount: itTax,
+          subtotal: sub,
+          total: itTotal
         };
       });
     } else {
@@ -1377,15 +1391,36 @@ class ERPStore {
           description: name,
           quantity,
           price_unit: priceUnit,
-          subtotal: round2(quantity * priceUnit)
+          tax_rate: taxRate,
+          tax_amount: round2(quantity * priceUnit * (taxRate / 100)),
+          subtotal: round2(quantity * priceUnit),
+          total: round2(quantity * priceUnit * (1 + taxRate / 100))
         }
       ];
     }
 
-    const itemsSum = round2(items.reduce((s, it) => s + it.subtotal, 0));
-    const untaxed = itemsSum > 0 ? itemsSum : round2(quantity * priceUnit);
-    const taxAmount = round2(untaxed * (taxRate / 100));
-    const totalAmount = round2(untaxed + taxAmount);
+    const itemsSum = round2(items.reduce((acc, it) => acc + it.subtotal, 0));
+    let untaxed = itemsSum > 0 ? itemsSum : round2(quantity * priceUnit);
+    let taxAmount;
+    let totalAmount;
+    if (hasItemTax) {
+      taxAmount = round2(items.reduce((acc, it) => acc + it.tax_amount, 0));
+      totalAmount = round2(items.reduce((acc, it) => acc + it.total, 0));
+    } else {
+      taxAmount = round2(untaxed * (taxRate / 100));
+      totalAmount = round2(untaxed + taxAmount);
+    }
+    // Totales literales impresos al pie de la factura escaneada
+    if (payload.literal_totals) {
+      const lTotal = Number(payload.total_amount);
+      if (Number.isFinite(lTotal) && lTotal > 0) {
+        totalAmount = round2(lTotal);
+        const lTax = Number(payload.tax_amount);
+        taxAmount = Number.isFinite(lTax) && lTax >= 0 ? round2(lTax) : taxAmount;
+        const lSub = Number(payload.untaxed_amount);
+        untaxed = Number.isFinite(lSub) && lSub > 0 ? round2(lSub) : round2(totalAmount - taxAmount);
+      }
+    }
 
     const product = this.data.products.find((p) => Number(p.id) === Number(payload.product_id));
     let partner = this.data.contacts.find((c) => Number(c.id) === Number(payload.partner_id));
@@ -1509,9 +1544,11 @@ class ERPStore {
         quantity: it.quantity,
         price_unit: it.price_unit,
         discount: 0,
-        tax_rate: taxRate,
+        tax_rate: it.tax_rate !== undefined ? it.tax_rate : taxRate,
         subtotal: it.subtotal,
-        tax_amount: round2(it.subtotal * (taxRate / 100))
+        tax_amount: it.tax_amount !== undefined ? it.tax_amount : round2(it.subtotal * (taxRate / 100)),
+        literal_subtotal: it.subtotal,
+        literal_tax: it.tax_amount !== undefined ? it.tax_amount : round2(it.subtotal * (taxRate / 100))
       }));
 
       const vendorBill = await this.saveAccountMove({
@@ -2238,8 +2275,11 @@ class ERPStore {
       const taxRate = Number(l.tax_rate ?? 19);
       if (!Number.isFinite(qty) || qty <= 0) throw new Error(`Cantidad inválida en línea ${idx + 1}.`);
       if (!Number.isFinite(price) || price < 0) throw new Error(`Precio inválido en línea ${idx + 1}.`);
-      const subtotal = round2(qty * price);
-      const taxAmount = round2(subtotal * (taxRate / 100));
+      const hasLiteral = l.literal_subtotal !== undefined && l.literal_subtotal !== null;
+      const subtotal = hasLiteral ? round2(Number(l.literal_subtotal)) : round2(qty * price);
+      const taxAmount = hasLiteral && l.literal_tax !== undefined && l.literal_tax !== null
+        ? round2(Number(l.literal_tax))
+        : round2(subtotal * (taxRate / 100));
       const total = round2(subtotal + taxAmount);
       return {
         id: idx + 1,

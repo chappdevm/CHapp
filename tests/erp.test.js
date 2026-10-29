@@ -1779,6 +1779,75 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     }
   });
 
+  it('Module 2 (Gastos): factura escaneada conserva literalmente IVA por producto, subtotales y totales impresos', async () => {
+    const { normalizeInvoiceData, parseNumber } = require('../server/gemini');
+
+    assert.equal(parseNumber('1.234.567,50'), 1234567.5);
+    assert.equal(parseNumber('$ 45.000'), 45000);
+    assert.equal(parseNumber('19'), 19);
+
+    const scanned = normalizeInvoiceData({
+      supplier_name: 'Ferreteria Test',
+      total_amount: '151.600',
+      tax_amount: '24.200',
+      subtotal_amount: '127.400',
+      items: [
+        { description: 'Tubo PVC 1/2 x 6m', quantity: 2, price_unit: '12.500', tax_rate: 19, tax_amount: '4.750', subtotal: '25.000', total: '29.750' },
+        { description: 'Cemento gris 50kg', quantity: 3, price_unit: '34.133', tax_rate: '19', subtotal: '102.400' }
+      ]
+    });
+    assert.equal(scanned.items.length, 2);
+    assert.equal(scanned.items[0].description, 'Tubo PVC 1/2 x 6m');
+    assert.equal(scanned.items[0].tax_amount, 4750);
+    assert.equal(scanned.items[0].total, 29750);
+    // Si el documento no trae IVA/total de la línea, solo se rellena el hueco
+    assert.equal(scanned.items[1].subtotal, 102400);
+    assert.equal(scanned.items[1].tax_amount, 19456);
+    assert.equal(scanned.items[1].total, 121856);
+    // Totales de la factura: literales, no recalculados
+    assert.equal(scanned.total_amount, 151600);
+    assert.equal(scanned.tax_amount, 24200);
+    assert.equal(scanned.subtotal_amount, 127400);
+
+    const saved = await req('/api/expenses', 'POST', {
+      name: 'Compra ferreteria',
+      partner_name: 'Ferreteria Test',
+      supplier_vat: '900.555.444-1',
+      quantity: 1,
+      price_unit: 151600,
+      total_amount: 151600,
+      untaxed_amount: 127400,
+      tax_amount: 24200,
+      literal_totals: true,
+      items: scanned.items
+    });
+    assert.equal(saved.status, 200);
+    const exp = saved.json.expense;
+    assert.equal(exp.total_amount, 151600);
+    assert.equal(exp.tax_amount, 24200);
+    assert.equal(exp.untaxed_amount, 127400);
+    assert.equal(exp.items[0].tax_rate, 19);
+    assert.equal(exp.items[0].tax_amount, 4750);
+    assert.equal(exp.items[0].total, 29750);
+    assert.equal(exp.items[1].total, 121856);
+
+    // Sin totales literales: suma de IVA y totales por producto (sin tasa global)
+    const saved2 = await req('/api/expenses', 'POST', {
+      name: 'Compra mixta',
+      partner_name: 'Ferreteria Test',
+      quantity: 1,
+      price_unit: 1,
+      items: [
+        { description: 'Gravado', quantity: 1, price_unit: 100000, tax_rate: 19, tax_amount: 19000, subtotal: 100000, total: 119000 },
+        { description: 'Exento', quantity: 1, price_unit: 50000, tax_rate: 0, tax_amount: 0, subtotal: 50000, total: 50000 }
+      ]
+    });
+    assert.equal(saved2.status, 200);
+    assert.equal(saved2.json.expense.untaxed_amount, 150000);
+    assert.equal(saved2.json.expense.tax_amount, 19000);
+    assert.equal(saved2.json.expense.total_amount, 169000);
+  });
+
   it('Module 3 (Ventas): Pedidos de venta confirmados bloquean edición de cliente y productos, y se remueven instrucciones bancarias de representaciones gráficas', async () => {
     const jsText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
 

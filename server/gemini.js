@@ -11,6 +11,94 @@ function getGeminiApiKey() {
   return envKey || DEFAULT_GEMINI_KEY;
 }
 
+
+function parseNumber(v) {
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  let s = String(v).replace(/[^0-9,.\-]/g, '');
+  if (!s || s === '-' || s === '.' || s === ',') return null;
+  const hasDot = s.includes('.');
+  const hasComma = s.includes(',');
+  if (hasDot && hasComma) {
+    if (s.lastIndexOf(',') > s.lastIndexOf('.')) s = s.replace(/\./g, '').replace(',', '.');
+    else s = s.replace(/,/g, '');
+  } else if (hasComma) {
+    s = /,\d{1,2}$/.test(s) && s.split(',').length === 2 ? s.replace(',', '.') : s.replace(/,/g, '');
+  } else if (hasDot) {
+    const parts = s.split('.');
+    if (parts.length > 2 || /\.\d{3}$/.test(s)) s = s.replace(/\./g, '');
+  }
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
+const r2 = (n) => Math.round(n * 100) / 100;
+
+function snapTaxRate(rate) {
+  if (rate === null || rate === undefined) return null;
+  for (const std of [0, 5, 19]) {
+    if (Math.abs(rate - std) <= 0.6) return std;
+  }
+  return r2(rate);
+}
+
+// Normaliza la respuesta de la IA sin sobrescribir lo que viene impreso en la factura:
+// solo rellena huecos cuando el documento no trae el dato.
+function normalizeInvoiceData(data) {
+  const out = { ...(data || {}) };
+  const rawItems = Array.isArray(out.items) ? out.items : [];
+  out.items = rawItems
+    .map((it) => {
+      const quantity = parseNumber(it.quantity);
+      const qty = quantity && quantity > 0 ? quantity : 1;
+      let priceUnit = parseNumber(it.price_unit);
+      let subtotal = parseNumber(it.subtotal);
+      let taxRate = parseNumber(it.tax_rate);
+      let taxAmount = parseNumber(it.tax_amount);
+      let total = parseNumber(it.total);
+
+      if (taxRate === null && taxAmount !== null && taxAmount > 0 && subtotal) {
+        taxRate = snapTaxRate((taxAmount / subtotal) * 100);
+      }
+      if (subtotal === null && total !== null && taxRate !== null) subtotal = r2(total / (1 + taxRate / 100));
+      if (subtotal === null && priceUnit !== null) subtotal = r2(qty * priceUnit);
+      if (priceUnit === null && subtotal !== null) priceUnit = r2(subtotal / qty);
+      if (taxRate !== null) taxRate = snapTaxRate(taxRate);
+      if (taxAmount === null && taxRate !== null && subtotal !== null) taxAmount = r2(subtotal * (taxRate / 100));
+      if (total === null && subtotal !== null) total = r2(subtotal + (taxAmount || 0));
+
+      return {
+        description: String(it.description || it.name || '').trim(),
+        quantity: qty,
+        price_unit: priceUnit || 0,
+        tax_rate: taxRate === null ? 0 : taxRate,
+        tax_amount: taxAmount === null ? 0 : taxAmount,
+        subtotal: subtotal || 0,
+        total: total || 0
+      };
+    })
+    .filter((it) => it.description || it.subtotal || it.price_unit);
+
+  const sumSub = r2(out.items.reduce((s, it) => s + it.subtotal, 0));
+  const sumTax = r2(out.items.reduce((s, it) => s + it.tax_amount, 0));
+  const sumTotal = r2(out.items.reduce((s, it) => s + it.total, 0));
+
+  let subtotalAmount = parseNumber(out.subtotal_amount);
+  let taxAmountInv = parseNumber(out.tax_amount);
+  let totalAmount = parseNumber(out.total_amount);
+  if (totalAmount === null) totalAmount = out.items.length ? sumTotal : null;
+  if (subtotalAmount === null) subtotalAmount = out.items.length ? sumSub : null;
+  if (taxAmountInv === null) {
+    taxAmountInv = out.items.length ? sumTax : (totalAmount !== null && subtotalAmount !== null ? r2(totalAmount - subtotalAmount) : null);
+  }
+
+  out.subtotal_amount = subtotalAmount === null ? 0 : subtotalAmount;
+  out.tax_amount = taxAmountInv === null ? 0 : taxAmountInv;
+  out.total_amount = totalAmount === null ? 0 : totalAmount;
+  out.literal = true;
+  return out;
+}
+
 async function analyzeInvoiceImage(base64Image, mimeType = 'image/jpeg') {
   const apiKey = getGeminiApiKey();
   if (!apiKey) {
@@ -33,28 +121,38 @@ async function analyzeInvoiceImage(base64Image, mimeType = 'image/jpeg') {
     throw new Error('La imagen de la factura está vacía o es inválida.');
   }
 
-  const prompt = `Analiza esta imagen de una factura, recibo o comprobante de compra o gasto de un proveedor.
-Extrae la información contable y responde EXCLUSIVAMENTE con un JSON válido (sin formato markdown ni texto adicional) con la siguiente estructura:
+  const prompt = `Eres un sistema de OCR contable. Analiza la imagen de una factura, recibo o comprobante de compra de un proveedor y TRANSCRIBE LITERALMENTE lo que está impreso.
+REGLAS ESTRICTAS:
+- NO calcules, NO redondees, NO corrijas, NO inventes valores. Copia cada cifra EXACTAMENTE como aparece en el documento.
+- Cada fila de la tabla de productos de la factura debe ser un elemento de "items", en el mismo orden, con su MISMA descripción (texto completo tal cual, sin resumir).
+- Si el documento muestra una columna de IVA / impuesto (porcentaje o valor) por producto, cópiala en tax_rate / tax_amount de ese producto. Si el IVA aparece solo de forma global y todos los productos lo comparten, aplica ese porcentaje a cada producto en tax_rate y deja tax_amount como esté impreso por línea (o 0 si no se imprime por línea).
+- price_unit = valor unitario impreso. subtotal = valor de la línea ANTES de IVA tal como se imprime. total = valor de la línea CON IVA si el documento lo imprime (si no lo imprime, pon null).
+- Los totales de la factura (subtotal_amount, tax_amount, total_amount) deben ser los impresos al pie del documento, no los calculados por ti. Si algún valor no existe en el documento, pon null.
+- Los números deben ser JSON numéricos en pesos colombianos sin símbolos ni separadores de miles (ej: 1.234.567,50 -> 1234567.5). Cantidad como número.
+Responde EXCLUSIVAMENTE con un JSON válido (sin markdown ni texto adicional) con esta estructura:
 {
   "name": "Descripción clara y global del gasto (ej: Materiales de Ferretería, Repuestos, Gasolina)",
   "supplier_name": "Nombre o Razón Social del Proveedor / Establecimiento emisor",
-  "supplier_vat": "NIT o Documento de identificación del proveedor si está visible (ej: 900.123.456-7)",
+  "supplier_vat": "NIT o documento del proveedor si está visible (ej: 900.123.456-7)",
   "reference": "Número de factura o comprobante (ej: FE-1234, FACT-890, REC-45)",
-  "date": "Fecha de la factura en formato YYYY-MM-DD (ej: 2026-10-27). Si no tiene año pon 2026",
+  "date": "Fecha de la factura en formato YYYY-MM-DD. Si no tiene año pon 2026",
   "category": "Una de: Materiales, Herramientas, Transporte, Alimentación, Servicios, Mantenimiento, General",
-  "total_amount": 0,
+  "subtotal_amount": 0,
   "tax_amount": 0,
+  "total_amount": 0,
   "items": [
     {
-      "description": "Descripción o nombre del producto/artículo",
+      "description": "Descripción exacta del producto/artículo tal como sale en la factura",
       "quantity": 1,
       "price_unit": 0,
-      "subtotal": 0
+      "tax_rate": 0,
+      "tax_amount": 0,
+      "subtotal": 0,
+      "total": 0
     }
   ],
   "notes": "Observaciones generales de la factura (NO incluir la lista de artículos ni el NIT aquí)"
-}
-Nota: total_amount y los subtotales/precios deben ser números en pesos colombianos, sin símbolos de moneda. Si la factura tiene varios productos o ítems detallados, extráelos todos en el arreglo 'items'.`;
+}`;
 
   const models = ['gemini-3.5-flash', 'gemini-3.7-flash', 'gemini-flash-latest', 'gemini-3.8-flash'];
   let lastError = null;
@@ -62,7 +160,7 @@ Nota: total_amount y los subtotales/precios deben ser números en pesos colombia
   for (const model of models) {
     try {
       const result = await makeGeminiRequest(model, apiKey, prompt, cleanBase64, mimeType);
-      if (result) return result;
+      if (result) return normalizeInvoiceData(result);
     } catch (err) {
       lastError = err;
       console.warn(`[Gemini Vision] Fallo con ${model}:`, err.message);
@@ -89,7 +187,7 @@ function makeGeminiRequest(model, apiKey, prompt, base64Data, mimeType) {
         }
       ],
       generationConfig: {
-        temperature: 0.1,
+        temperature: 0,
         response_mime_type: 'application/json'
       }
     });
@@ -139,5 +237,7 @@ function makeGeminiRequest(model, apiKey, prompt, base64Data, mimeType) {
 
 module.exports = {
   getGeminiApiKey,
-  analyzeInvoiceImage
+  analyzeInvoiceImage,
+  normalizeInvoiceData,
+  parseNumber
 };
