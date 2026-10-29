@@ -143,30 +143,31 @@
               </div>
 
               <div class="o_form_sheet">
-                ${
-                  !isNew && existing.invoice_ids && existing.invoice_ids.length > 0
-                    ? (() => {
-                        const moves = (state.data.accounting && state.data.accounting.moves) || [];
-                        const orderMoves = moves.filter((m) => (existing.invoice_ids || []).includes(m.id) && m.state !== 'cancel');
-                        const totalInvSum = orderMoves.reduce((s, m) => s + Number(m.amount_total || 0), 0);
-                        return `
-                  <div class="o_button_box">
-                    <button type="button" class="o_stat_button oe_stat_button" id="btnOpenSaleInvoice" title="Ver facturas generadas">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-                      <div class="o_stat_info">
-                        <span class="o_stat_value">${existing.invoice_ids.length} Factura(s)</span>
-                        <span class="o_stat_text">Total: ${formatMoney(totalInvSum)}</span>
-                      </div>
-                    </button>
+                <div class="o_form_header_row" style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--o-border-color); padding-bottom: 0.85rem;">
+                  <div class="o_form_title_group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--o-text-muted); font-weight: 700; display: block; margin-bottom: 0.25rem;">Documento de Venta</label>
+                    <div class="o_sale_doc_name" style="font-size: 2.1rem; font-weight: 800; color: var(--o-heading, #074073); line-height: 1.15; letter-spacing: -0.01em;">${esc(existing.name)}</div>
                   </div>
-                `;
-                      })()
-                    : ''
-                }
-
-                <div class="o_form_title_group">
-                  <label>Documento de Venta</label>
-                  <div style="font-size: 1.5rem; font-weight: 700;">${esc(existing.name)}</div>
+                  ${
+                    !isNew && existing.invoice_ids && existing.invoice_ids.length > 0
+                      ? (() => {
+                          const moves = (state.data.accounting && state.data.accounting.moves) || [];
+                          const orderMoves = moves.filter((m) => (existing.invoice_ids || []).includes(m.id) && m.state !== 'cancel');
+                          const totalInvSum = orderMoves.reduce((s, m) => s + Number(m.amount_total || 0), 0);
+                          return `
+                    <div class="o_button_box" style="margin-bottom: 0; padding-bottom: 0; border-bottom: none;">
+                      <button type="button" class="o_stat_button oe_stat_button" id="btnOpenSaleInvoice" title="Ver facturas generadas">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                        <div class="o_stat_info">
+                          <span class="o_stat_value">${existing.invoice_ids.length} Factura(s)</span>
+                          <span class="o_stat_text">Total: ${formatMoney(totalInvSum)}</span>
+                        </div>
+                      </button>
+                    </div>
+                  `;
+                        })()
+                      : ''
+                  }
                 </div>
 
                 <div class="o_group">

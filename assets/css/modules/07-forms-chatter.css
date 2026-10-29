@@ -77,6 +77,23 @@
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
 }
 
+.o_form_header_row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid var(--o-border-color);
+  padding-bottom: 0.85rem;
+}
+
+.o_form_header_row .o_button_box {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
 .o_button_box {
   display: flex;
   flex-wrap: wrap;
