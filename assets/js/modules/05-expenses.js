@@ -358,16 +358,14 @@
               </div>
 
               <div tabindex="0" role="region" aria-label="Tabla de productos del gasto" class="table-wrapper" style="margin-bottom: 0.75rem;">
-                <table class="o_list_table" id="expenseItemsTable" style="--label-2: 'Cantidad'; --label-3: 'Valor Unit.'; --label-4: 'IVA %'; --label-5: 'IVA $'; --label-6: 'Subtotal'; --label-7: 'Total'; --label-8: 'Acción';">
+                <table class="o_list_table" id="expenseItemsTable" style="--label-2: 'Cantidad'; --label-3: 'Valor Unit.'; --label-4: 'IVA %'; --label-5: 'Total'; --label-6: 'Acción';">
                   <thead>
                     <tr>
                       <th>Descripción del Producto / Artículo</th>
                       <th style="width: 90px;">Cantidad</th>
                       <th style="width: 130px;">Valor Unitario ($)</th>
-                      <th style="width: 80px;">IVA %</th>
-                      <th style="width: 120px;">IVA ($)</th>
-                      <th style="width: 130px;">Subtotal ($)</th>
-                      <th style="width: 130px;">Total con IVA ($)</th>
+                      <th style="width: 90px;">IVA %</th>
+                      <th style="width: 140px;">Total ($)</th>
                       <th style="width: 50px;"></th>
                     </tr>
                   </thead>
@@ -413,17 +411,35 @@
     const normalizeExpenseItem = (it) => {
       const qty = Number(it.quantity || 1);
       const price = Number(it.price_unit || 0);
-      const sub = it.subtotal !== undefined && it.subtotal !== null && it.subtotal !== '' ? Number(it.subtotal) : Math.round(qty * price * 100) / 100;
       const rate = Number(it.tax_rate || 0);
-      const tax = it.tax_amount !== undefined && it.tax_amount !== null && it.tax_amount !== '' ? Number(it.tax_amount) : Math.round(sub * rate) / 100;
-      const total = it.total !== undefined && it.total !== null && it.total !== '' && Number(it.total) > 0 ? Number(it.total) : Math.round((sub + tax) * 100) / 100;
-      return { ...it, description: it.description || it.name || '', quantity: qty, price_unit: price, tax_rate: rate, tax_amount: tax, subtotal: sub, total };
+      let total = it.total !== undefined && it.total !== null && it.total !== '' && Number(it.total) > 0
+        ? Number(it.total)
+        : (it.subtotal !== undefined && it.subtotal !== null && it.subtotal !== ''
+            ? Number(it.subtotal) + Number(it.tax_amount || 0)
+            : Math.round(qty * price * (1 + rate / 100) * 100) / 100);
+      total = Math.round(total * 100) / 100;
+      const sub = it.subtotal !== undefined && it.subtotal !== null && it.subtotal !== ''
+        ? Number(it.subtotal)
+        : (rate > 0 ? Math.round((total / (1 + rate / 100)) * 100) / 100 : total);
+      const tax = it.tax_amount !== undefined && it.tax_amount !== null && it.tax_amount !== ''
+        ? Number(it.tax_amount)
+        : Math.round((total - sub) * 100) / 100;
+      return {
+        ...it,
+        description: it.description || it.name || '',
+        quantity: qty,
+        price_unit: price || (qty > 0 ? Math.round((sub / qty) * 100) / 100 : 0),
+        tax_rate: rate,
+        tax_amount: tax,
+        subtotal: sub,
+        total: total
+      };
     };
     let expenseItems = (Array.isArray(existing.items) && existing.items.length > 0
       ? [...existing.items]
       : (draft && Array.isArray(draft.items) && draft.items.length > 0
           ? [...draft.items]
-          : [{ description: existing.name || '', quantity: existing.quantity || 1, price_unit: existing.price_unit || existing.total_amount || 0, subtotal: existing.total_amount || 0 }])
+          : [{ description: existing.name || '', quantity: existing.quantity || 1, price_unit: existing.price_unit || existing.total_amount || 0, total: existing.total_amount || 0 }])
     ).map(normalizeExpenseItem);
 
     // Totales literales impresos en la factura escaneada (se conservan hasta que el usuario edite los productos)
@@ -434,10 +450,8 @@
     const renderExpenseSummary = () => {
       const box = document.getElementById('expenseItemsSummary');
       if (!box) return;
-      const sub = literalTotals ? literalTotals.untaxed : round2c(expenseItems.reduce((a, it) => a + Number(it.subtotal || 0), 0));
-      const tax = literalTotals ? literalTotals.tax : round2c(expenseItems.reduce((a, it) => a + Number(it.tax_amount || 0), 0));
       const tot = literalTotals ? literalTotals.total : round2c(expenseItems.reduce((a, it) => a + Number(it.total || 0), 0));
-      box.innerHTML = `<span>Subtotal: <strong>${formatMoney(sub)}</strong></span><span>IVA: <strong>${formatMoney(tax)}</strong></span><span>Total: <strong style="color: #2563eb;">${formatMoney(tot)}</strong></span>`;
+      box.innerHTML = `<span>Total: <strong style="color: #2563eb; font-size: 1.05rem;">${formatMoney(tot)}</strong></span>`;
     };
 
     const renderExpenseItems = () => {
@@ -459,13 +473,7 @@
               <input type="number" class="o_input exp-item-field" data-field="tax_rate" data-idx="${idx}" min="0" step="any" value="${Number(it.tax_rate || 0)}" />
             </td>
             <td>
-              <input type="number" class="o_input exp-item-field" data-field="tax_amount" data-idx="${idx}" min="0" step="any" value="${Number(it.tax_amount || 0)}" />
-            </td>
-            <td>
-              <input type="number" class="o_input exp-item-field" data-field="subtotal" data-idx="${idx}" min="0" step="any" value="${Number(it.subtotal || 0)}" />
-            </td>
-            <td>
-              <input type="number" class="o_input exp-item-field" data-field="total" data-idx="${idx}" min="0" step="any" value="${Number(it.total || 0)}" />
+              <input type="number" class="o_input exp-item-field text-end" data-field="total" data-idx="${idx}" min="0" step="any" value="${Number(it.total || 0)}" style="font-weight: 600;" />
             </td>
             <td class="text-center">
               ${expenseItems.length > 1 ? `<button type="button" class="btn btn-sm btn-danger btn-remove-exp-item" data-idx="${idx}" title="Quitar ítem">Quitar</button>` : ''}
@@ -495,16 +503,38 @@
             const el = row.querySelector(`[data-field="${f}"]`);
             if (el) el.value = v;
           };
-          // Recalcula solo lo derivado del campo que el usuario editó; lo demás queda literal.
-          if (field === 'quantity' || field === 'price_unit') {
-            setField('subtotal', round2c(item.quantity * item.price_unit));
-            setField('tax_amount', round2c(item.subtotal * item.tax_rate / 100));
-            setField('total', round2c(item.subtotal + item.tax_amount));
+
+          if (field === 'total') {
+            // Usuario ajusta el total literal del renglón de la factura
+            const rate = Number(item.tax_rate || 0);
+            const sub = rate > 0 ? round2c(item.total / (1 + rate / 100)) : item.total;
+            item.subtotal = sub;
+            item.tax_amount = round2c(item.total - sub);
+            if (Number(item.quantity || 0) > 0 && !item.price_unit) {
+              setField('price_unit', round2c(sub / item.quantity));
+            }
+          } else if (field === 'quantity' || field === 'price_unit') {
+            const qty = Number(item.quantity || 0);
+            const price = Number(item.price_unit || 0);
+            const rate = Number(item.tax_rate || 0);
+            const sub = round2c(qty * price);
+            const tax = round2c(sub * (rate / 100));
+            item.subtotal = sub;
+            item.tax_amount = tax;
+            setField('total', round2c(sub + tax));
           } else if (field === 'tax_rate') {
-            setField('tax_amount', round2c(item.subtotal * item.tax_rate / 100));
-            setField('total', round2c(item.subtotal + item.tax_amount));
-          } else if (field === 'subtotal' || field === 'tax_amount') {
-            setField('total', round2c(item.subtotal + item.tax_amount));
+            const rate = Number(item.tax_rate || 0);
+            if (item.total > 0 && (!item.price_unit || !item.quantity)) {
+              const sub = rate > 0 ? round2c(item.total / (1 + rate / 100)) : item.total;
+              item.subtotal = sub;
+              item.tax_amount = round2c(item.total - sub);
+            } else {
+              const sub = round2c(Number(item.quantity || 1) * Number(item.price_unit || 0));
+              const tax = round2c(sub * (rate / 100));
+              item.subtotal = sub;
+              item.tax_amount = tax;
+              setField('total', round2c(sub + tax));
+            }
           }
           literalTotals = null;
           recalcExpenseTotal();
@@ -704,16 +734,26 @@
           const suppVatInput = document.getElementById('fExpPartnerVat') ? document.getElementById('fExpPartnerVat').value.trim() : '';
 
           // Collect items from table
-          const cleanItems = expenseItems.filter(it => it.description || it.price_unit > 0 || it.subtotal > 0).map((it, idx) => ({
-            id: idx + 1,
-            description: it.description || name,
-            quantity: Number(it.quantity || 1),
-            price_unit: Number(it.price_unit || 0),
-            tax_rate: Number(it.tax_rate || 0),
-            tax_amount: Number(it.tax_amount || 0),
-            subtotal: Number(it.subtotal || 0),
-            total: Number(it.total || 0)
-          }));
+          const cleanItems = expenseItems.filter(it => it.description || it.price_unit > 0 || it.total > 0 || it.subtotal > 0).map((it, idx) => {
+            const rate = Number(it.tax_rate || 0);
+            const tot = Number(it.total || 0);
+            const sub = it.subtotal !== undefined && it.subtotal !== null && it.subtotal > 0
+              ? Number(it.subtotal)
+              : (rate > 0 ? round2c(tot / (1 + rate / 100)) : tot);
+            const tax = it.tax_amount !== undefined && it.tax_amount !== null && it.tax_amount > 0
+              ? Number(it.tax_amount)
+              : round2c(tot - sub);
+            return {
+              id: idx + 1,
+              description: it.description || name,
+              quantity: Number(it.quantity || 1),
+              price_unit: Number(it.price_unit || 0) || (Number(it.quantity || 1) > 0 ? round2c(sub / Number(it.quantity || 1)) : 0),
+              tax_rate: rate,
+              tax_amount: tax,
+              subtotal: sub,
+              total: tot
+            };
+          });
           const useLiteral = Boolean(literalTotals && Math.abs(literalTotals.total - totalAmount) < 0.01);
 
           const payload = {

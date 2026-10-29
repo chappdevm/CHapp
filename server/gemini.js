@@ -60,10 +60,12 @@ function normalizeInvoiceData(data) {
       if (taxRate === null && taxAmount !== null && taxAmount > 0 && subtotal) {
         taxRate = snapTaxRate((taxAmount / subtotal) * 100);
       }
-      if (subtotal === null && total !== null && taxRate !== null) subtotal = r2(total / (1 + taxRate / 100));
+      if (taxRate !== null) taxRate = snapTaxRate(taxRate);
+      if (subtotal === null && total !== null) {
+        subtotal = taxRate ? r2(total / (1 + taxRate / 100)) : total;
+      }
       if (subtotal === null && priceUnit !== null) subtotal = r2(qty * priceUnit);
       if (priceUnit === null && subtotal !== null) priceUnit = r2(subtotal / qty);
-      if (taxRate !== null) taxRate = snapTaxRate(taxRate);
       if (taxAmount === null && taxRate !== null && subtotal !== null) taxAmount = r2(subtotal * (taxRate / 100));
       if (total === null && subtotal !== null) total = r2(subtotal + (taxAmount || 0));
 
@@ -77,7 +79,7 @@ function normalizeInvoiceData(data) {
         total: total || 0
       };
     })
-    .filter((it) => it.description || it.subtotal || it.price_unit);
+    .filter((it) => it.description || it.total || it.subtotal || it.price_unit);
 
   const sumSub = r2(out.items.reduce((s, it) => s + it.subtotal, 0));
   const sumTax = r2(out.items.reduce((s, it) => s + it.tax_amount, 0));
@@ -125,9 +127,13 @@ async function analyzeInvoiceImage(base64Image, mimeType = 'image/jpeg') {
 REGLAS ESTRICTAS:
 - NO calcules, NO redondees, NO corrijas, NO inventes valores. Copia cada cifra EXACTAMENTE como aparece en el documento.
 - Cada fila de la tabla de productos de la factura debe ser un elemento de "items", en el mismo orden, con su MISMA descripción (texto completo tal cual, sin resumir).
-- Si el documento muestra una columna de IVA / impuesto (porcentaje o valor) por producto, cópiala en tax_rate / tax_amount de ese producto. Si el IVA aparece solo de forma global y todos los productos lo comparten, aplica ese porcentaje a cada producto en tax_rate y deja tax_amount como esté impreso por línea (o 0 si no se imprime por línea).
-- price_unit = valor unitario impreso. subtotal = valor de la línea ANTES de IVA tal como se imprime. total = valor de la línea CON IVA si el documento lo imprime (si no lo imprime, pon null).
-- Los totales de la factura (subtotal_amount, tax_amount, total_amount) deben ser los impresos al pie del documento, no los calculados por ti. Si algún valor no existe en el documento, pon null.
+- Para cada producto/artículo extrae:
+  * description: Nombre o descripción exacta del producto tal como sale en la factura.
+  * quantity: Cantidad de unidades (número).
+  * price_unit: Valor unitario impreso (si está visible; si no, 0).
+  * tax_rate: Porcentaje de IVA aplicable al producto (ej: 0, 5, 19). Solo porcentaje. Si el IVA es global, indícalo aquí.
+  * total: El valor total de ese producto tal como sale impreso en su renglón de la factura.
+- El total general de la factura ("total_amount") debe ser el valor total impreso al pie del documento (el valor total de todo). Si la factura tiene subtotal o impuesto global impreso, colócalos en subtotal_amount y tax_amount; si no, déjalos en null.
 - Los números deben ser JSON numéricos en pesos colombianos sin símbolos ni separadores de miles (ej: 1.234.567,50 -> 1234567.5). Cantidad como número.
 Responde EXCLUSIVAMENTE con un JSON válido (sin markdown ni texto adicional) con esta estructura:
 {
@@ -146,8 +152,6 @@ Responde EXCLUSIVAMENTE con un JSON válido (sin markdown ni texto adicional) co
       "quantity": 1,
       "price_unit": 0,
       "tax_rate": 0,
-      "tax_amount": 0,
-      "subtotal": 0,
       "total": 0
     }
   ],

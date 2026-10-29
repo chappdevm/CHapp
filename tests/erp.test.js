@@ -1846,6 +1846,14 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.equal(saved2.json.expense.untaxed_amount, 150000);
     assert.equal(saved2.json.expense.tax_amount, 19000);
     assert.equal(saved2.json.expense.total_amount, 169000);
+
+    // Verificación de contrato frontend: la tabla muestra solo IVA% y Total ($)
+    const jsTextExp = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
+    assert.ok(jsTextExp.includes('>IVA %</th>'), 'La tabla de productos debe mostrar columna IVA %');
+    assert.ok(jsTextExp.includes('>Total ($)</th>'), 'La tabla de productos debe mostrar columna Total ($)');
+    assert.ok(!jsTextExp.includes('>IVA ($)</th>'), 'La tabla de productos NO debe duplicar IVA con columna IVA ($)');
+    assert.ok(!jsTextExp.includes('>Subtotal ($)</th>'), 'La tabla de productos NO debe mostrar columna separada Subtotal ($)');
+    assert.ok(!jsTextExp.includes('>Total con IVA ($)</th>'), 'La tabla de productos NO debe mostrar columna Total con IVA ($)');
   });
 
   it('Module 3 (Ventas): Pedidos de venta confirmados bloquean edición de cliente y productos, y se remueven instrucciones bancarias de representaciones gráficas', async () => {
