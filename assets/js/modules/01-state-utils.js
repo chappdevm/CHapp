@@ -117,6 +117,15 @@
     return `${sym} ${Math.round(num).toLocaleString('es-CO')}`;
   }
 
+  function formatUomShort(uom) {
+    if (!uom) return 'm²';
+    const s = String(uom).toLowerCase().trim();
+    if (s.includes('cuadrado') || s.includes('m2') || s.includes('m²')) return 'm²';
+    if (s.includes('lineal') || s.includes('liso') || s === 'metro' || s === 'm') return 'm';
+    if (s.includes('unidad') || s === 'und') return 'und';
+    return uom;
+  }
+
   function initials(name) {
     const parts = String(name || 'CH').trim().split(/\s+/);
     if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();

@@ -150,13 +150,14 @@
         <table class="o_pdf_items_table">
           <thead>
             <tr>
-              <th style="width: 32px; text-align: center;">#</th>
+              <th style="width: 28px; text-align: center;">#</th>
               <th>Concepto / Producto</th>
-              <th style="width: 75px; text-align: center;">Unidad</th>
-              <th style="width: 55px; text-align: center;">Cant.</th>
+              <th style="width: 60px; text-align: center;">Medida</th>
+              <th style="width: 65px; text-align: center;">Und. Medida</th>
+              <th style="width: 50px; text-align: center;">Cant.</th>
               <th style="width: 105px; text-align: right;">Vr. Unitario</th>
-              ${hasDiscounts ? '<th style="width: 60px; text-align: center;">Dcto.</th>' : ''}
-              <th style="width: 65px; text-align: center;">IVA</th>
+              ${hasDiscounts ? '<th style="width: 55px; text-align: center;">Dcto.</th>' : ''}
+              <th style="width: 55px; text-align: center;">IVA</th>
               <th style="width: 110px; text-align: right;">Subtotal</th>
             </tr>
           </thead>
@@ -167,12 +168,14 @@
               const disc = Number(l.discount || 0);
               const calcSub = l.subtotal !== undefined && l.subtotal !== null ? Number(l.subtotal) : (qty * price * (1 - disc / 100));
               const prodName = l.product_name || l.name || 'Producto / Servicio';
-              const prodDesc = l.description && l.description !== prodName ? `<div style="font-size: 0.75rem; color: #64748b; font-weight: normal; margin-top: 2px;">${esc(l.description)}</div>` : '';
+              const measureVal = l.measure !== undefined && l.measure !== null ? Number(l.measure) : 1;
+              const uomDisplay = typeof formatUomShort === 'function' ? formatUomShort(l.uom) : (l.uom || 'm²');
               return `
                 <tr>
                   <td class="text-center" style="color: #64748b;">${idx + 1}</td>
-                  <td><strong>${esc(prodName)}</strong>${prodDesc}</td>
-                  <td class="text-center" style="color: #64748b;">${esc(l.uom || (prodName && prodName.toLowerCase().includes('perfil') ? 'Metro Lineal' : 'Und'))}</td>
+                  <td><strong>${esc(prodName)}</strong></td>
+                  <td class="text-center" style="font-weight: 600; color: #0f172a;">${measureVal}</td>
+                  <td class="text-center" style="font-weight: 700; color: #074073;">${esc(uomDisplay)}</td>
                   <td class="text-center">${qty}</td>
                   <td class="text-end">${formatMoney(price)}</td>
                   ${hasDiscounts ? `<td class="text-center" style="color: ${disc > 0 ? '#b91c1c' : '#64748b'};">${disc > 0 ? `-${disc}%` : '0%'}</td>` : ''}

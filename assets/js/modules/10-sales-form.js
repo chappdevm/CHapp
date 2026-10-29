@@ -225,7 +225,7 @@
                       <tr>
                         <th>Producto / Servicio</th>
                         <th style="width: 95px;">Medida</th>
-                        <th style="width: 140px;">Unidad de Medida</th>
+                        <th style="width: 85px; text-align: center;">Und. Medida</th>
                         <th style="width: 135px;">Precio Unit.</th>
                         <th style="width: 85px;">Cant.</th>
                         <th style="width: 80px;">Desc.%</th>
@@ -254,7 +254,7 @@
                               </select>
                             </th>
                             <td><input type="number" class="o_input line-measure" data-idx="${idx}" min="0" step="any" value="${measureVal}" ${!isEditable ? 'readonly' : ''} /></td>
-                            <td><input type="text" class="o_input line-uom" data-idx="${idx}" value="${esc(uomName)}" readonly style="background: var(--o-bg-subtle, #f8fafc); color: var(--o-text-muted, #64748b); font-weight: 500;" /></td>
+                            <td style="text-align: center;"><input type="text" class="o_input line-uom" data-idx="${idx}" value="${esc(formatUomShort(uomName))}" readonly style="background: var(--o-bg-subtle, #f8fafc); color: #074073; font-weight: 700; text-align: center;" /></td>
                             <td><input type="number" class="o_input line-price" data-idx="${idx}" min="0" step="any" value="${Number(l.price_unit || 0)}" ${!isEditable ? 'readonly' : ''} /></td>
                             <td><input type="number" class="o_input line-qty" data-idx="${idx}" min="1" step="any" value="${Number(l.quantity || 1)}" ${!isEditable ? 'readonly' : ''} /></td>
                             <td><input type="number" class="o_input line-disc" data-idx="${idx}" min="0" max="100" step="any" value="${Number(l.discount || 0)}" ${!isEditable ? 'readonly' : ''} /></td>

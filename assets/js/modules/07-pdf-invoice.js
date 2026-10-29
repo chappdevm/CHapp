@@ -377,7 +377,7 @@
                 <tr>
                   <td class="text-center" style="color: #64748b;">${idx + 1}</td>
                   <td><strong>${esc(l.name)}</strong></td>
-                  <td class="text-center" style="color: #64748b;">${esc(l.uom || (l.name && l.name.toLowerCase().includes('perfil') ? 'Metro Lineal' : 'Und'))}</td>
+                  <td class="text-center" style="color: #64748b; font-weight: 600;">${esc(typeof formatUomShort === 'function' ? formatUomShort(l.uom) : (l.uom || (l.name && l.name.toLowerCase().includes('perfil') ? 'm' : 'und')))}</td>
                   <td class="text-center">${qty}</td>
                   <td class="text-end">${formatMoney(price)}</td>
                   ${hasDiscounts ? `<td class="text-center" style="color: ${disc > 0 ? '#b91c1c' : '#64748b'};">${disc > 0 ? `-${disc}%` : '0%'}</td>` : ''}
