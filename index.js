@@ -141,6 +141,24 @@ function createHandler(store = new ERPStore(undefined, { useSupabase: isSupabase
           return sendJson(res, 200, { ok: true, removed, state: store.getBootstrapState() });
         }
 
+        // Inventory
+        if (method === 'GET' && pathname === '/api/inventory') {
+          const summary = store.getInventorySummary ? store.getInventorySummary() : {};
+          return sendJson(res, 200, {
+            ok: true,
+            summary,
+            products: store.data.products || [],
+            moves: store.data.inventory_moves || []
+          });
+        }
+
+        if (method === 'GET' && pathname === '/api/inventory/moves') {
+          return sendJson(res, 200, {
+            ok: true,
+            moves: store.data.inventory_moves || []
+          });
+        }
+
         // Expenses AI Scan
         if (method === 'POST' && pathname === '/api/expenses/ai-scan') {
           const body = await readJsonBody(req);

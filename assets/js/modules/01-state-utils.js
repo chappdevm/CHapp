@@ -57,6 +57,18 @@
       ]
     },
     {
+      id: 'inventory',
+      name: 'Inventario',
+      icon: '/assets/icons/inventory.png',
+      xmlid: 'stock.menu_stock_root',
+      defaultSubmenu: 'stock',
+      defaultView: 'list',
+      submenus: [
+        { id: 'stock', label: 'Existencias (Stock)' },
+        { id: 'moves', label: 'Movimientos de Entrada' }
+      ]
+    },
+    {
       id: 'settings',
       name: 'Ajustes',
       icon: '/assets/icons/settings.png',

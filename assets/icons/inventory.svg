@@ -1,0 +1,40 @@
+<svg width="50" height="50" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="invDropShadow" x="-10%" y="-10%" width="125%" height="125%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+    <linearGradient id="invTop" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8"/>
+      <stop offset="100%" stop-color="#0284C7"/>
+    </linearGradient>
+    <linearGradient id="invLeft" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0284C7"/>
+      <stop offset="100%" stop-color="#0369A1"/>
+    </linearGradient>
+    <linearGradient id="invRight" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0369A1"/>
+      <stop offset="100%" stop-color="#075985"/>
+    </linearGradient>
+    <linearGradient id="tapeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FCD34D"/>
+      <stop offset="100%" stop-color="#F59E0B"/>
+    </linearGradient>
+  </defs>
+  <!-- Top Face -->
+  <polygon points="25,5 44,15 25,25 6,15" fill="url(#invTop)" filter="url(#invDropShadow)" stroke="rgba(255,255,255,0.4)" stroke-width="0.8"/>
+  <!-- Left Face -->
+  <polygon points="6,15 25,25 25,44 6,34" fill="url(#invLeft)" filter="url(#invDropShadow)"/>
+  <!-- Right Face -->
+  <polygon points="25,25 44,15 44,34 25,44" fill="url(#invRight)" filter="url(#invDropShadow)"/>
+  <!-- Package tape down the center -->
+  <polygon points="25,7 28,8.5 22,23.5 19,22" fill="url(#tapeGrad)" opacity="0.95"/>
+  <polygon points="23,24 27,26 27,44 23,43" fill="url(#tapeGrad)" opacity="0.9"/>
+  <!-- Up arrow on left face -->
+  <path d="M12,25 L15.5,22 L19,25" fill="none" stroke="#BAE6FD" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+  <line x1="15.5" y1="22" x2="15.5" y2="31" stroke="#BAE6FD" stroke-width="1.8" stroke-linecap="round" opacity="0.9"/>
+  <!-- Barcode on right face -->
+  <line x1="30" y1="27" x2="30" y2="35" stroke="#7DD3FC" stroke-width="1.5" opacity="0.85"/>
+  <line x1="33" y1="25.5" x2="33" y2="33.5" stroke="#7DD3FC" stroke-width="1" opacity="0.85"/>
+  <line x1="36" y1="24" x2="36" y2="32" stroke="#7DD3FC" stroke-width="2.2" opacity="0.85"/>
+  <line x1="39" y1="22.5" x2="39" y2="30.5" stroke="#7DD3FC" stroke-width="1.2" opacity="0.85"/>
+</svg>

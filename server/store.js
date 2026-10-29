@@ -253,7 +253,8 @@ function createInitialData() {
     ],
     "moves": [],
     "payments": []
-  }
+  },
+  "inventory_moves": []
 };
 }
 
@@ -405,6 +406,14 @@ class ERPStore {
             jList.push({ id: 6, code: 'DVP', name: 'Daviplata', type: 'bank', default_account: '111015', balance: 0, active: true });
           }
         }
+        if (!Array.isArray(this.data.inventory_moves)) {
+          this.data.inventory_moves = [];
+        }
+        if (this.data.inventory_moves.length === 0 && Array.isArray(this.data.expenses) && this.data.expenses.length > 0) {
+          this.data.expenses.forEach((e) => this.syncExpenseToInventory(e));
+        } else {
+          this.recomputeInventoryStock();
+        }
         this.updateSequencesFromData();
       } else {
         this.data = createInitialData();
@@ -547,6 +556,10 @@ class ERPStore {
     let maxInv = moves.filter((m) => m.move_type === 'out_invoice').reduce((m, x) => Math.max(m, Number(x.id) || 0), 0);
     let maxBill = moves.filter((m) => m.move_type === 'in_invoice').reduce((m, x) => Math.max(m, Number(x.id) || 0), 0);
     let maxMisc = moves.filter((m) => m.move_type === 'entry').reduce((m, x) => Math.max(m, Number(x.id) || 0), 0);
+
+    // Inventory moves sequence
+    const maxInvMove = (this.data.inventory_moves || []).reduce((m, x) => Math.max(m, Number(x.id) || 0), 0);
+    seq.inventory_move = Math.max(seq.inventory_move || 1, maxInvMove + 1);
 
     moves.forEach((m) => {
       const match = m.name && String(m.name).match(/(\d+)$/);
@@ -831,7 +844,187 @@ class ERPStore {
       expenses: this.data.expenses,
       sales: this.data.sales,
       accounting: this.data.accounting,
+      inventory_moves: this.data.inventory_moves || [],
       kpis: this.getSummaryKPIs()
+    };
+  }
+
+
+  // ==================== INVENTARIO (stock) ====================
+  recomputeInventoryStock() {
+    if (!this.data) return;
+    const moves = this.data.inventory_moves || [];
+    const products = this.data.products || [];
+
+    const stockMap = new Map();
+    moves.forEach((m) => {
+      if (m.state !== 'cancel') {
+        const pid = Number(m.product_id);
+        if (!stockMap.has(pid)) {
+          stockMap.set(pid, { qty: 0, totalVal: 0 });
+        }
+        const entry = stockMap.get(pid);
+        const q = Number(m.quantity || 0);
+        entry.qty += q;
+        entry.totalVal += Number(m.total_value || (q * (Number(m.price_unit) || 0)));
+      }
+    });
+
+    products.forEach((p) => {
+      const pid = Number(p.id);
+      const stock = stockMap.get(pid);
+      if (stock) {
+        p.qty_available = Math.max(0, round2(stock.qty));
+        if ((!p.standard_price || p.standard_price <= 0) && stock.qty > 0) {
+          p.standard_price = round2(stock.totalVal / stock.qty);
+        }
+      } else {
+        p.qty_available = Number(p.qty_available || 0);
+      }
+      p.stock_value = round2((p.qty_available || 0) * (p.standard_price || 0));
+    });
+  }
+
+  syncExpenseToInventory(expense) {
+    if (!expense || !this.data) return;
+    this.data.inventory_moves = Array.isArray(this.data.inventory_moves) ? this.data.inventory_moves : [];
+
+    // DEDUPLICACIÓN ESTRICTA: Eliminar movimientos previos de este mismo gasto antes de aplicar los nuevos
+    this.data.inventory_moves = this.data.inventory_moves.filter(
+      (m) => !(m.origin_type === 'expense' && Number(m.origin_id) === Number(expense.id))
+    );
+
+    // Si el gasto fue rechazado o cancelado, el inventario se revierte
+    if (expense.state === 'refused' || expense.state === 'cancel') {
+      this.recomputeInventoryStock();
+      return;
+    }
+
+    const rawItems = Array.isArray(expense.items) && expense.items.length > 0
+      ? expense.items
+      : [{
+          id: 1,
+          description: expense.name,
+          quantity: Number(expense.quantity || 1),
+          price_unit: Number(expense.price_unit || expense.total_amount || 0),
+          subtotal: Number(expense.total_amount || 0)
+        }];
+
+    for (const item of rawItems) {
+      const desc = String(item.description || expense.name || '').trim();
+      if (!desc) continue;
+      const qty = Math.max(0.001, Number(item.quantity || 1));
+      const priceUnit = Math.max(0, Number(item.price_unit || 0));
+
+      // DEDUPLICACIÓN DE PRODUCTOS:
+      // Buscar si el producto ya existe por ID o nombre/código
+      let product = null;
+      if (item.product_id) {
+        product = this.data.products.find((p) => Number(p.id) === Number(item.product_id));
+      }
+      if (!product && expense.product_id) {
+        const candidate = this.data.products.find((p) => Number(p.id) === Number(expense.product_id));
+        if (candidate && candidate.name.trim().toLowerCase() === desc.toLowerCase()) {
+          product = candidate;
+        }
+      }
+      if (!product) {
+        const normDesc = desc.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+        product = this.data.products.find((p) => {
+          const normP = (p.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+          const normCode = (p.default_code || '').toLowerCase().trim();
+          return normP === normDesc || normCode === normDesc;
+        });
+      }
+
+      if (!product) {
+        // Auto-crear producto sólo si no existe, asignando categoría y unidad técnica de GH Aluminios
+        const seqNum = this.nextSeq('product');
+        const defaultCode = `PRD-${this.padSeq(seqNum, 3)}`;
+
+        const lowerDesc = desc.toLowerCase();
+        let category = 'Materiales y Perfilería';
+        let uom = 'Unidad';
+
+        if (lowerDesc.includes('metro') || lowerDesc.includes('perfil') || lowerDesc.includes('tubo') || lowerDesc.includes('varilla') || lowerDesc.includes('aluminio')) {
+          category = 'Materiales y Perfilería';
+          uom = lowerDesc.includes('cuadrado') || lowerDesc.includes('m2') ? 'Metro Cuadrado' : (lowerDesc.includes('lineal') || lowerDesc.includes('ml') || lowerDesc.includes('metro') ? 'Metro Lineal' : 'Unidad');
+        } else if (lowerDesc.includes('vidrio') || lowerDesc.includes('cristal') || lowerDesc.includes('espejo') || lowerDesc.includes('templado')) {
+          category = 'Vidrios y Paneles';
+          uom = 'Metro Cuadrado';
+        } else if (lowerDesc.includes('tornillo') || lowerDesc.includes('remache') || lowerDesc.includes('chapa') || lowerDesc.includes('bisagra') || lowerDesc.includes('felpa') || lowerDesc.includes('empaque') || lowerDesc.includes('escuadra') || lowerDesc.includes('silicona')) {
+          category = 'Herrajes y Accesorios';
+          uom = lowerDesc.includes('caja') ? 'Caja' : (lowerDesc.includes('rollo') ? 'Rollo' : 'Unidad');
+        } else if (lowerDesc.includes('transporte') || lowerDesc.includes('viatico') || lowerDesc.includes('almuerzo') || lowerDesc.includes('hotel') || lowerDesc.includes('asesoria') || lowerDesc.includes('servicio')) {
+          category = 'Gastos Operativos';
+          uom = 'Unidad';
+        }
+
+        product = {
+          id: seqNum,
+          name: desc,
+          default_code: defaultCode,
+          type: category === 'Gastos Operativos' ? 'consu' : 'product',
+          list_price: round2(priceUnit > 0 ? priceUnit * 1.35 : 0),
+          standard_price: priceUnit,
+          tax_rate: Number(expense.tax_rate ?? 19),
+          category,
+          can_be_sold: true,
+          can_be_expensed: true,
+          uom,
+          qty_available: 0
+        };
+        this.data.products.push(product);
+      } else {
+        if (priceUnit > 0) {
+          product.standard_price = priceUnit;
+        }
+      }
+
+      // Registrar movimiento de almacén trazable
+      const moveId = this.nextSeq('inventory_move');
+      const invMove = {
+        id: moveId,
+        date: expense.date || todayStr(),
+        product_id: product.id,
+        product_name: product.name,
+        product_code: product.default_code || '',
+        quantity: qty,
+        uom: product.uom || 'Unidad',
+        price_unit: priceUnit,
+        total_value: round2(qty * priceUnit),
+        origin_type: 'expense',
+        origin_id: expense.id,
+        origin_ref: expense.reference,
+        item_id: item.id || 1,
+        partner_id: expense.partner_id || null,
+        partner_name: expense.partner_name || 'Proveedor General',
+        supplier_vat: expense.supplier_vat || '',
+        employee_name: expense.employee_name || 'Administrador',
+        notes: `Entrada a almacén por compra/gasto ${expense.reference}`,
+        state: 'done'
+      };
+      this.data.inventory_moves.unshift(invMove);
+    }
+
+    this.recomputeInventoryStock();
+  }
+
+  getInventorySummary() {
+    this.recomputeInventoryStock();
+    const products = this.data.products || [];
+    const moves = this.data.inventory_moves || [];
+    const totalUnits = products.reduce((acc, p) => acc + (Number(p.qty_available) || 0), 0);
+    const totalValue = products.reduce((acc, p) => acc + (Number(p.stock_value) || 0), 0);
+    const inStockCount = products.filter((p) => (Number(p.qty_available) || 0) > 0).length;
+    const lastMove = moves.length > 0 ? moves[0] : null;
+
+    return {
+      total_units: round2(totalUnits),
+      total_value: round2(totalValue),
+      in_stock_count: inStockCount,
+      total_products: products.length,
+      last_move: lastMove
     };
   }
 
@@ -1256,6 +1449,7 @@ class ERPStore {
       });
       const oldExpense = { ...existing };
       this.data.expenses[idx] = updated;
+      this.syncExpenseToInventory(updated);
       this.save();
       if (this.supabase) {
         try {
@@ -1359,6 +1553,7 @@ class ERPStore {
     }
 
     this.data.expenses.unshift(newExpense);
+    this.syncExpenseToInventory(newExpense);
     this.save();
     if (this.supabase) {
       try {
@@ -1376,6 +1571,12 @@ class ERPStore {
     const idx = this.data.expenses.findIndex((e) => Number(e.id) === Number(id));
     if (idx === -1) throw new Error(`Gasto #${id} no encontrado.`);
     const [removed] = this.data.expenses.splice(idx, 1);
+    if (Array.isArray(this.data.inventory_moves)) {
+      this.data.inventory_moves = this.data.inventory_moves.filter(
+        (m) => !(m.origin_type === 'expense' && Number(m.origin_id) === Number(id))
+      );
+      this.recomputeInventoryStock();
+    }
     this.save();
     if (this.supabase) {
       await this.supabase.deleteExpense(id);

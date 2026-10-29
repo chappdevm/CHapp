@@ -29,6 +29,14 @@
       const sale = (state.data.sales || []).find((s) => Number(s.id) === idNum);
       return sale ? (sale.name || `SO/2026/${String(sale.id).padStart(4, '0')}`) : `Pedido #${recordId}`;
     }
+    if (appId === 'inventory') {
+      if (submenu === 'moves') {
+        const m = (state.data.inventory_moves || []).find((x) => Number(x.id) === idNum);
+        return m ? `Movimiento #${m.id}` : `Movimiento #${recordId}`;
+      }
+      const prod = (state.data.products || []).find((p) => Number(p.id) === idNum);
+      return prod ? (prod.default_code ? `[${prod.default_code}] ${prod.name}` : prod.name) : `Producto #${recordId}`;
+    }
     if (appId === 'contacts') {
       const cont = (state.data.contacts || []).find((c) => Number(c.id) === idNum);
       return cont ? cont.name : `Contacto #${recordId}`;
@@ -73,6 +81,28 @@
       actionBtns.innerHTML = `
         <button type="button" class="btn btn-primary" id="btnGoToInvoicesForPay">Registrar Pago en Factura</button>
       `;
+    } else if (state.currentApp === 'inventory') {
+      if (state.viewType === 'form') {
+        actionBtns.innerHTML = `
+          <button type="button" class="btn btn-secondary" id="btnCpBackToList">Volver a Existencias</button>
+          <button type="button" class="btn btn-primary" id="btnInvGoToExpense">Entrada por Gasto</button>
+        `;
+      } else if (state.submenu === 'moves') {
+        actionBtns.innerHTML = `
+          <button type="button" class="btn btn-primary" id="btnInvGoToExpense" style="display: inline-flex; align-items: center; gap: 6px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Nueva Entrada (Gasto)
+          </button>
+        `;
+      } else {
+        actionBtns.innerHTML = `
+          <button type="button" class="btn btn-primary" id="btnInvGoToExpense" style="display: inline-flex; align-items: center; gap: 6px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Entrada por Gasto
+          </button>
+          <button type="button" class="btn btn-secondary" id="btnInvViewMovesList">Ver Movimientos</button>
+        `;
+      }
     } else {
       actionBtns.innerHTML = `<button type="button" class="btn btn-primary" id="btnCpNewRecord"${productAttr}>${newRecordLabel}</button>`;
     }
@@ -249,6 +279,22 @@
         state.activeRecordId = 'new';
         state.formDraft = null;
         state.viewType = 'form';
+        renderSubmenus(app);
+        renderModuleWorkspace();
+      });
+    }
+
+    const invExpBtn = document.getElementById('btnInvGoToExpense');
+    if (invExpBtn) {
+      invExpBtn.addEventListener('click', () => {
+        openApp('expenses', { viewType: 'form', recordId: 'new' });
+      });
+    }
+    const invMovesBtn = document.getElementById('btnInvViewMovesList');
+    if (invMovesBtn) {
+      invMovesBtn.addEventListener('click', () => {
+        state.submenu = 'moves';
+        state.viewType = 'list';
         renderSubmenus(app);
         renderModuleWorkspace();
       });

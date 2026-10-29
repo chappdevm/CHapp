@@ -1,0 +1,138 @@
+/* ==========================================================================
+   CH Aluminios ERP -- CSS Module: 11-inventory.css
+   Modulo 6: Inventario y Control de Stock -- Existencias y Kardex de Entradas
+   ========================================================================== */
+
+.o_stock_badge_in {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(34, 197, 94, 0.12);
+  color: #15803d;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  font-weight: 700;
+  font-size: 0.82rem;
+  padding: 3px 9px;
+  border-radius: 6px;
+}
+
+[data-theme="dark"] .o_stock_badge_in {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.35);
+}
+
+.o_stock_badge_low {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  font-weight: 700;
+  font-size: 0.82rem;
+  padding: 3px 9px;
+  border-radius: 6px;
+}
+
+[data-theme="dark"] .o_stock_badge_low {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.35);
+}
+
+.o_stock_badge_out {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #b91c1c;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  font-weight: 600;
+  font-size: 0.82rem;
+  padding: 3px 9px;
+  border-radius: 6px;
+}
+
+[data-theme="dark"] .o_stock_badge_out {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+.o_inventory_quick_card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1.1rem 1.4rem;
+  background: var(--o-view-bg);
+  border: 1px solid var(--o-border-color);
+  border-left: 4px solid var(--o-accent, #14B5D9);
+  border-radius: 8px;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.o_inventory_filter_bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.o_inv_pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--o-bg-subtle, rgba(0, 0, 0, 0.04));
+  border: 1px solid var(--o-border-color);
+  color: var(--o-text-muted);
+  transition: all 0.18s ease;
+}
+
+.o_inv_pill:hover {
+  background: var(--o-hover-bg, rgba(20, 181, 217, 0.08));
+  color: var(--o-text);
+  border-color: var(--o-accent, #14B5D9);
+}
+
+.o_inv_pill.is-active {
+  background: var(--o-primary, #074073);
+  color: #ffffff;
+  border-color: var(--o-primary, #074073);
+}
+
+.o_stock_qty_big {
+  font-size: 1.85rem;
+  font-weight: 800;
+  color: var(--o-heading);
+  line-height: 1.1;
+  margin: 0.4rem 0;
+}
+
+.o_stock_movement_tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(2, 132, 199, 0.1);
+  color: #0284c7;
+  border: 1px solid rgba(2, 132, 199, 0.25);
+  font-weight: 600;
+  font-size: 0.78rem;
+  padding: 2px 7px;
+  border-radius: 4px;
+  text-decoration: none;
+}
+
+.o_stock_movement_tag:hover {
+  background: #0284c7;
+  color: #ffffff;
+}

@@ -4,7 +4,7 @@
     "based_on": "CHapp ERP Enterprise",
     "sequences": {
       "contact": 5,
-      "product": 3,
+      "product": 5,
       "expense": 3,
       "sale": 4,
       "move_inv": 5,
@@ -12,7 +12,8 @@
       "move_misc": 1,
       "payment": 5,
       "account": 12,
-      "tax": 5
+      "tax": 5,
+      "inventory_move": 5
     }
   },
   "settings": {
@@ -149,7 +150,39 @@
       "category": "General",
       "can_be_sold": true,
       "can_be_expensed": true,
-      "uom": "Unidad"
+      "uom": "Unidad",
+      "qty_available": 0,
+      "stock_value": 0
+    },
+    {
+      "id": 3,
+      "name": "Divisiones de baño y perfiles de aluminio",
+      "default_code": "PRD-003",
+      "type": "product",
+      "list_price": 510300,
+      "standard_price": 378000,
+      "tax_rate": 0,
+      "category": "Materiales y Perfilería",
+      "can_be_sold": true,
+      "can_be_expensed": true,
+      "uom": "Unidad",
+      "qty_available": 1,
+      "stock_value": 378000
+    },
+    {
+      "id": 4,
+      "name": "Gasto Transporte Live",
+      "default_code": "PRD-004",
+      "type": "consu",
+      "list_price": 108000,
+      "standard_price": 80000,
+      "tax_rate": 0,
+      "category": "Gastos Operativos",
+      "can_be_sold": true,
+      "can_be_expensed": true,
+      "uom": "Unidad",
+      "qty_available": 1,
+      "stock_value": 80000
     }
   ],
   "expenses": [
@@ -352,6 +385,24 @@
         "name": "Gastos de Empleados",
         "type": "purchase",
         "default_account": "510506"
+      },
+      {
+        "id": 5,
+        "code": "NEQ",
+        "name": "Nequi",
+        "type": "bank",
+        "default_account": "111010",
+        "balance": 0,
+        "active": true
+      },
+      {
+        "id": 6,
+        "code": "DVP",
+        "name": "Daviplata",
+        "type": "bank",
+        "default_account": "111015",
+        "balance": 0,
+        "active": true
       }
     ],
     "accounts": [
@@ -763,5 +814,49 @@
         "state": "posted"
       }
     ]
-  }
+  },
+  "inventory_moves": [
+    {
+      "id": 4,
+      "date": "2026-10-26",
+      "product_id": 4,
+      "product_name": "Gasto Transporte Live",
+      "product_code": "PRD-004",
+      "quantity": 1,
+      "uom": "Unidad",
+      "price_unit": 80000,
+      "total_value": 80000,
+      "origin_type": "expense",
+      "origin_id": 1,
+      "origin_ref": "EXP/2026/0001",
+      "item_id": 1,
+      "partner_id": 1,
+      "partner_name": "Workflow Test SAS",
+      "supplier_vat": "",
+      "employee_name": "Tester",
+      "notes": "Entrada a almacén por compra/gasto EXP/2026/0001",
+      "state": "done"
+    },
+    {
+      "id": 3,
+      "date": "2026-09-08",
+      "product_id": 3,
+      "product_name": "Divisiones de baño y perfiles de aluminio",
+      "product_code": "PRD-003",
+      "quantity": 1,
+      "uom": "Unidad",
+      "price_unit": 378000,
+      "total_value": 378000,
+      "origin_type": "expense",
+      "origin_id": 2,
+      "origin_ref": "EXP/2026/0002",
+      "item_id": 1,
+      "partner_id": 4,
+      "partner_name": "COMERCIAL CORTEZA S.A.S.",
+      "supplier_vat": "",
+      "employee_name": "Administrador CHapp",
+      "notes": "Entrada a almacén por compra/gasto EXP/2026/0002",
+      "state": "done"
+    }
+  ]
 }

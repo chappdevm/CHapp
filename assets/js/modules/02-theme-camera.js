@@ -223,6 +223,7 @@
     else if (state.currentApp === 'expenses') renderExpensesModule();
     else if (state.currentApp === 'sales') renderSalesModule();
     else if (state.currentApp === 'accounting') renderAccountingModule();
+    else if (state.currentApp === 'inventory') renderInventoryModule();
   }
 
   
