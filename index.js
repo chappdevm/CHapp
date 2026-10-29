@@ -320,6 +320,13 @@ function createHandler(store = new ERPStore(undefined, { useSupabase: isSupabase
           if (model === 'sales' && record.state === 'draft') {
             record.state = 'sent';
             store.save();
+            if (store.supabase) {
+              try {
+                await store.supabase.saveSaleOrder(record);
+              } catch (supaErr) {
+                console.warn('[WhatsApp] Error actualizando estado en Supabase:', supaErr.message);
+              }
+            }
           }
 
           return sendJson(res, 200, {

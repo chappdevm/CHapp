@@ -1824,6 +1824,33 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
       const loadedAfterDelete = await loadWhatsAppSession();
       assert.equal(loadedAfterDelete, null, 'Session in Supabase must be cleanly removed on unlink');
     }
+
+    // 6. Test that /api/whatsapp/send transitions quotation state from draft to sent
+    const contactWithPhone = await req('/api/contacts', 'POST', { name: 'Cliente WhatsApp Valido', mobile: '573001234567' });
+    const draftQuote = await req('/api/sales', 'POST', {
+      partner_id: contactWithPhone.json.contact.id,
+      lines: [{ description: 'Ventana Corrediza', quantity: 1, price_unit: 500000, tax_rate: 19 }]
+    });
+    assert.equal(draftQuote.json.order.state, 'draft');
+
+    const origSendPdf = baileysManager.sendPdf;
+    baileysManager.sendPdf = async (phone, buf, name, caption) => ({ success: true, to: phone });
+    try {
+      const waSendRes = await req('/api/whatsapp/send', 'POST', {
+        model: 'sales',
+        id: draftQuote.json.order.id,
+        pdfBase64: 'data:application/pdf;base64,JVBERi0xLjQK'
+      });
+      assert.equal(waSendRes.status, 200);
+      assert.ok(waSendRes.json.ok);
+
+      const bootRes = await req('/api/bootstrap', 'GET');
+      const updatedOrder = (bootRes.json.data.sales || []).find((s) => Number(s.id) === Number(draftQuote.json.order.id));
+      assert.ok(updatedOrder, 'Quotation must exist in bootstrap data');
+      assert.equal(updatedOrder.state, 'sent', 'Quotation state must transition to sent after sending WhatsApp');
+    } finally {
+      baileysManager.sendPdf = origSendPdf;
+    }
   });
 
   it('Module 2 (Gastos): factura escaneada conserva literalmente IVA por producto, subtotales y totales impresos', async () => {

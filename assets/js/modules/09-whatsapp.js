@@ -322,6 +322,7 @@
         const json = await boot.json();
         state.data = json.data;
       }
+      state.formDraft = null;
       renderModuleWorkspace();
     } catch (err) {
       showToast(err.message, true);

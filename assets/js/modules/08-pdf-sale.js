@@ -43,13 +43,13 @@
 
     let stampHtml = '';
     if (isCancel) {
-      stampHtml = `<div class="o_pdf_stamp is-cancel" style="display:inline-block;text-align:center;"><span class="stamp-inner" style="display:block;font-size:0.82rem;font-weight:800;line-height:1.25;">${stampCancelSvg}CANCELADA</span><span class="stamp-sub" style="display:block;font-size:0.62rem;font-weight:700;line-height:1.2;margin-top:2px;">PROPUESTA ANULADA</span></div>`;
+      stampHtml = `<div class="o_pdf_stamp is-cancel" style="display:inline-block;text-align:center;border:2px solid #cb2f2f !important;border-radius:6px;background:#fef2f2 !important;color:#cb2f2f !important;padding:4px 12px;margin-top:6px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;"><span class="stamp-inner" style="display:block;font-size:0.82rem;font-weight:800;color:#991b1b !important;line-height:1.25;">${stampCancelSvg}CANCELADA</span><span class="stamp-sub" style="display:block;font-size:0.62rem;font-weight:700;color:#dc2626 !important;line-height:1.2;margin-top:2px;">PROPUESTA ANULADA</span></div>`;
     } else if (isSale) {
-      stampHtml = `<div class="o_pdf_stamp is-paid" style="display:inline-block;text-align:center;"><span class="stamp-inner" style="display:block;font-size:0.82rem;font-weight:800;line-height:1.25;">${stampCheckSvg}CONFIRMADO</span><span class="stamp-sub" style="display:block;font-size:0.62rem;font-weight:700;line-height:1.2;margin-top:2px;">PEDIDO DE VENTA</span></div>`;
+      stampHtml = `<div class="o_pdf_stamp is-paid" style="display:inline-block;text-align:center;border:2px solid #22b053 !important;border-radius:6px;background:#ecfdf5 !important;color:#22b053 !important;padding:4px 12px;margin-top:6px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;"><span class="stamp-inner" style="display:block;font-size:0.82rem;font-weight:800;color:#065f46 !important;line-height:1.25;">${stampCheckSvg}CONFIRMADO</span><span class="stamp-sub" style="display:block;font-size:0.62rem;font-weight:700;color:#059669 !important;line-height:1.2;margin-top:2px;">PEDIDO DE VENTA</span></div>`;
     } else if (isSent) {
-      stampHtml = `<div class="o_pdf_stamp is-posted" style="display:inline-block;text-align:center;"><span class="stamp-inner" style="display:block;font-size:0.82rem;font-weight:800;line-height:1.25;">${stampMailSvg}ENVIADA</span><span class="stamp-sub" style="display:block;font-size:0.62rem;font-weight:700;line-height:1.2;margin-top:2px;">OFERTA AL CLIENTE</span></div>`;
+      stampHtml = `<div class="o_pdf_stamp is-posted" style="display:inline-block;text-align:center;border:2px solid #14B5D9 !important;border-radius:6px;background:#f0f7fc !important;color:#074073 !important;padding:4px 12px;margin-top:6px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;"><span class="stamp-inner" style="display:block;font-size:0.82rem;font-weight:800;color:#074073 !important;line-height:1.25;">${stampMailSvg}ENVIADA</span><span class="stamp-sub" style="display:block;font-size:0.62rem;font-weight:700;color:#0284c7 !important;line-height:1.2;margin-top:2px;">OFERTA AL CLIENTE</span></div>`;
     } else {
-      stampHtml = `<div class="o_pdf_stamp is-draft" style="display:inline-block;text-align:center;"><span class="stamp-inner" style="display:block;font-size:0.82rem;font-weight:800;line-height:1.25;">${stampPencilSvg}COTIZACIÓN</span><span class="stamp-sub" style="display:block;font-size:0.62rem;font-weight:700;line-height:1.2;margin-top:2px;">PROPUESTA COMERCIAL</span></div>`;
+      stampHtml = `<div class="o_pdf_stamp is-draft" style="display:inline-block;text-align:center;border:2px solid #5593c2 !important;border-radius:6px;background:#f0f7fc !important;color:#074073 !important;padding:4px 12px;margin-top:6px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;"><span class="stamp-inner" style="display:block;font-size:0.82rem;font-weight:800;color:#074073 !important;line-height:1.25;">${stampPencilSvg}COTIZACIÓN</span><span class="stamp-sub" style="display:block;font-size:0.62rem;font-weight:700;color:#0284c7 !important;letter-spacing:0.05em;line-height:1.2;margin-top:2px;">PROPUESTA COMERCIAL</span></div>`;
     }
 
     const docTitle = isSale ? 'Pedido de Venta' : 'Cotización';
@@ -121,7 +121,7 @@
             </div>
           </div>
           <div class="o_pdf_doc_box">
-            <div class="doc_type_title">${esc(docTitle)}</div>
+            <div class="doc_type_title" style="font-size: 0.88rem; font-weight: 800; color: #ffffff !important; background: #074073 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; border-bottom: 2px solid #14B5D9 !important; padding: 0.4rem 0.5rem; border-radius: 5px 5px 0 0; text-transform: uppercase; letter-spacing: 0.04em; margin: -0.75rem -1rem 0.6rem -1rem;">${esc(docTitle)}</div>
             <div class="doc_number">${docNumber}</div>
             <div class="o_pdf_doc_meta">
               <div class="o_pdf_doc_meta_row"><span>Emisión:</span><strong>${esc(sale.date_order || '')}</strong></div>
@@ -338,7 +338,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${isQuotation ? 'Cotización' : 'Pedido de Venta'} ${esc(sale.name)} - ${esc(company.company_name || 'CH Aluminios')}</title>
   <style>
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
     body {
       margin: 0;
       padding: 24px;
@@ -519,6 +523,10 @@
     .o_pdf_sign_box .sign_sub { font-size: 0.68rem; color: #94a3b8; margin-top: 0.2rem; }
     .o_pdf_legal_footer { font-size: 0.68rem; color: #64748b; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 0.85rem; line-height: 1.4; }
     @media print {
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
       body { background: #ffffff !important; padding: 0 !important; }
       .o_pdf_sheet { border: none !important; box-shadow: none !important; padding: 0 !important; max-width: 100% !important; }
       .o_pdf_brand_header {
