@@ -101,25 +101,28 @@
     return `
       <div style="position: relative; width: 100%;">
         <!-- Toolbar con filtro de Mes/Año al estilo de la app y Badge de Margen en la esquina -->
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; padding: 0.75rem 1rem 0; margin-bottom: 2px;">
-          <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
-            <label for="accFilterMonth" style="font-size: 0.82rem; font-weight: 700; color: var(--o-text-muted); display: inline-flex; align-items: center; gap: 4px; margin: 0;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+        <div class="o_period_filter_bar">
+          <div class="o_period_controls">
+            <span class="o_period_badge">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
               Periodo:
-            </label>
-            <select id="accFilterMonth" class="form-control form-control-sm" style="width: auto; padding: 4px 8px; font-size: 0.82rem; font-weight: 600; border-radius: 6px; border: 1px solid var(--o-border-color); background: var(--o-view-bg); color: var(--o-text-main);">
+            </span>
+            <select id="accFilterMonth" class="o_period_select" aria-label="Seleccionar mes">
               ${months.map(mo => `<option value="${mo.v}" ${mo.v === currMonth ? 'selected' : ''}>${mo.l}</option>`).join('')}
             </select>
-            <select id="accFilterYear" class="form-control form-control-sm" style="width: auto; padding: 4px 8px; font-size: 0.82rem; font-weight: 600; border-radius: 6px; border: 1px solid var(--o-border-color); background: var(--o-view-bg); color: var(--o-text-main);">
+            <select id="accFilterYear" class="o_period_select" aria-label="Seleccionar año">
               ${years.map(y => `<option value="${y}" ${y === currYear ? 'selected' : ''}>${y}</option>`).join('')}
             </select>
-            <button type="button" id="btnAccResetMonth" class="btn btn-sm btn-secondary" style="padding: 3px 8px; font-size: 0.75rem; font-weight: 600;">Mes Actual</button>
+            <button type="button" id="btnAccResetMonth" class="o_period_btn_reset">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path><path d="M3 21v-5h5"></path></svg>
+              Mes Actual
+            </button>
           </div>
 
           <!-- Badge Margen Operativo ubicado en la esquina de la sección -->
           <div id="accMarginBadgeContainer">
-            <span id="accMarginBadge" style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 9999px; background: rgba(14, 165, 233, 0.12); color: #0ea5e9; font-size: 0.8rem; font-weight: 700; border: 1px solid rgba(14, 165, 233, 0.25);">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+            <span id="accMarginBadge" style="display: inline-flex; align-items: center; gap: 5px; padding: 6px 14px; border-radius: 9999px; background: rgba(14, 165, 233, 0.12); color: #0ea5e9; font-size: 0.84rem; font-weight: 700; border: 1px solid rgba(14, 165, 233, 0.25);">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
               Margen Operativo: ${data.margin_pct >= 0 ? '+' : ''}${data.margin_pct}%
             </span>
           </div>

@@ -47,42 +47,46 @@
 .o_stat_card {
   background: var(--o-view-bg);
   border: 1px solid var(--o-border-color);
-  border-radius: 8px;
-  padding: 1.15rem 1.15rem;
+  border-radius: 10px;
+  padding: 1.45rem 1.4rem;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 0.4rem;
+  gap: 0.65rem;
   cursor: pointer;
-  transition: border-color 0.14s ease, transform 0.12s ease;
-  min-height: 105px;
+  transition: border-color 0.14s ease, transform 0.12s ease, box-shadow 0.14s ease;
+  min-height: 155px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .o_stat_card:hover {
   border-color: var(--o-action);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .o_stat_card .o_stat_label {
-  font-size: 0.92rem;
+  font-size: 1.05rem;
   color: var(--o-text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.035em;
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.3;
 }
 
 .o_stat_card .o_stat_value {
-  font-size: 1.45rem;
+  font-size: 1.85rem;
   font-weight: 800;
   color: var(--o-text-main);
-  line-height: 1.2;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  margin: 0.35rem 0;
 }
 
 .o_stat_card .o_stat_sub {
-  font-size: 0.8rem;
+  font-size: 0.88rem;
   color: var(--o-action);
-  line-height: 1.2;
+  line-height: 1.25;
 }
 
 /* Kanban Grid */

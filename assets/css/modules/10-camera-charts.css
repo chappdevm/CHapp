@@ -205,3 +205,86 @@
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
   user-select: none;
 }
+
+
+/* Toolbar con diseño integrado para filtro de periodo en balance */
+.o_period_filter_bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.85rem;
+  background: var(--o-gray-100);
+  border: 1px solid var(--o-border-color);
+  border-radius: 8px;
+}
+
+.o_period_controls {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.o_period_badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--o-action);
+}
+
+.o_period_select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: var(--o-view-bg);
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23074073' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px;
+  border: 1px solid var(--o-border-color);
+  border-radius: 6px;
+  padding: 0.45rem 2.1rem 0.45rem 0.85rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--o-text-main);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  outline: none;
+}
+
+.o_period_select:hover {
+  border-color: var(--o-action);
+}
+
+.o_period_select:focus {
+  border-color: var(--o-action);
+  box-shadow: 0 0 0 3px rgba(7, 64, 115, 0.12);
+}
+
+.o_period_btn_reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--o-view-bg);
+  border: 1px solid var(--o-border-color);
+  color: var(--o-action);
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.45rem 0.95rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.o_period_btn_reset:hover {
+  background: var(--o-action);
+  color: #ffffff;
+  border-color: var(--o-action);
+}
