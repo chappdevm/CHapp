@@ -36,15 +36,20 @@
       watermarkHtml = '<div class="o_pdf_watermark is-draft">COTIZACIÓN</div>';
     }
 
+    const stampPencilSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px;margin-right:4px;"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>';
+    const stampCheckSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px;margin-right:4px;"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+    const stampMailSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px;margin-right:4px;"><rect width="20" height="16" x="2" y="4" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>';
+    const stampCancelSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px;margin-right:4px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+
     let stampHtml = '';
     if (isCancel) {
-      stampHtml = '<div class="o_pdf_stamp is-cancel"><span class="stamp-inner">✕ CANCELADA</span><span class="stamp-sub">PROPUESTA ANULADA</span></div>';
+      stampHtml = `<div class="o_pdf_stamp is-cancel" style="display:inline-block;text-align:center;"><span class="stamp-inner" style="display:block;font-size:0.82rem;font-weight:800;line-height:1.25;">${stampCancelSvg}CANCELADA</span><span class="stamp-sub" style="display:block;font-size:0.62rem;font-weight:700;line-height:1.2;margin-top:2px;">PROPUESTA ANULADA</span></div>`;
     } else if (isSale) {
-      stampHtml = '<div class="o_pdf_stamp is-paid"><span class="stamp-inner">✓ CONFIRMADO</span><span class="stamp-sub">PEDIDO DE VENTA</span></div>';
+      stampHtml = `<div class="o_pdf_stamp is-paid" style="display:inline-block;text-align:center;"><span class="stamp-inner" style="display:block;font-size:0.82rem;font-weight:800;line-height:1.25;">${stampCheckSvg}CONFIRMADO</span><span class="stamp-sub" style="display:block;font-size:0.62rem;font-weight:700;line-height:1.2;margin-top:2px;">PEDIDO DE VENTA</span></div>`;
     } else if (isSent) {
-      stampHtml = '<div class="o_pdf_stamp is-posted"><span class="stamp-inner">✉ ENVIADA</span><span class="stamp-sub">OFERTA AL CLIENTE</span></div>';
+      stampHtml = `<div class="o_pdf_stamp is-posted" style="display:inline-block;text-align:center;"><span class="stamp-inner" style="display:block;font-size:0.82rem;font-weight:800;line-height:1.25;">${stampMailSvg}ENVIADA</span><span class="stamp-sub" style="display:block;font-size:0.62rem;font-weight:700;line-height:1.2;margin-top:2px;">OFERTA AL CLIENTE</span></div>`;
     } else {
-      stampHtml = '<div class="o_pdf_stamp is-draft"><span class="stamp-inner">✎ COTIZACIÓN</span><span class="stamp-sub">PROPUESTA COMERCIAL</span></div>';
+      stampHtml = `<div class="o_pdf_stamp is-draft" style="display:inline-block;text-align:center;"><span class="stamp-inner" style="display:block;font-size:0.82rem;font-weight:800;line-height:1.25;">${stampPencilSvg}COTIZACIÓN</span><span class="stamp-sub" style="display:block;font-size:0.62rem;font-weight:700;line-height:1.2;margin-top:2px;">PROPUESTA COMERCIAL</span></div>`;
     }
 
     const docTitle = isSale ? 'Pedido de Venta' : 'Cotización';
@@ -270,6 +275,26 @@
             bannerImg.src = bannerData;
           }
         }
+        const stampEl = targetEl.querySelector('.o_pdf_stamp');
+        if (stampEl) {
+          stampEl.style.display = 'inline-block';
+          stampEl.style.textAlign = 'center';
+          const innerEl = stampEl.querySelector('.stamp-inner');
+          if (innerEl) {
+            innerEl.style.display = 'block';
+            innerEl.style.fontSize = '0.82rem';
+            innerEl.style.fontWeight = '800';
+            innerEl.style.lineHeight = '1.25';
+          }
+          const subEl = stampEl.querySelector('.stamp-sub');
+          if (subEl) {
+            subEl.style.display = 'block';
+            subEl.style.fontSize = '0.62rem';
+            subEl.style.fontWeight = '700';
+            subEl.style.lineHeight = '1.2';
+            subEl.style.marginTop = '2px';
+          }
+        }
 
         const opt = {
           margin: [8, 8, 8, 8],
@@ -437,19 +462,22 @@
     .o_pdf_doc_meta_row span { color: #64748b; }
     .o_pdf_stamp {
       display: inline-block;
+      text-align: center;
       margin-top: 0.5rem;
       padding: 0.25rem 0.65rem;
-      border: 2px dashed;
+      border: 2px solid currentColor;
       border-radius: 6px;
       font-weight: 800;
       text-transform: uppercase;
       font-size: 0.72rem;
-      line-height: 1.15;
+      line-height: 1.2;
     }
-    .o_pdf_stamp.is-draft { border-color: #14B5D9; color: #074073; background: #e0f4fb; }
-    .o_pdf_stamp.is-paid { border-color: #059669; color: #059669; background: #ecfdf5; }
-    .o_pdf_stamp.is-posted { border-color: #0ea5e9; color: #0284c7; background: #f0f9ff; }
+    .o_pdf_stamp.is-draft { border-color: #93bee0; color: #5593c2; background: #f0f7fc; }
+    .o_pdf_stamp.is-paid { border-color: #22b053; color: #22b053; background: #ecfdf5; }
+    .o_pdf_stamp.is-posted { border-color: #14B5D9; color: #074073; background: #f0f9ff; }
     .o_pdf_stamp.is-cancel { border-color: #cb2f2f; color: #cb2f2f; background: #fef2f2; }
+    .o_pdf_stamp .stamp-inner { display: block; font-size: 0.82rem; font-weight: 800; line-height: 1.25; }
+    .o_pdf_stamp .stamp-sub { display: block; font-size: 0.62rem; font-weight: 700; opacity: 0.9; letter-spacing: 0.06em; line-height: 1.2; margin-top: 2px; }
     .o_pdf_resolution_bar {
       color: #ffffff;
       padding: 0.45rem 0.85rem;

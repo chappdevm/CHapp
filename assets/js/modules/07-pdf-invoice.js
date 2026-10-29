@@ -190,18 +190,21 @@
     }
 
     let stampHtml = '';
+    const sPencil = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:inline-block;vertical-align:-1px;margin-right:4px;"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>';
+    const sCheck = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="display:inline-block;vertical-align:-1px;margin-right:4px;"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+    const sCancel = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="display:inline-block;vertical-align:-1px;margin-right:4px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
     if (isCancel) {
-      stampHtml = '<div class="o_pdf_stamp is-cancel"><span class="stamp-inner">✕ ANULADA</span><span class="stamp-sub">DOCUMENTO CANCELADO</span></div>';
+      stampHtml = `<div class="o_pdf_stamp is-cancel" style="display:inline-block;text-align:center;"><span class="stamp-inner" style="display:block;font-size:0.82rem;font-weight:800;line-height:1.25;">${sCancel}ANULADA</span><span class="stamp-sub" style="display:block;font-size:0.62rem;font-weight:700;line-height:1.2;margin-top:2px;">DOCUMENTO CANCELADO</span></div>`;
     } else if (isDraft) {
-      stampHtml = '<div class="o_pdf_stamp is-draft"><span class="stamp-inner">✎ BORRADOR</span><span class="stamp-sub">SIN VALIDEZ FISCAL</span></div>';
+      stampHtml = `<div class="o_pdf_stamp is-draft" style="display:inline-block;text-align:center;"><span class="stamp-inner" style="display:block;font-size:0.82rem;font-weight:800;line-height:1.25;">${sPencil}BORRADOR</span><span class="stamp-sub" style="display:block;font-size:0.62rem;font-weight:700;line-height:1.2;margin-top:2px;">SIN VALIDEZ FISCAL</span></div>`;
     } else if (isPaid) {
-      stampHtml = '<div class="o_pdf_stamp is-paid"><span class="stamp-inner">✓ PAGADA</span><span class="stamp-sub">CANCELADA TOTAL</span></div>';
+      stampHtml = `<div class="o_pdf_stamp is-paid" style="display:inline-block;text-align:center;"><span class="stamp-inner" style="display:block;font-size:0.82rem;font-weight:800;line-height:1.25;">${sCheck}PAGADA</span><span class="stamp-sub" style="display:block;font-size:0.62rem;font-weight:700;line-height:1.2;margin-top:2px;">CANCELADA TOTAL</span></div>`;
     } else if (isPartial) {
-      stampHtml = '<div class="o_pdf_stamp is-partial"><span class="stamp-inner">◐ PAGO PARCIAL</span><span class="stamp-sub">SALDO PENDIENTE</span></div>';
+      stampHtml = '<div class="o_pdf_stamp is-partial" style="display:inline-block;text-align:center;"><span class="stamp-inner" style="display:block;font-size:0.82rem;font-weight:800;line-height:1.25;">◐ PAGO PARCIAL</span><span class="stamp-sub" style="display:block;font-size:0.62rem;font-weight:700;line-height:1.2;margin-top:2px;">SALDO PENDIENTE</span></div>';
     } else if (isOverdue) {
-      stampHtml = '<div class="o_pdf_stamp is-overdue"><span class="stamp-inner">⚠ VENCIDA</span><span class="stamp-sub">PAGO MOROSO</span></div>';
+      stampHtml = '<div class="o_pdf_stamp is-overdue" style="display:inline-block;text-align:center;"><span class="stamp-inner" style="display:block;font-size:0.82rem;font-weight:800;line-height:1.25;">⚠ VENCIDA</span><span class="stamp-sub" style="display:block;font-size:0.62rem;font-weight:700;line-height:1.2;margin-top:2px;">PAGO MOROSO</span></div>';
     } else {
-      stampHtml = '<div class="o_pdf_stamp is-posted"><span class="stamp-inner">★ PUBLICADA</span><span class="stamp-sub">POR COBRAR</span></div>';
+      stampHtml = '<div class="o_pdf_stamp is-posted" style="display:inline-block;text-align:center;"><span class="stamp-inner" style="display:block;font-size:0.82rem;font-weight:800;line-height:1.25;">★ PUBLICADA</span><span class="stamp-sub" style="display:block;font-size:0.62rem;font-weight:700;line-height:1.2;margin-top:2px;">POR COBRAR</span></div>';
     }
 
 
@@ -610,8 +613,8 @@
     .o_pdf_stamp.is-cancel, .o_pdf_stamp.is-overdue { color: #cb2f2f; border-color: #cb2f2f; background: #fef2f2; }
     .o_pdf_stamp.is-partial { color: #074073; border-color: #14B5D9; background: #f0f9ff; }
     .o_pdf_stamp.is-posted { color: #074073; border-color: #14B5D9; background: #f0f7fc; }
-    .o_pdf_stamp .stamp-inner { font-size: 0.8rem; font-weight: 800; }
-    .o_pdf_stamp .stamp-sub { font-size: 0.62rem; font-weight: 700; opacity: 0.85; letter-spacing: 0.06em; }
+    .o_pdf_stamp .stamp-inner { display: block; font-size: 0.8rem; font-weight: 800; line-height: 1.25; }
+    .o_pdf_stamp .stamp-sub { display: block; font-size: 0.62rem; font-weight: 700; opacity: 0.85; letter-spacing: 0.06em; line-height: 1.2; margin-top: 2px; }
     .o_pdf_brand_header {
       position: relative;
       z-index: 2;

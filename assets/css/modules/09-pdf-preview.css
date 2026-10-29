@@ -236,18 +236,15 @@
 
 /* Sello Oficial de Estado */
 .o_pdf_stamp {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  display: inline-block;
+  text-align: center;
   border: 2px solid currentColor;
   border-radius: 6px;
-  padding: 3px 10px;
+  padding: 4px 12px;
   text-transform: uppercase;
-  font-weight: 800;
-  line-height: 1.15;
   margin-top: 6px;
   letter-spacing: 0.04em;
+  line-height: 1.2;
 }
 
 .o_pdf_stamp.is-paid {
@@ -287,15 +284,20 @@
 }
 
 .o_pdf_stamp .stamp-inner {
-  font-size: 0.8rem;
+  display: block;
+  font-size: 0.82rem;
   font-weight: 800;
+  line-height: 1.25;
 }
 
 .o_pdf_stamp .stamp-sub {
+  display: block;
   font-size: 0.62rem;
   font-weight: 700;
   opacity: 0.85;
   letter-spacing: 0.06em;
+  line-height: 1.2;
+  margin-top: 2px;
 }
 
 /* Encabezado Corporativo y Logo (Identidad Unificada y Tarjeta de Documento) */
