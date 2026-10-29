@@ -79,7 +79,7 @@
     const logoData = typeof getLogoDataUrl === 'function' ? getLogoDataUrl() : '';
     const logoSrc = logoData && logoData.startsWith('data:') ? logoData : '/assets/icons/logo.png';
     const bannerData = typeof getBannerDataUrl === 'function' ? getBannerDataUrl() : '';
-    const bannerSrc = bannerData && bannerData.startsWith('data:') ? bannerData : '/assets/icons/brand-banner.jpg';
+    const bannerSrc = bannerData && bannerData.startsWith('data:') ? bannerData : '/assets/icons/brand-banner.png';
 
     return `
       <div class="o_pdf_sheet" id="salePdfSheet">
@@ -296,9 +296,9 @@
     }
     const bannerData = typeof getBannerDataUrl === 'function' ? getBannerDataUrl() : '';
     if (bannerData && bannerData.startsWith('data:')) {
-      sheetHtml = sheetHtml.replace('src="/assets/icons/brand-banner.jpg"', 'src="' + bannerData + '"');
+      sheetHtml = sheetHtml.replace('src="/assets/icons/brand-banner.png"', 'src="' + bannerData + '"');
     } else if (typeof window !== 'undefined' && window.location && window.location.origin) {
-      sheetHtml = sheetHtml.replace('src="/assets/icons/brand-banner.jpg"', 'src="' + window.location.origin + '/assets/icons/brand-banner.jpg"');
+      sheetHtml = sheetHtml.replace('src="/assets/icons/brand-banner.png"', 'src="' + window.location.origin + '/assets/icons/brand-banner.png"');
     }
     const printScript = autoPrint ? '<script>window.addEventListener("load", function() { var imgs = Array.from(document.images); Promise.all(imgs.map(function(img) { if (img.complete) return Promise.resolve(); return new Promise(function(res) { img.onload = img.onerror = res; }); })).then(function() { setTimeout(function() { window.print(); }, 250); }); });</script>' : '';
 
@@ -389,7 +389,7 @@
       filter: drop-shadow(0 2px 4px rgba(7, 64, 115, 0.12));
     }
     .o_pdf_company_title_box { display: flex; align-items: center; justify-content: flex-start; min-width: 0; flex: 1; }
-    .o_pdf_brand_banner { max-height: 85px; max-width: 100%; width: auto; height: auto; object-fit: contain; display: block; }
+    .o_pdf_brand_banner { max-height: 102px; max-width: 100%; width: auto; height: auto; object-fit: contain; display: block; }
     .o_pdf_company_details {
       display: flex;
       flex-direction: column;
@@ -526,7 +526,7 @@
       }
       .o_pdf_brand_banner {
         display: block !important;
-        max-height: 85px !important;
+        max-height: 102px !important;
         max-width: 100% !important;
         width: auto !important;
         height: auto !important;

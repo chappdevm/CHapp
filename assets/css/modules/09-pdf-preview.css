@@ -347,7 +347,7 @@
 
 .o_pdf_company_title_box { display: flex; align-items: center; justify-content: flex-start; min-width: 0; flex: 1; }
 .o_pdf_brand_banner {
-  max-height: 85px;
+  max-height: 102px;
   max-width: 100%;
   width: auto;
   height: auto;
@@ -832,7 +832,7 @@
   }
   .o_pdf_brand_banner {
     display: block !important;
-    max-height: 85px !important;
+    max-height: 102px !important;
     max-width: 100% !important;
     width: auto !important;
     height: auto !important;

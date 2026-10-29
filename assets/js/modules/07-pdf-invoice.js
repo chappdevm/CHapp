@@ -97,7 +97,7 @@
         reader.readAsDataURL(blob);
       }).catch(() => {});
 
-    fetch('/assets/icons/brand-banner.jpg')
+    fetch('/assets/icons/brand-banner.png')
       .then((r) => (r.ok ? r.blob() : null))
       .then((blob) => {
         if (!blob) return;
@@ -136,7 +136,7 @@
         canvas.height = bImg.naturalHeight;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(bImg, 0, 0);
-        cachedBannerDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+        cachedBannerDataUrl = canvas.toDataURL('image/png');
         return cachedBannerDataUrl;
       }
     } catch (_) {}
@@ -232,7 +232,7 @@
     const logoData = typeof getLogoDataUrl === 'function' ? getLogoDataUrl() : '';
     const logoSrc = logoData && logoData.startsWith('data:') ? logoData : '/assets/icons/logo.png';
     const bannerData = typeof getBannerDataUrl === 'function' ? getBannerDataUrl() : '';
-    const bannerSrc = bannerData && bannerData.startsWith('data:') ? bannerData : '/assets/icons/brand-banner.jpg';
+    const bannerSrc = bannerData && bannerData.startsWith('data:') ? bannerData : '/assets/icons/brand-banner.png';
 
     return `
       <div class="o_pdf_sheet" id="invoicePdfSheet">
@@ -533,9 +533,9 @@
     }
     const bannerData = getBannerDataUrl();
     if (bannerData && bannerData.startsWith('data:')) {
-      sheetHtml = sheetHtml.replace('src="/assets/icons/brand-banner.jpg"', 'src="' + bannerData + '"');
+      sheetHtml = sheetHtml.replace('src="/assets/icons/brand-banner.png"', 'src="' + bannerData + '"');
     } else if (window.location && window.location.origin) {
-      sheetHtml = sheetHtml.replace('src="/assets/icons/brand-banner.jpg"', 'src="' + window.location.origin + '/assets/icons/brand-banner.jpg"');
+      sheetHtml = sheetHtml.replace('src="/assets/icons/brand-banner.png"', 'src="' + window.location.origin + '/assets/icons/brand-banner.png"');
     }
     const printScript = autoPrint ? '<script>window.addEventListener("load", function() { var imgs = Array.from(document.images); Promise.all(imgs.map(function(img) { if (img.complete) return Promise.resolve(); return new Promise(function(res) { img.onload = img.onerror = res; }); })).then(function() { setTimeout(function() { window.print(); }, 250); }); });</script>' : '';
 
@@ -636,7 +636,7 @@
       filter: drop-shadow(0 2px 4px rgba(7, 64, 115, 0.12));
     }
     .o_pdf_company_title_box { display: flex; align-items: center; justify-content: flex-start; min-width: 0; flex: 1; }
-    .o_pdf_brand_banner { max-height: 85px; max-width: 100%; width: auto; height: auto; object-fit: contain; display: block; }
+    .o_pdf_brand_banner { max-height: 102px; max-width: 100%; width: auto; height: auto; object-fit: contain; display: block; }
     .o_pdf_company_details { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.88rem; color: #334155; line-height: 1.45; border-top: 1px dashed #cbd5e1; padding-top: 0.65rem; }
     .o_pdf_detail_row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.6rem; }
     .o_pdf_detail_row strong { color: #074073; font-weight: 700; }
@@ -840,7 +840,7 @@
         object-fit: contain !important;
         margin: 0 auto !important;
       }
-      .o_pdf_brand_banner { display: block !important; max-height: 85px !important; max-width: 100% !important; width: auto !important; height: auto !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; object-fit: contain !important; }
+      .o_pdf_brand_banner { display: block !important; max-height: 102px !important; max-width: 100% !important; width: auto !important; height: auto !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; object-fit: contain !important; }
       .o_pdf_company_details { font-size: 0.88rem !important; }
       .o_pdf_doc_box { width: 100% !important; }
       .o_pdf_watermark { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
