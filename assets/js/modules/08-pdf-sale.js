@@ -78,6 +78,8 @@
 
     const logoData = typeof getLogoDataUrl === 'function' ? getLogoDataUrl() : '';
     const logoSrc = logoData && logoData.startsWith('data:') ? logoData : '/assets/icons/logo.png';
+    const bannerData = typeof getBannerDataUrl === 'function' ? getBannerDataUrl() : '';
+    const bannerSrc = bannerData && bannerData.startsWith('data:') ? bannerData : '/assets/icons/brand-banner.jpg';
 
     return `
       <div class="o_pdf_sheet" id="salePdfSheet">
@@ -90,8 +92,7 @@
                 <img src="${logoSrc}" alt="CH Aluminios" class="o_pdf_company_logo" onerror="if(!this.src.startsWith('data:'))this.style.display='none'" />
               </div>
               <div class="o_pdf_company_title_box">
-                <h2 class="o_pdf_brand_title"><span class="brand-ch">CH</span> <span class="brand-aluminios">ALUMINIOS</span></h2>
-                <div class="o_pdf_brand_tagline">Calidad para tu hogar</div>
+                <img src="${bannerSrc}" alt="${esc(company.company_name || 'CH Aluminios')} - Calidad para tu Hogar" class="o_pdf_brand_banner" onerror="if(!this.src.startsWith('data:'))this.style.display='none'" />
               </div>
             </div>
             <div class="o_pdf_company_info">
@@ -257,6 +258,14 @@
             logoImg.src = logoData;
           }
         }
+        const bannerData = typeof getBannerDataUrl === 'function' ? getBannerDataUrl() : '';
+        const bannerImg = targetEl.querySelector('.o_pdf_brand_banner');
+        if (bannerImg) {
+          bannerImg.style.display = 'block';
+          if (bannerData && bannerData.startsWith('data:')) {
+            bannerImg.src = bannerData;
+          }
+        }
 
         const opt = {
           margin: [8, 8, 8, 8],
@@ -284,6 +293,12 @@
       sheetHtml = sheetHtml.replace(/onerror="[^"]*"/g, '');
     } else if (typeof window !== 'undefined' && window.location && window.location.origin) {
       sheetHtml = sheetHtml.replace('src="/assets/icons/logo.png"', 'src="' + window.location.origin + '/assets/icons/logo.png"');
+    }
+    const bannerData = typeof getBannerDataUrl === 'function' ? getBannerDataUrl() : '';
+    if (bannerData && bannerData.startsWith('data:')) {
+      sheetHtml = sheetHtml.replace('src="/assets/icons/brand-banner.jpg"', 'src="' + bannerData + '"');
+    } else if (typeof window !== 'undefined' && window.location && window.location.origin) {
+      sheetHtml = sheetHtml.replace('src="/assets/icons/brand-banner.jpg"', 'src="' + window.location.origin + '/assets/icons/brand-banner.jpg"');
     }
     const printScript = autoPrint ? '<script>window.addEventListener("load", function() { var imgs = Array.from(document.images); Promise.all(imgs.map(function(img) { if (img.complete) return Promise.resolve(); return new Promise(function(res) { img.onload = img.onerror = res; }); })).then(function() { setTimeout(function() { window.print(); }, 250); }); });</script>' : '';
 
@@ -373,24 +388,8 @@
       display: block;
       filter: drop-shadow(0 2px 4px rgba(7, 64, 115, 0.12));
     }
-    .o_pdf_company_title_box {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      min-width: 0;
-    }
-    .o_pdf_brand_title {
-      font-size: 1.85rem;
-      font-weight: 900;
-      letter-spacing: 0.05em;
-      margin: 0 0 0.18rem 0;
-      line-height: 1.1;
-      white-space: nowrap;
-      text-transform: uppercase;
-    }
-    .o_pdf_brand_title .brand-ch { color: #074073; font-weight: 900; letter-spacing: 0.02em; }
-    .o_pdf_brand_title .brand-aluminios { color: #0284c7; font-weight: 800; letter-spacing: 0.05em; }
-    .o_pdf_brand_tagline { font-size: 0.82rem; font-weight: 600; color: #64748b; letter-spacing: 0.02em; font-style: italic; }
+    .o_pdf_company_title_box { display: flex; align-items: center; justify-content: flex-start; min-width: 0; flex: 1; }
+    .o_pdf_brand_banner { max-height: 85px; max-width: 100%; width: auto; height: auto; object-fit: contain; display: block; }
     .o_pdf_company_details {
       display: flex;
       flex-direction: column;
@@ -525,8 +524,15 @@
         object-fit: contain !important;
         margin: 0 auto !important;
       }
-      .o_pdf_brand_title {
-        white-space: nowrap !important;
+      .o_pdf_brand_banner {
+        display: block !important;
+        max-height: 85px !important;
+        max-width: 100% !important;
+        width: auto !important;
+        height: auto !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        object-fit: contain !important;
       }
       .o_pdf_company_details {
         font-size: 0.88rem !important;

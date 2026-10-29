@@ -230,12 +230,20 @@
     targetEl.style.margin = '0 auto';
     targetEl.style.boxShadow = 'none';
     targetEl.style.border = 'none';
-    const logoData = getLogoDataUrl();
+    const logoData = typeof getLogoDataUrl === 'function' ? getLogoDataUrl() : '';
     const logoImg = targetEl.querySelector('.o_pdf_company_logo');
     if (logoImg) {
       logoImg.style.display = 'block';
       if (logoData && logoData.startsWith('data:')) {
         logoImg.src = logoData;
+      }
+    }
+    const bannerData = typeof getBannerDataUrl === 'function' ? getBannerDataUrl() : '';
+    const bannerImg = targetEl.querySelector('.o_pdf_brand_banner');
+    if (bannerImg) {
+      bannerImg.style.display = 'block';
+      if (bannerData && bannerData.startsWith('data:')) {
+        bannerImg.src = bannerData;
       }
     }
 

@@ -84,6 +84,7 @@
 
   
   let cachedLogoDataUrl = '';
+  let cachedBannerDataUrl = '';
   if (typeof window !== 'undefined' && typeof fetch === 'function') {
     fetch('/assets/icons/logo.png')
       .then((r) => (r.ok ? r.blob() : null))
@@ -91,13 +92,21 @@
         if (!blob) return;
         const reader = new FileReader();
         reader.onloadend = () => {
-          if (reader.result && typeof reader.result === 'string') {
-            cachedLogoDataUrl = reader.result;
-          }
+          if (reader.result && typeof reader.result === 'string') cachedLogoDataUrl = reader.result;
         };
         reader.readAsDataURL(blob);
-      })
-      .catch(() => {});
+      }).catch(() => {});
+
+    fetch('/assets/icons/brand-banner.jpg')
+      .then((r) => (r.ok ? r.blob() : null))
+      .then((blob) => {
+        if (!blob) return;
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          if (reader.result && typeof reader.result === 'string') cachedBannerDataUrl = reader.result;
+        };
+        reader.readAsDataURL(blob);
+      }).catch(() => {});
   }
 
   function getLogoDataUrl() {
@@ -115,6 +124,28 @@
       }
     } catch (_) {}
     return cachedLogoDataUrl || '';
+  }
+
+  function getBannerDataUrl() {
+    if (cachedBannerDataUrl) return cachedBannerDataUrl;
+    try {
+      const bImg = document.querySelector('.o_pdf_brand_banner');
+      if (bImg && bImg.complete && bImg.naturalWidth > 0) {
+        const canvas = document.createElement('canvas');
+        canvas.width = bImg.naturalWidth;
+        canvas.height = bImg.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(bImg, 0, 0);
+        cachedBannerDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+        return cachedBannerDataUrl;
+      }
+    } catch (_) {}
+    return cachedBannerDataUrl || '';
+  }
+
+  if (typeof window !== 'undefined') {
+    window.getLogoDataUrl = getLogoDataUrl;
+    window.getBannerDataUrl = getBannerDataUrl;
   }
 
   function renderInvoicePdfSheetHtml(invoice) {
@@ -200,6 +231,8 @@
 
     const logoData = typeof getLogoDataUrl === 'function' ? getLogoDataUrl() : '';
     const logoSrc = logoData && logoData.startsWith('data:') ? logoData : '/assets/icons/logo.png';
+    const bannerData = typeof getBannerDataUrl === 'function' ? getBannerDataUrl() : '';
+    const bannerSrc = bannerData && bannerData.startsWith('data:') ? bannerData : '/assets/icons/brand-banner.jpg';
 
     return `
       <div class="o_pdf_sheet" id="invoicePdfSheet">
@@ -212,8 +245,7 @@
                 <img src="${logoSrc}" alt="CH Aluminios" class="o_pdf_company_logo" onerror="if(!this.src.startsWith('data:'))this.style.display='none'" />
               </div>
               <div class="o_pdf_company_title_box">
-                <h2 class="o_pdf_brand_title"><span class="brand-ch">CH</span> <span class="brand-aluminios">ALUMINIOS</span></h2>
-                <div class="o_pdf_brand_tagline">Calidad para tu hogar</div>
+                <img src="${bannerSrc}" alt="${esc(company.company_name || 'CH Aluminios')} - Calidad para tu Hogar" class="o_pdf_brand_banner" onerror="if(!this.src.startsWith('data:'))this.style.display='none'" />
               </div>
             </div>
             <div class="o_pdf_company_info">
@@ -463,6 +495,14 @@
             logoImg.src = logoData;
           }
         }
+        const bannerData = getBannerDataUrl();
+        const bannerImg = targetEl.querySelector('.o_pdf_brand_banner');
+        if (bannerImg) {
+          bannerImg.style.display = 'block';
+          if (bannerData && bannerData.startsWith('data:')) {
+            bannerImg.src = bannerData;
+          }
+        }
 
         const opt = {
           margin: [8, 8, 8, 8],
@@ -490,6 +530,12 @@
       sheetHtml = sheetHtml.replace(/onerror="[^"]*"/g, '');
     } else if (window.location && window.location.origin) {
       sheetHtml = sheetHtml.replace('src="/assets/icons/logo.png"', 'src="' + window.location.origin + '/assets/icons/logo.png"');
+    }
+    const bannerData = getBannerDataUrl();
+    if (bannerData && bannerData.startsWith('data:')) {
+      sheetHtml = sheetHtml.replace('src="/assets/icons/brand-banner.jpg"', 'src="' + bannerData + '"');
+    } else if (window.location && window.location.origin) {
+      sheetHtml = sheetHtml.replace('src="/assets/icons/brand-banner.jpg"', 'src="' + window.location.origin + '/assets/icons/brand-banner.jpg"');
     }
     const printScript = autoPrint ? '<script>window.addEventListener("load", function() { var imgs = Array.from(document.images); Promise.all(imgs.map(function(img) { if (img.complete) return Promise.resolve(); return new Promise(function(res) { img.onload = img.onerror = res; }); })).then(function() { setTimeout(function() { window.print(); }, 250); }); });</script>' : '';
 
@@ -589,43 +635,15 @@
       display: block;
       filter: drop-shadow(0 2px 4px rgba(7, 64, 115, 0.12));
     }
-    .o_pdf_company_title_box { display: flex; flex-direction: column; justify-content: center; min-width: 0; }
-    .o_pdf_brand_title {
-      font-size: 1.85rem;
-      font-weight: 900;
-      letter-spacing: 0.05em;
-      margin: 0 0 0.18rem 0;
-      line-height: 1.1;
-      white-space: nowrap;
-      text-transform: uppercase;
-    }
-    .o_pdf_brand_title .brand-ch { color: #074073; font-weight: 900; letter-spacing: 0.02em; }
-    .o_pdf_brand_title .brand-aluminios { color: #0284c7; font-weight: 800; letter-spacing: 0.05em; }
-    .o_pdf_brand_tagline { font-size: 0.82rem; font-weight: 600; color: #64748b; letter-spacing: 0.02em; font-style: italic; }
-    .o_pdf_company_details {
-      display: flex;
-      flex-direction: column;
-      gap: 0.3rem;
-      font-size: 0.88rem;
-      color: #334155;
-      line-height: 1.45;
-      border-top: 1px dashed #cbd5e1;
-      padding-top: 0.65rem;
-    }
+    .o_pdf_company_title_box { display: flex; align-items: center; justify-content: flex-start; min-width: 0; flex: 1; }
+    .o_pdf_brand_banner { max-height: 85px; max-width: 100%; width: auto; height: auto; object-fit: contain; display: block; }
+    .o_pdf_company_details { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.88rem; color: #334155; line-height: 1.45; border-top: 1px dashed #cbd5e1; padding-top: 0.65rem; }
     .o_pdf_detail_row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.6rem; }
     .o_pdf_detail_row strong { color: #074073; font-weight: 700; }
     .o_pdf_detail_row .detail-sep { color: #94a3b8; font-weight: bold; }
     .o_pdf_company_info p { margin: 0.2rem 0; font-size: 0.82rem; color: #475569; line-height: 1.45; }
     .o_pdf_company_info p strong { color: #074073; }
-    .o_pdf_doc_box {
-      background: rgba(248, 250, 252, 0.85);
-      border: 2px solid #074073;
-      border-radius: 8px;
-      padding: 0.75rem 1rem;
-      text-align: center;
-      width: 100%;
-      box-shadow: 0 2px 4px rgba(7, 64, 115, 0.08);
-    }
+    .o_pdf_doc_box { background: rgba(248, 250, 252, 0.85); border: 2px solid #074073; border-radius: 8px; padding: 0.75rem 1rem; text-align: center; width: 100%; box-shadow: 0 2px 4px rgba(7, 64, 115, 0.08); }
     .doc_type_title {
       font-size: 0.82rem;
       font-weight: 800;
@@ -822,7 +840,7 @@
         object-fit: contain !important;
         margin: 0 auto !important;
       }
-      .o_pdf_brand_title { white-space: nowrap !important; }
+      .o_pdf_brand_banner { display: block !important; max-height: 85px !important; max-width: 100% !important; width: auto !important; height: auto !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; object-fit: contain !important; }
       .o_pdf_company_details { font-size: 0.88rem !important; }
       .o_pdf_doc_box { width: 100% !important; }
       .o_pdf_watermark { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
