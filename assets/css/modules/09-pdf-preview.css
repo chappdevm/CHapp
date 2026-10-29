@@ -347,27 +347,22 @@
 
 .o_pdf_company_title_box { display: flex; flex-direction: column; justify-content: center; min-width: 0; }
 .o_pdf_brand_title {
-  font-size: 1.65rem;
+  font-size: 1.85rem;
   font-weight: 900;
-  letter-spacing: 0.07em;
-  margin: 0 0 0.15rem 0;
-  line-height: 1.15;
+  letter-spacing: 0.05em;
+  margin: 0 0 0.18rem 0;
+  line-height: 1.1;
   white-space: nowrap;
   text-transform: uppercase;
 }
-.o_pdf_brand_title .brand-ch { color: #074073; font-weight: 900; }
-.o_pdf_brand_title .brand-aluminios {
-  color: #0284c7;
-  background: linear-gradient(135deg, #074073 15%, #0284c7 65%, #14B5D9 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
+.o_pdf_brand_title .brand-ch { color: #074073; font-weight: 900; letter-spacing: 0.02em; }
+.o_pdf_brand_title .brand-aluminios { color: #0284c7; font-weight: 800; letter-spacing: 0.05em; }
 .o_pdf_brand_tagline {
-  font-size: 0.72rem;
-  font-weight: 700;
+  font-size: 0.82rem;
+  font-weight: 600;
   color: #64748b;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-style: italic;
 }
 .o_pdf_company_details {
   display: flex;
