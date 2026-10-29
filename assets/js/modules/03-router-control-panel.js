@@ -85,23 +85,10 @@
       if (state.viewType === 'form') {
         actionBtns.innerHTML = `
           <button type="button" class="btn btn-secondary" id="btnCpBackToList">Volver a Existencias</button>
-          <button type="button" class="btn btn-primary" id="btnInvGoToExpense">Entrada por Gasto</button>
-        `;
-      } else if (state.submenu === 'moves') {
-        actionBtns.innerHTML = `
-          <button type="button" class="btn btn-primary" id="btnInvGoToExpense" style="display: inline-flex; align-items: center; gap: 6px;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            Nueva Entrada (Gasto)
-          </button>
         `;
       } else {
-        actionBtns.innerHTML = `
-          <button type="button" class="btn btn-primary" id="btnInvGoToExpense" style="display: inline-flex; align-items: center; gap: 6px;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            Entrada por Gasto
-          </button>
-          <button type="button" class="btn btn-secondary" id="btnInvViewMovesList">Ver Movimientos</button>
-        `;
+        // En inventario, los botones de acción rápida se mantienen en la tarjeta del banner para evitar duplicados
+        actionBtns.innerHTML = '';
       }
     } else {
       actionBtns.innerHTML = `<button type="button" class="btn btn-primary" id="btnCpNewRecord"${productAttr}>${newRecordLabel}</button>`;
@@ -165,7 +152,7 @@
 
     // View Switcher (Kanban / List)
     // En las facturas y contabilidad se quita la opción de elegir lista/kanban: siempre lista por defecto
-    if (state.currentApp === 'accounting' || state.currentApp === 'expenses' || state.currentApp === 'contacts' || state.currentApp === 'sales') {
+    if (state.currentApp === 'accounting' || state.currentApp === 'expenses' || state.currentApp === 'contacts' || state.currentApp === 'sales' || state.currentApp === 'inventory') {
       switcher.innerHTML = '';
       if (state.viewType !== 'form') {
         state.viewType = 'list';
