@@ -116,6 +116,21 @@
     });
   }
 
+  /**
+   * Devuelve la etiqueta del precio según la unidad de medida.
+   * @param {string} uom Unidad de medida del producto.
+   * @param {boolean} withCurrency Si se agrega el sufijo "(COP)".
+   */
+  function getProductPriceLabel(uom, withCurrency = false) {
+    let label = 'Precio de Venta';
+    if (uom === 'Metro Lineal' || uom === 'Metro Liso') {
+      label = 'Precio por Metro Lineal';
+    } else if (uom === 'Metro Cuadrado') {
+      label = 'Precio por Metro Cuadrado';
+    }
+    return withCurrency ? `${label} (COP)` : label;
+  }
+
   function renderProductForm(container) {
     const isNew = state.activeRecordId === 'new';
     const products = state.data.products || [];
@@ -156,19 +171,20 @@
           </div>
 
           <form id="productForm" class="o_form_sheet" onsubmit="return false;">
-            <div class="o_button_box">
-              <div class="o_stat_button oe_stat_button" style="cursor: default;">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
-                <div class="o_stat_info">
-                  <span class="o_stat_value">${formatMoney(existing.list_price || 0)}</span>
-                  <span class="o_stat_text">Precio de Venta</span>
+            <div class="o_form_header_row" style="align-items: center;">
+              <div class="o_form_title_group" style="flex: 1 1 320px; margin-bottom: 0;">
+                <label for="prodName" class="o_form_label_title">Nombre del Producto *</label>
+                <input type="text" id="prodName" class="o_input_title" style="font-size: clamp(1.5rem, 4.5vw, 2rem);" placeholder="Ej. Alfombra Modular..." value="${esc(existing.name || '')}" required />
+              </div>
+              <div class="o_button_box">
+                <div class="o_stat_button oe_stat_button" style="cursor: default;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+                  <div class="o_stat_info">
+                    <span class="o_stat_value">${formatMoney(existing.list_price || 0)}</span>
+                    <span class="o_stat_text" id="prodPriceStatText">${getProductPriceLabel(existing.uom)}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-
-            <div class="o_form_title_group">
-              <label for="prodName" class="o_form_label_title">Nombre del Producto *</label>
-              <input type="text" id="prodName" class="o_input_title" placeholder="Ej. Alfombra Modular..." value="${esc(existing.name || '')}" required />
             </div>
 
             <div class="o_notebook">
@@ -183,10 +199,6 @@
                     <input type="text" id="prodSku" class="o_input" placeholder="Ej. PRD-001" value="${esc(existing.default_code || '')}" />
                   </div>
                   <div class="o_field_row">
-                    <label for="prodCategory">Categoría</label>
-                    <input type="text" id="prodCategory" class="o_input" placeholder="Ej. Pisos, Revestimientos, General" value="${esc(existing.category || 'General')}" />
-                  </div>
-                  <div class="o_field_row">
                     <label for="prodUom">Unidad de Medida</label>
                     <select id="prodUom" class="o_select">
                       <option value="" ${!existing.uom ? 'selected disabled' : ''}>— Seleccione Unidad de Medida —</option>
@@ -196,7 +208,7 @@
                     </select>
                   </div>
                   <div class="o_field_row">
-                    <label for="prodPrice">Precio de Venta (COP)</label>
+                    <label for="prodPrice" id="prodPriceLabel">${getProductPriceLabel(existing.uom, true)}</label>
                     <input type="number" id="prodPrice" class="o_input" min="0" step="any" value="${existing.list_price ?? 0}" />
                   </div>
                   <div class="o_field_row">
@@ -216,6 +228,16 @@
       </div>
     `;
 
+    const uomSelect = document.getElementById('prodUom');
+    if (uomSelect) {
+      uomSelect.addEventListener('change', () => {
+        const priceLabel = document.getElementById('prodPriceLabel');
+        const statText = document.getElementById('prodPriceStatText');
+        if (priceLabel) priceLabel.textContent = getProductPriceLabel(uomSelect.value, true);
+        if (statText) statText.textContent = getProductPriceLabel(uomSelect.value);
+      });
+    }
+
     const btnSaveProd = document.getElementById('btnSaveProductForm');
     if (btnSaveProd) {
       btnSaveProd.addEventListener('click', () => {
@@ -226,7 +248,7 @@
             return;
           }
           const default_code = (document.getElementById('prodSku').value || '').trim();
-          const category = (document.getElementById('prodCategory').value || 'General').trim();
+          const category = existing.category || 'General';
           const uom = (document.getElementById('prodUom').value || '').trim();
           if (!uom) {
             showToast('Debe seleccionar una unidad de medida.', true);
