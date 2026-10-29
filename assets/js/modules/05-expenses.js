@@ -301,18 +301,6 @@
                 <input type="number" id="fExpTotal" class="o_input" min="1" step="any" value="${Number(existing.total_amount || existing.price_unit || 0)}" required style="font-size: 1.1rem; font-weight: 700; color: #2563eb;" />
               </div>
               <div class="o_field_row">
-                <label for="fExpProduct">Categoría de Gasto</label>
-                <select id="fExpProduct" class="o_select">
-                  <option value="" ${!existing.product_id ? 'selected disabled' : ''}>— Seleccione Categoría de Gasto —</option>
-                  ${(state.data.products || [])
-                    .map(
-                      (p) =>
-                        `<option value="${p.id}" ${Number(existing.product_id) === Number(p.id) ? 'selected' : ''}>${esc(p.name)}</option>`
-                    )
-                    .join('')}
-                </select>
-              </div>
-              <div class="o_field_row">
                 <label for="fExpJournal">Cuenta / Medio de Pago *</label>
                 <select id="fExpJournal" class="o_select" required>
                   ${((state.data.accounting && state.data.accounting.journals) || [])
@@ -322,27 +310,28 @@
                 </select>
               </div>
               <div class="o_field_row">
-                <label for="fExpPayMode">Forma de Pago</label>
-                <select id="fExpPayMode" class="o_select">
-                  <option value="" ${!existing.payment_mode ? 'selected disabled' : ''}>— Seleccione Forma de Pago —</option>
-                  <option value="company_account" ${existing.payment_mode === 'company_account' ? 'selected' : ''}>Compañía (Transferencia / Tarjeta / Caja)</option>
-                  <option value="own_account" ${existing.payment_mode === 'own_account' ? 'selected' : ''}>Empleado (a reembolsar)</option>
-                </select>
-              </div>
-              <div class="o_field_row">
                 <label for="fExpEmployee">Responsable / Empleado</label>
                 <input type="text" id="fExpEmployee" class="o_input" value="${esc(existing.employee_name || 'Andrés Salazar')}" />
               </div>
             </div>
 
             <div style="display: none;" aria-hidden="true">
-                <select id="fExpTax">
-                  <option value="" ${existing.tax_rate === '' || existing.tax_rate === undefined || existing.tax_rate === null ? 'selected disabled' : ''}>— Seleccione IVA —</option>
-                  <option value="0" ${existing.tax_rate === 0 ? 'selected' : ''}>IVA 0% (Exento)</option>
-                  <option value="5" ${existing.tax_rate === 5 ? 'selected' : ''}>IVA 5%</option>
-                  <option value="19" ${existing.tax_rate === 19 ? 'selected' : ''}>IVA 19%</option>
-                </select>
-              </div>
+              <select id="fExpProduct">
+                <option value="" ${!existing.product_id ? 'selected disabled' : ''}>— Seleccione Categoría de Gasto —</option>
+                ${(state.data.products || []).map((p) => `<option value="${p.id}" ${Number(existing.product_id) === Number(p.id) ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
+              </select>
+              <select id="fExpPayMode">
+                <option value="" ${!existing.payment_mode ? 'selected disabled' : ''}>— Seleccione Forma de Pago —</option>
+                <option value="company_account" ${existing.payment_mode === 'company_account' || !existing.payment_mode ? 'selected' : ''}>Compañía (Transferencia / Tarjeta / Caja)</option>
+                <option value="own_account" ${existing.payment_mode === 'own_account' ? 'selected' : ''}>Empleado (a reembolsar)</option>
+              </select>
+              <select id="fExpTax">
+                <option value="" ${existing.tax_rate === '' || existing.tax_rate === undefined || existing.tax_rate === null ? 'selected disabled' : ''}>— Seleccione IVA —</option>
+                <option value="0" ${existing.tax_rate === 0 ? 'selected' : ''}>IVA 0% (Exento)</option>
+                <option value="5" ${existing.tax_rate === 5 ? 'selected' : ''}>IVA 5%</option>
+                <option value="19" ${existing.tax_rate === 19 ? 'selected' : ''}>IVA 19%</option>
+              </select>
+            </div>
 
             <!-- Tabla estructurada de Artículos / Productos -->
             <div style="margin-top: 1.25rem; border-top: 1px solid var(--o-border); padding-top: 1rem;">
@@ -729,7 +718,8 @@
             ? (state.data.contacts || []).find((c) => Number(c.id) === Number(partnerVal))
             : (partnerNameInput ? (state.data.contacts || []).find((c) => c.name.toLowerCase() === partnerNameInput.toLowerCase()) : null);
 
-          const prodVal = document.getElementById('fExpProduct').value;
+          const prodEl = document.getElementById('fExpProduct');
+          const prodVal = prodEl ? prodEl.value : (existing.product_id || null);
           const defaultProd = (state.data.products || [])[0];
           const suppVatInput = document.getElementById('fExpPartnerVat') ? document.getElementById('fExpPartnerVat').value.trim() : '';
 
@@ -778,7 +768,7 @@
             total_amount: totalAmount,
             literal_totals: useLiteral,
             journal_code: document.getElementById('fExpJournal') ? document.getElementById('fExpJournal').value : (existing.journal_code || 'CSH1'),
-            payment_mode: document.getElementById('fExpPayMode').value || 'company_account',
+            payment_mode: (document.getElementById('fExpPayMode') && document.getElementById('fExpPayMode').value) || existing.payment_mode || 'company_account',
             notes: document.getElementById('fExpNotes').value.trim(),
             receipt_image: existing.receipt_image || '',
             items: cleanItems.length > 0 ? cleanItems : [{ id: 1, description: name, quantity: 1, price_unit: totalAmount, tax_rate: 0, tax_amount: 0, subtotal: totalAmount, total: totalAmount }]
