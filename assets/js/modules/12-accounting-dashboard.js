@@ -15,7 +15,37 @@
     return `<span class="o_badge ${item.cls}">${esc(item.text)}</span>`;
   }
 
-  function generateMonthBalanceSvg(m) {
+  function calculateMonthFinancials(monthKey) {
+    const acc = (state.data && state.data.accounting) || { payments: [] };
+    const payments = acc.payments || [];
+    const expenses = (state.data && state.data.expenses) || [];
+
+    const inflow = payments
+      .filter((p) => p.payment_type === 'inbound' && p.state !== 'cancel' && (p.date || '').startsWith(monthKey))
+      .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+    const monthExpensesTotal = expenses
+      .filter((e) => e.state !== 'cancel' && (e.date || '').startsWith(monthKey))
+      .reduce((sum, e) => sum + Number(e.total_amount || 0), 0);
+
+    const monthOutPayments = payments
+      .filter((p) => p.payment_type === 'outbound' && p.state !== 'cancel' && (p.date || '').startsWith(monthKey))
+      .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+    const outflow = Math.max(monthExpensesTotal, monthOutPayments);
+    const net = round2(inflow - outflow);
+    const margin_pct = inflow > 0 ? Math.round(((inflow - outflow) / inflow) * 100) : 0;
+
+    return {
+      inflow: round2(inflow),
+      outflow: round2(outflow),
+      net,
+      margin_pct,
+      key: monthKey
+    };
+  }
+
+  function generateMonthBalanceInnerSvg(m) {
     const data = m || { inflow: 0, outflow: 0, net: 0, margin_pct: 0 };
     const maxVal = Math.max(Number(data.inflow || 0), Number(data.outflow || 0), Math.abs(Number(data.net || 0)), 1);
     const chartH = 120;
@@ -27,46 +57,77 @@
     const isNetPos = Number(data.net || 0) >= 0;
 
     return `
+      <svg viewBox="0 0 600 220" style="width: 100%; height: auto; max-height: 250px; font-family: inherit;" role="img" aria-label="Gráfica comparativa de balance del mes">
+        <!-- Lineas de escala -->
+        <line x1="40" y1="40" x2="560" y2="40" stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" /><line x1="40" y1="80" x2="560" y2="80" stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" /><line x1="40" y1="120" x2="560" y2="120" stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" />
+        <line x1="40" y1="${baseY}" x2="560" y2="${baseY}" stroke="currentColor" stroke-opacity="0.25" stroke-width="1.5" />
+
+        <!-- Barra 1: Recaudado -->
+        <g>
+          <rect x="85" y="${baseY - hInflow}" width="85" height="${hInflow}" rx="5" fill="#10b981" />
+          <text x="127" y="${Math.max(25, baseY - hInflow - 8)}" font-size="12" font-weight="700" fill="#10b981" text-anchor="middle">${formatMoney(data.inflow)}</text>
+          <text x="127" y="${baseY + 22}" font-size="12" font-weight="600" fill="var(--o-text-main)" text-anchor="middle">Recaudado</text>
+          <text x="127" y="${baseY + 38}" font-size="10" fill="var(--o-text-muted)" text-anchor="middle">Cobros Reales</text>
+        </g>
+
+        <!-- Barra 2: Gastos Pagados -->
+        <g>
+          <rect x="255" y="${baseY - hOutflow}" width="85" height="${hOutflow}" rx="5" fill="#ef4444" />
+          <text x="297" y="${Math.max(25, baseY - hOutflow - 8)}" font-size="12" font-weight="700" fill="#ef4444" text-anchor="middle">${formatMoney(data.outflow)}</text>
+          <text x="297" y="${baseY + 22}" font-size="12" font-weight="600" fill="var(--o-text-main)" text-anchor="middle">Gastos Pagados</text>
+          <text x="297" y="${baseY + 38}" font-size="10" fill="var(--o-text-muted)" text-anchor="middle">Total Gastos</text>
+        </g>
+
+        <!-- Barra 3: Balance Neto -->
+        <g>
+          <rect x="425" y="${baseY - hNet}" width="85" height="${hNet}" rx="5" fill="${isNetPos ? '#0ea5e9' : '#f59e0b'}" />
+          <text x="467" y="${Math.max(25, baseY - hNet - 8)}" font-size="12" font-weight="700" fill="${isNetPos ? '#0ea5e9' : '#f59e0b'}" text-anchor="middle">${formatMoney(data.net)}</text>
+          <text x="467" y="${baseY + 22}" font-size="12" font-weight="600" fill="var(--o-text-main)" text-anchor="middle">Balance Neto</text>
+          <text x="467" y="${baseY + 38}" font-size="10" fill="var(--o-text-muted)" text-anchor="middle">Cajas / Bancos</text>
+        </g>
+      </svg>
+    `;
+  }
+
+  function generateMonthBalanceSvg(m) {
+    const data = m || { inflow: 0, outflow: 0, net: 0, margin_pct: 0 };
+    const now = new Date();
+    const currYear = now.getFullYear();
+    const currMonth = String(now.getMonth() + 1).padStart(2, '0');
+
+    const years = [currYear - 2, currYear - 1, currYear, currYear + 1];
+    const months = [{ v: '01', l: 'Enero' }, { v: '02', l: 'Febrero' }, { v: '03', l: 'Marzo' }, { v: '04', l: 'Abril' }, { v: '05', l: 'Mayo' }, { v: '06', l: 'Junio' }, { v: '07', l: 'Julio' }, { v: '08', l: 'Agosto' }, { v: '09', l: 'Septiembre' }, { v: '10', l: 'Octubre' }, { v: '11', l: 'Noviembre' }, { v: '12', l: 'Diciembre' }];
+
+    return `
       <div style="position: relative; width: 100%;">
-        <!-- Badge Margen Operativo ubicado en la esquina de la sección para no chocar con las barras ni elementos -->
-        <div style="display: flex; justify-content: flex-end; padding: 0.5rem 1rem 0; margin-bottom: -6px;">
-          <span style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 9999px; background: rgba(14, 165, 233, 0.12); color: #0ea5e9; font-size: 0.8rem; font-weight: 700; border: 1px solid rgba(14, 165, 233, 0.25);">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
-            Margen Operativo: ${data.margin_pct >= 0 ? '+' : ''}${data.margin_pct}%
-          </span>
+        <!-- Toolbar con filtro de Mes/Año al estilo de la app y Badge de Margen en la esquina -->
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; padding: 0.75rem 1rem 0; margin-bottom: 2px;">
+          <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
+            <label for="accFilterMonth" style="font-size: 0.82rem; font-weight: 700; color: var(--o-text-muted); display: inline-flex; align-items: center; gap: 4px; margin: 0;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+              Periodo:
+            </label>
+            <select id="accFilterMonth" class="form-control form-control-sm" style="width: auto; padding: 4px 8px; font-size: 0.82rem; font-weight: 600; border-radius: 6px; border: 1px solid var(--o-border-color); background: var(--o-view-bg); color: var(--o-text-main);">
+              ${months.map(mo => `<option value="${mo.v}" ${mo.v === currMonth ? 'selected' : ''}>${mo.l}</option>`).join('')}
+            </select>
+            <select id="accFilterYear" class="form-control form-control-sm" style="width: auto; padding: 4px 8px; font-size: 0.82rem; font-weight: 600; border-radius: 6px; border: 1px solid var(--o-border-color); background: var(--o-view-bg); color: var(--o-text-main);">
+              ${years.map(y => `<option value="${y}" ${y === currYear ? 'selected' : ''}>${y}</option>`).join('')}
+            </select>
+            <button type="button" id="btnAccResetMonth" class="btn btn-sm btn-secondary" style="padding: 3px 8px; font-size: 0.75rem; font-weight: 600;">Mes Actual</button>
+          </div>
+
+          <!-- Badge Margen Operativo ubicado en la esquina de la sección -->
+          <div id="accMarginBadgeContainer">
+            <span id="accMarginBadge" style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 9999px; background: rgba(14, 165, 233, 0.12); color: #0ea5e9; font-size: 0.8rem; font-weight: 700; border: 1px solid rgba(14, 165, 233, 0.25);">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+              Margen Operativo: ${data.margin_pct >= 0 ? '+' : ''}${data.margin_pct}%
+            </span>
+          </div>
         </div>
 
-        <svg viewBox="0 0 600 220" style="width: 100%; height: auto; max-height: 250px; font-family: inherit;" role="img" aria-label="Gráfica comparativa de balance del mes actual">
-          <!-- Lineas de escala -->
-          <line x1="40" y1="40" x2="560" y2="40" stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" />
-          <line x1="40" y1="80" x2="560" y2="80" stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" />
-          <line x1="40" y1="120" x2="560" y2="120" stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" />
-          <line x1="40" y1="${baseY}" x2="560" y2="${baseY}" stroke="currentColor" stroke-opacity="0.25" stroke-width="1.5" />
-
-          <!-- Barra 1: Recaudado -->
-          <g>
-            <rect x="85" y="${baseY - hInflow}" width="85" height="${hInflow}" rx="5" fill="#10b981" />
-            <text x="127" y="${Math.max(25, baseY - hInflow - 8)}" font-size="12" font-weight="700" fill="#10b981" text-anchor="middle">${formatMoney(data.inflow)}</text>
-            <text x="127" y="${baseY + 22}" font-size="12" font-weight="600" fill="var(--o-text-main)" text-anchor="middle">Recaudado</text>
-            <text x="127" y="${baseY + 38}" font-size="10" fill="var(--o-text-muted)" text-anchor="middle">Cobros Reales</text>
-          </g>
-
-          <!-- Barra 2: Gastos Pagados -->
-          <g>
-            <rect x="255" y="${baseY - hOutflow}" width="85" height="${hOutflow}" rx="5" fill="#ef4444" />
-            <text x="297" y="${Math.max(25, baseY - hOutflow - 8)}" font-size="12" font-weight="700" fill="#ef4444" text-anchor="middle">${formatMoney(data.outflow)}</text>
-            <text x="297" y="${baseY + 22}" font-size="12" font-weight="600" fill="var(--o-text-main)" text-anchor="middle">Gastos Pagados</text>
-            <text x="297" y="${baseY + 38}" font-size="10" fill="var(--o-text-muted)" text-anchor="middle">Total Gastos</text>
-          </g>
-
-          <!-- Barra 3: Balance Neto -->
-          <g>
-            <rect x="425" y="${baseY - hNet}" width="85" height="${hNet}" rx="5" fill="${isNetPos ? '#0ea5e9' : '#f59e0b'}" />
-            <text x="467" y="${Math.max(25, baseY - hNet - 8)}" font-size="12" font-weight="700" fill="${isNetPos ? '#0ea5e9' : '#f59e0b'}" text-anchor="middle">${formatMoney(data.net)}</text>
-            <text x="467" y="${baseY + 22}" font-size="12" font-weight="600" fill="var(--o-text-main)" text-anchor="middle">Balance Neto</text>
-            <text x="467" y="${baseY + 38}" font-size="10" fill="var(--o-text-muted)" text-anchor="middle">Cajas / Bancos</text>
-          </g>
-        </svg>
+        <div id="accMonthSvgContainer">
+          ${generateMonthBalanceInnerSvg(data)}
+        </div>
       </div>
     `;
   }
@@ -93,10 +154,24 @@
       netPoints.push(`${centerX},${netY}`);
 
       return `
-        <g>
-          <rect x="${centerX - 24}" y="${baseY - hIn}" width="22" height="${hIn}" rx="3" fill="#10b981" />
-          <rect x="${centerX + 2}" y="${baseY - hOut}" width="22" height="${hOut}" rx="3" fill="#ef4444" />
-          <text x="${centerX}" y="${baseY + 20}" font-size="11" font-weight="600" fill="var(--o-text-muted)" text-anchor="middle">${esc(m.label)}</text>
+        <g class="o_trend_col" data-trend-idx="${i}" data-label="${esc(m.label)}" data-inflow="${m.inflow}" data-outflow="${m.outflow}" data-net="${m.net}">
+          <!-- Barra 1: Recaudado -->
+          <rect class="o_trend_bar" data-kind="Recaudado" data-amount="${m.inflow}" data-label="${esc(m.label)}" data-color="#10b981"
+            x="${centerX - 24}" y="${baseY - hIn}" width="22" height="${hIn}" rx="3" fill="#10b981"
+            style="cursor: pointer; transition: opacity 0.15s, transform 0.15s;">
+            <title>${esc(m.label)} — Recaudado: ${formatMoney(m.inflow)}</title>
+          </rect>
+          <!-- Barra 2: Gastos -->
+          <rect class="o_trend_bar" data-kind="Gastos" data-amount="${m.outflow}" data-label="${esc(m.label)}" data-color="#ef4444"
+            x="${centerX + 2}" y="${baseY - hOut}" width="22" height="${hOut}" rx="3" fill="#ef4444"
+            style="cursor: pointer; transition: opacity 0.15s, transform 0.15s;">
+            <title>${esc(m.label)} — Gastos: ${formatMoney(m.outflow)}</title>
+          </rect>
+          <!-- Valores mostrados directamente sobre las barras al dar clic -->
+          <text id="trendValIn_${i}" x="${centerX - 13}" y="${Math.max(22, baseY - hIn - 6)}" font-size="10" font-weight="700" fill="#10b981" text-anchor="middle" style="display: none;">${formatMoney(m.inflow)}</text>
+          <text id="trendValOut_${i}" x="${centerX + 13}" y="${Math.max(22, baseY - hOut - 6)}" font-size="10" font-weight="700" fill="#ef4444" text-anchor="middle" style="display: none;">${formatMoney(m.outflow)}</text>
+          <!-- Etiqueta de mes -->
+          <text class="o_trend_label" x="${centerX}" y="${baseY + 20}" font-size="11" font-weight="600" fill="var(--o-text-muted)" text-anchor="middle" style="cursor: pointer;">${esc(m.label)}</text>
         </g>
       `;
     }).join('');
@@ -109,31 +184,46 @@
       const centerX = 40 + i * colW + colW / 2;
       const hNet = Math.round((Number(m.net || 0) / maxVal) * chartH);
       const netY = baseY - hNet;
-      return `<circle cx="${centerX}" cy="${netY}" r="4" fill="#0ea5e9" stroke="#ffffff" stroke-width="1.5" />`;
+      return `
+        <circle class="o_trend_dot" data-kind="Balance Neto" data-amount="${m.net}" data-label="${esc(m.label)}" data-color="#0ea5e9"
+          cx="${centerX}" cy="${netY}" r="5" fill="#0ea5e9" stroke="#ffffff" stroke-width="2" style="cursor: pointer;">
+          <title>${esc(m.label)} — Balance Neto: ${formatMoney(m.net)}</title>
+        </circle>
+      `;
     }).join('');
 
     return `
-      <svg viewBox="0 0 620 220" style="width: 100%; height: auto; max-height: 250px; font-family: inherit;" role="img" aria-label="Evolución financiera de 6 meses">
-        <!-- Leyenda -->
-        <g transform="translate(130, 10)">
-          <rect x="0" y="2" width="12" height="12" rx="2" fill="#10b981" />
-          <text x="18" y="12" font-size="11" fill="var(--o-text-main)">Recaudado</text>
-          <rect x="110" y="2" width="12" height="12" rx="2" fill="#ef4444" />
-          <text x="128" y="12" font-size="11" fill="var(--o-text-main)">Gastos</text>
-          <circle cx="216" cy="8" r="5" fill="#0ea5e9" />
-          <text x="228" y="12" font-size="11" fill="var(--o-text-main)">Balance Neto</text>
-        </g>
+      <div style="position: relative; width: 100%;">
+        <!-- Banner interactivo de valor seleccionado al dar clic en cualquier barra -->
+        <div id="trendValueDisplayBanner" style="min-height: 38px; display: flex; align-items: center; justify-content: center; padding: 6px 14px; margin: 0.5rem 1rem 0; border-radius: 8px; background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.2); font-size: 0.85rem; color: var(--o-text-main); transition: all 0.2s ease;">
+          <span id="trendValueDisplayText" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 500;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            Haz clic en cualquier barra o punto para ver el valor exacto del periodo
+          </span>
+        </div>
 
-        <!-- Escalas -->
-        <line x1="30" y1="45" x2="590" y2="45" stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" />
-        <line x1="30" y1="85" x2="590" y2="85" stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" />
-        <line x1="30" y1="125" x2="590" y2="125" stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" />
-        <line x1="30" y1="${baseY}" x2="590" y2="${baseY}" stroke="currentColor" stroke-opacity="0.25" stroke-width="1.5" />
+        <svg viewBox="0 0 620 220" style="width: 100%; height: auto; max-height: 250px; font-family: inherit;" role="img" aria-label="Evolución financiera de 6 meses">
+          <!-- Leyenda -->
+          <g transform="translate(130, 10)">
+            <rect x="0" y="2" width="12" height="12" rx="2" fill="#10b981" />
+            <text x="18" y="12" font-size="11" fill="var(--o-text-main)">Recaudado</text>
+            <rect x="110" y="2" width="12" height="12" rx="2" fill="#ef4444" />
+            <text x="128" y="12" font-size="11" fill="var(--o-text-main)">Gastos</text>
+            <circle cx="216" cy="8" r="5" fill="#0ea5e9" />
+            <text x="228" y="12" font-size="11" fill="var(--o-text-main)">Balance Neto</text>
+          </g>
 
-        ${barsSvg}
-        ${polylineSvg}
-        ${dotsSvg}
-      </svg>
+          <!-- Escalas -->
+          <line x1="30" y1="45" x2="590" y2="45" stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" />
+          <line x1="30" y1="85" x2="590" y2="85" stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" />
+          <line x1="30" y1="125" x2="590" y2="125" stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" />
+          <line x1="30" y1="${baseY}" x2="590" y2="${baseY}" stroke="currentColor" stroke-opacity="0.25" stroke-width="1.5" />
+
+          ${barsSvg}
+          ${polylineSvg}
+          ${dotsSvg}
+        </svg>
+      </div>
     `;
   }
 
@@ -187,8 +277,8 @@
             <svg viewBox="0 0 190 190" style="width: 100%; height: 100%;" role="img" aria-label="Diagrama circular de distribución de flujos">
               <circle cx="95" cy="95" r="${r}" fill="none" stroke="currentColor" stroke-opacity="0.08" stroke-width="24" />
               ${circlesSvg}
-              <text x="95" y="88" font-size="10" font-weight="600" fill="var(--o-text-muted)" text-anchor="middle">Volumen Total</text>
-              <text x="95" y="107" font-size="12" font-weight="700" fill="var(--o-text-main)" text-anchor="middle">${formatMoney(totalVolume)}</text>
+              <text x="95" y="86" font-size="10" font-weight="600" fill="var(--o-text-muted)" text-anchor="middle">Balance Neto</text>
+              <text x="95" y="106" font-size="12" font-weight="700" fill="${(collected - expenses) >= 0 ? '#0ea5e9' : '#ef4444'}" text-anchor="middle">${formatMoney(collected - expenses)}</text>
             </svg>
           </div>
 
@@ -384,38 +474,22 @@
         </div>
 
         <div class="o_financial_grid">
-          ${bankCashAccounts
-            .map(
-              (a) => `
-              <div class="o_journal_card ${a.type === 'bank' ? 'is-bank' : 'is-cash'}">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.45rem;">
-                  <div>
-                    <span class="o_badge ${a.code === 'NEQ' ? 'o_badge_info' : a.code === 'DVP' ? 'o_badge_danger' : a.type === 'bank' ? 'o_badge_success' : 'o_badge_warning'}">${esc(a.code)}</span>
-                    <h4 style="margin: 0.35rem 0 0 0; font-size: 1rem;">${esc(a.name)}</h4>
-                  </div>
-                  <span style="font-size: 0.72rem; color: var(--o-text-muted); text-transform: uppercase;">${a.type === 'bank' ? 'Banco / Billetera' : 'Caja Efectivo'}</span>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin: 0.65rem 0; padding: 0.5rem; background: var(--o-gray-100); border-radius: 6px; font-size: 0.8rem;">
-                  <div>
-                    <span style="color: var(--o-text-muted); display: block; font-size: 0.75rem;">Recaudado (+)</span>
-                    <strong style="color: #10b981;">+${formatMoney(a.inbound_total || 0)}</strong>
-                  </div>
-                  <div>
-                    <span style="color: var(--o-text-muted); display: block; font-size: 0.75rem;">Gastos (-)</span>
-                    <strong style="color: #ef4444;">-${formatMoney(a.outbound_total || 0)}</strong>
-                  </div>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--o-border-color); padding-top: 0.65rem; margin-top: 0.25rem;">
-                  <div>
-                    <span style="font-size: 0.75rem; color: var(--o-text-muted); display: block;">Saldo en Libros</span>
-                    <strong style="font-size: 1.15rem; color: var(--o-action);">${formatMoney(a.balance || 0)}</strong>
-                  </div>
-                  <button type="button" class="btn btn-sm btn-secondary" data-journal-action="payments">Ver Pagos</button>
-                </div>
+          ${bankCashAccounts.map((a) => `
+            <div class="o_journal_card ${a.type === 'bank' ? 'is-bank' : 'is-cash'}">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.45rem;">
+                <div><span class="o_badge ${a.code === 'NEQ' ? 'o_badge_info' : a.code === 'DVP' ? 'o_badge_danger' : a.type === 'bank' ? 'o_badge_success' : 'o_badge_warning'}">${esc(a.code)}</span><h4 style="margin: 0.35rem 0 0 0; font-size: 1rem;">${esc(a.name)}</h4></div>
+                <span style="font-size: 0.72rem; color: var(--o-text-muted); text-transform: uppercase;">${a.type === 'bank' ? 'Banco / Billetera' : 'Caja Efectivo'}</span>
               </div>
-            `
-            )
-            .join('')}
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin: 0.65rem 0; padding: 0.5rem; background: var(--o-gray-100); border-radius: 6px; font-size: 0.8rem;">
+                <div><span style="color: var(--o-text-muted); display: block; font-size: 0.75rem;">Recaudado (+)</span><strong style="color: #10b981;">+${formatMoney(a.inbound_total || 0)}</strong></div>
+                <div><span style="color: var(--o-text-muted); display: block; font-size: 0.75rem;">Gastos (-)</span><strong style="color: #ef4444;">-${formatMoney(a.outbound_total || 0)}</strong></div>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--o-border-color); padding-top: 0.65rem; margin-top: 0.25rem;">
+                <div><span style="font-size: 0.75rem; color: var(--o-text-muted); display: block;">Saldo en Libros</span><strong style="font-size: 1.15rem; color: var(--o-action);">${formatMoney(a.balance || 0)}</strong></div>
+                <button type="button" class="btn btn-sm btn-secondary" data-journal-action="payments">Ver Pagos</button>
+              </div>
+            </div>
+          `).join('')}
         </div>
 
         <!-- Tabla de Últimos Movimientos de Caja y Bancos -->
@@ -527,6 +601,79 @@
         </div>
       `;
 
+      // 1. Filtro Mes y Año en Balance Mes
+      const selectMonth = container.querySelector('#accFilterMonth');
+      const selectYear = container.querySelector('#accFilterYear');
+      const btnResetMonth = container.querySelector('#btnAccResetMonth');
+      const svgMonthContainer = container.querySelector('#accMonthSvgContainer');
+      const badgeMargin = container.querySelector('#accMarginBadge');
+
+      function updateFilteredMonthView() {
+        if (!selectMonth || !selectYear || !svgMonthContainer) return;
+        const key = `${selectYear.value}-${selectMonth.value}`;
+        const fin = calculateMonthFinancials(key);
+        svgMonthContainer.innerHTML = generateMonthBalanceInnerSvg(fin);
+        if (badgeMargin) {
+          badgeMargin.innerHTML = `
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+            Margen Operativo: ${fin.margin_pct >= 0 ? '+' : ''}${fin.margin_pct}%
+          `;
+        }
+      }
+
+      if (selectMonth) selectMonth.addEventListener('change', updateFilteredMonthView);
+      if (selectYear) selectYear.addEventListener('change', updateFilteredMonthView);
+      if (btnResetMonth) {
+        btnResetMonth.addEventListener('click', () => {
+          const now = new Date();
+          if (selectMonth) selectMonth.value = String(now.getMonth() + 1).padStart(2, '0');
+          if (selectYear) selectYear.value = String(now.getFullYear());
+          updateFilteredMonthView();
+        });
+      }
+
+      // 2. Click en barras de Evolución 6 Meses para ver su valor
+      const bannerTrendText = container.querySelector('#trendValueDisplayText');
+      container.querySelectorAll('.o_trend_col, .o_trend_bar, .o_trend_dot').forEach((elem) => {
+        elem.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const col = elem.closest('.o_trend_col') || elem;
+          const idx = col.getAttribute('data-trend-idx');
+          const label = col.getAttribute('data-label') || elem.getAttribute('data-label');
+          const inflow = Number(col.getAttribute('data-inflow') || 0);
+          const outflow = Number(col.getAttribute('data-outflow') || 0);
+          const net = Number(col.getAttribute('data-net') || 0);
+
+          container.querySelectorAll('[id^="trendValIn_"], [id^="trendValOut_"]').forEach((el) => el.style.display = 'none');
+          const valIn = container.querySelector(`#trendValIn_${idx}`);
+          const valOut = container.querySelector(`#trendValOut_${idx}`);
+          if (valIn) valIn.style.display = 'block';
+          if (valOut) valOut.style.display = 'block';
+
+          if (bannerTrendText) {
+            const isClickOnSpecificBar = elem.classList.contains('o_trend_bar') || elem.classList.contains('o_trend_dot');
+            const kind = elem.getAttribute('data-kind');
+            const amt = Number(elem.getAttribute('data-amount') || 0);
+
+            if (isClickOnSpecificBar && kind) {
+              const color = elem.getAttribute('data-color') || '#0ea5e9';
+              bannerTrendText.innerHTML = `
+                <span style="font-weight: 700; color: var(--o-text-main); font-size: 0.92rem;">${esc(label)}</span> &bull; 
+                <span style="color: ${color}; font-weight: 700;">${esc(kind)}: ${formatMoney(amt)}</span>
+                <span style="color: var(--o-text-muted); font-size: 0.78rem; margin-left: 6px;">(Recaudado: ${formatMoney(inflow)} | Gastos: ${formatMoney(outflow)} | Neto: ${formatMoney(net)})</span>
+              `;
+            } else {
+              bannerTrendText.innerHTML = `
+                <span style="font-weight: 700; color: var(--o-text-main); font-size: 0.92rem;">${esc(label)}:</span>
+                <span style="color: #10b981; font-weight: 700;">Recaudado: ${formatMoney(inflow)}</span> &bull; 
+                <span style="color: #ef4444; font-weight: 700;">Gastos: ${formatMoney(outflow)}</span> &bull; 
+                <span style="color: ${net >= 0 ? '#0ea5e9' : '#ef4444'}; font-weight: 700;">Neto: ${formatMoney(net)}</span>
+              `;
+            }
+          }
+        });
+      });
+
       // Chart tabs switcher
       container.querySelectorAll('[data-chart-tab]').forEach((tabBtn) => {
         tabBtn.addEventListener('click', () => {
@@ -603,21 +750,7 @@
               </tr>
             </thead>
             <tbody>
-              ${payments
-                .map(
-                  (p) => `
-                  <tr>
-                    <th>${esc(p.name)}</th>
-                    <td>${esc(p.date)}</td>
-                    <td>${esc(p.journal_name)}</td>
-                    <td>${esc(p.partner_name)}</td>
-                    <td>${esc(p.ref)}</td>
-                    <td class="text-end"><strong>${formatMoney(p.amount)}</strong></td>
-                    <td><span class="o_badge ${p.payment_type === 'inbound' ? 'o_badge_success' : 'o_badge_warning'}">${p.payment_type === 'inbound' ? 'Recaudo Cliente' : 'Egreso / Pago'}</span></td>
-                  </tr>
-                `
-                )
-                .join('')}
+              ${payments.map((p) => `<tr><th>${esc(p.name)}</th><td>${esc(p.date)}</td><td>${esc(p.journal_name)}</td><td>${esc(p.partner_name)}</td><td>${esc(p.ref)}</td><td class="text-end"><strong>${formatMoney(p.amount)}</strong></td><td><span class="o_badge ${p.payment_type === 'inbound' ? 'o_badge_success' : 'o_badge_warning'}">${p.payment_type === 'inbound' ? 'Recaudo Cliente' : 'Egreso / Pago'}</span></td></tr>`).join('')}
             </tbody>
           </table>
         </div>
@@ -667,18 +800,7 @@
               </tr>
             </thead>
             <tbody>
-              ${accounts
-                .map(
-                  (a) => `
-                  <tr>
-                    <th>${esc(a.code)}</th>
-                    <td>${esc(a.name)}</td>
-                    <td>${esc(a.type)}</td>
-                    <td><span class="o_badge ${a.reconcile ? 'o_badge_success' : 'o_badge_muted'}">${a.reconcile ? 'Sí' : 'No'}</span></td>
-                  </tr>
-                `
-                )
-                .join('')}
+              ${accounts.map((a) => `<tr><th>${esc(a.code)}</th><td>${esc(a.name)}</td><td>${esc(a.type)}</td><td><span class="o_badge ${a.reconcile ? 'o_badge_success' : 'o_badge_muted'}">${a.reconcile ? 'Sí' : 'No'}</span></td></tr>`).join('')}
             </tbody>
           </table>
         </div>
@@ -744,23 +866,7 @@
             </tr>
           </thead>
           <tbody>
-            ${moves
-              .map(
-                (m) => `
-                <tr data-move-id="${m.id}">
-                  <th>${esc(m.name)}</th>
-                  <td>${esc(m.partner_name)}</td>
-                  <td>${esc(m.invoice_date)}</td>
-                  <td>${esc(m.invoice_date_due)}</td>
-                  <td>${esc(m.journal_code)} · ${esc(m.origin || m.ref || '')}</td>
-                  <td class="text-end"><strong>${formatMoney(m.amount_total)}</strong></td>
-                  <td class="text-end">${formatMoney(m.amount_residual)}</td>
-                  <td>${paymentStateBadge(m.payment_state, m.state)}</td>
-                  <td><span class="o_badge ${m.state === 'posted' ? 'o_badge_success' : m.state === 'cancel' ? 'o_badge_danger' : 'o_badge_info'}">${m.state === 'posted' ? 'Publicado' : m.state === 'cancel' ? 'Cancelado' : 'Borrador'}</span></td>
-                </tr>
-              `
-              )
-              .join('')}
+            ${moves.map((m) => `<tr data-move-id="${m.id}"><th>${esc(m.name)}</th><td>${esc(m.partner_name)}</td><td>${esc(m.invoice_date)}</td><td>${esc(m.invoice_date_due)}</td><td>${esc(m.journal_code)} · ${esc(m.origin || m.ref || '')}</td><td class="text-end"><strong>${formatMoney(m.amount_total)}</strong></td><td class="text-end">${formatMoney(m.amount_residual)}</td><td>${paymentStateBadge(m.payment_state, m.state)}</td><td><span class="o_badge ${m.state === 'posted' ? 'o_badge_success' : m.state === 'cancel' ? 'o_badge_danger' : 'o_badge_info'}">${m.state === 'posted' ? 'Publicado' : m.state === 'cancel' ? 'Cancelado' : 'Borrador'}</span></td></tr>`).join('')}
           </tbody>
           <tfoot>
             <tr>

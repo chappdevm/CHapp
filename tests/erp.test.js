@@ -1562,6 +1562,12 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.ok(jsText.includes('Total Recaudos'), 'app.js debe incluir Total Recaudos');
     assert.ok(jsText.includes('Por Recaudar'), 'app.js debe incluir Por Recaudar');
     assert.ok(jsText.includes('Margen Operativo:'), 'app.js debe incluir Margen Operativo');
+    assert.ok(jsText.includes('accFilterMonth'), 'Balance mes actual debe tener selector de mes');
+    assert.ok(jsText.includes('accFilterYear'), 'Balance mes actual debe tener selector de año');
+    assert.ok(jsText.includes('trendValueDisplayBanner'), 'Evolución 6 meses debe tener banner interactivo de valores');
+    assert.ok(jsText.includes('o_trend_bar'), 'Barras de evolución deben tener clase interactiva o_trend_bar');
+    assert.ok(cssText.includes('min-height: 105px'), 'o_stat_card debe ser más alto');
+    assert.ok(cssText.includes('font-size: 0.92rem'), 'o_stat_card debe tener títulos más grandes');
     assert.ok(jsText.includes('Total Recaudado (Cobros Reales)'), 'app.js debe tener tarjeta de Total Recaudado');
     assert.ok(jsText.includes('Total Gastos / Compras'), 'app.js debe tener tarjeta de Total Gastos');
     assert.ok(jsText.includes('Balance Neto en Cajas y Bancos'), 'app.js debe tener tarjeta de Balance Neto');
