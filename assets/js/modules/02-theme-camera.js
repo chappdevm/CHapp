@@ -345,10 +345,16 @@
     const btnCapture = document.getElementById('btnCapturePhoto');
     const fileInput = document.getElementById('cameraFileInput');
     const btnClose = document.getElementById('btnCloseExpenseAiCamera');
+    const errorState = document.getElementById('cameraErrorState');
+    const errorMsg = document.getElementById('cameraErrorMessage');
+    const btnRetryCam = document.getElementById('btnRetryCamera');
+    const retryFileInput = document.getElementById('cameraRetryFileInput');
+    const btnContinueManual = document.getElementById('btnContinueManualWithPhoto');
 
     capturedImg.style.display = 'none';
     capturedImg.src = '';
     aiLoading.style.display = 'none';
+    if (errorState) errorState.style.display = 'none';
     placeholder.style.display = 'block';
     video.style.display = 'none';
     btnCapture.style.display = 'none';
@@ -412,35 +418,75 @@
         }
       } catch (err) {
         aiLoading.style.display = 'none';
-        dialog.close();
-        showToast('No se pudo extraer texto automático con IA (' + err.message + '). La imagen quedó adjunta al gasto.', true);
+        if (errorState) {
+          if (errorMsg) {
+            errorMsg.textContent = 'No se pudo leer la información de la factura (' + (err.message || 'error de lectura') + '). Asegúrate de que la foto tenga buena luz, enfoque y que se vean completos los valores.';
+          }
+          errorState.style.display = 'flex';
 
-        const fallbackData = {
-          name: 'Gasto según comprobante adjunto',
-          date: new Date().toISOString().slice(0, 10),
-          total_amount: 0,
-          items: [{ description: 'Artículo según factura adjunta', quantity: 1, price_unit: 0, tax_rate: 0, total: 0 }]
-        };
-        if (targetCallback) {
-          targetCallback(fallbackData, base64Data, null);
+          if (btnRetryCam) {
+            btnRetryCam.onclick = () => {
+              errorState.style.display = 'none';
+              capturedImg.style.display = 'none';
+              btnStart.click();
+            };
+          }
+
+          if (retryFileInput) {
+            retryFileInput.value = '';
+            retryFileInput.onchange = async (ev) => {
+              const file = ev.target.files && ev.target.files[0];
+              if (!file) return;
+              try {
+                errorState.style.display = 'none';
+                aiLoading.style.display = 'flex';
+                const compressedBase64 = await compressImageFile(file, 1600, 1600, 0.85);
+                executeAiScan(compressedBase64, 'image/jpeg');
+              } catch (e) {
+                aiLoading.style.display = 'none';
+                errorState.style.display = 'flex';
+                showToast('Error procesando imagen: ' + e.message, true);
+              }
+            };
+          }
+
+          if (btnContinueManual) {
+            btnContinueManual.onclick = () => {
+              errorState.style.display = 'none';
+              dialog.close();
+              const fallbackData = {
+                name: 'Gasto según comprobante adjunto',
+                date: new Date().toISOString().slice(0, 10),
+                total_amount: 0,
+                items: [{ description: 'Artículo según factura adjunta', quantity: 1, price_unit: 0, tax_rate: 0, total: 0 }]
+              };
+              if (targetCallback) {
+                targetCallback(fallbackData, base64Data, null);
+              } else {
+                state.currentApp = 'expenses';
+                state.viewType = 'form';
+                state.activeRecordId = 'new';
+                state.formDraft = {
+                  name: fallbackData.name,
+                  date: fallbackData.date,
+                  total_amount: 0,
+                  quantity: 1,
+                  receipt_image: base64Data,
+                  items: fallbackData.items
+                };
+                renderModuleWorkspace();
+              }
+            };
+          }
         } else {
-          state.currentApp = 'expenses';
-          state.viewType = 'form';
-          state.activeRecordId = 'new';
-          state.formDraft = {
-            name: fallbackData.name,
-            date: fallbackData.date,
-            total_amount: 0,
-            quantity: 1,
-            receipt_image: base64Data,
-            items: fallbackData.items
-          };
-          renderModuleWorkspace();
+          dialog.close();
+          showToast('No se pudo procesar la imagen: ' + err.message, true);
         }
       }
     };
 
     btnStart.onclick = async () => {
+      if (errorState) errorState.style.display = 'none';
       if (activeCameraStream) {
         stopCameraStream();
         return;

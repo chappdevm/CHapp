@@ -225,6 +225,31 @@
             <div style="font-weight: 600; font-size: 1rem; color: #38bdf8;">Gemini IA analizando factura...</div>
             <div style="font-size: 0.82rem; color: #cbd5e1;">Extrayendo automáticamente proveedor, NIT, fecha y monto</div>
           </div>
+
+          <!-- Ventana de error elegante al fallar procesamiento de imagen -->
+          <div id="cameraErrorState" style="display: none; position: absolute; inset: 0; background: rgba(15, 23, 42, 0.96); flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 1.5rem; color: #ffffff; z-index: 15;">
+            <div style="width: 48px; height: 48px; border-radius: 50%; background: rgba(239, 68, 68, 0.15); border: 2px solid #ef4444; display: flex; align-items: center; justify-content: center; margin-bottom: 0.75rem; color: #ef4444;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            </div>
+            <h3 style="margin: 0 0 0.4rem; font-size: 1.05rem; color: #f87171; font-weight: 700;">No se pudo procesar la imagen</h3>
+            <p id="cameraErrorMessage" style="margin: 0 0 1.25rem; font-size: 0.84rem; color: #cbd5e1; max-width: 420px; line-height: 1.45;">
+              No logramos reconocer los datos de la factura. Asegúrate de que la foto tenga buena luz, enfoque y que se vean completos los valores.
+            </p>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;">
+              <button type="button" class="btn btn-primary" id="btnRetryCamera" style="background: #2563eb; display: inline-flex; align-items: center; gap: 6px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+                Tomar Otra Foto
+              </button>
+              <label class="btn btn-secondary" style="cursor: pointer; margin: 0; display: inline-flex; align-items: center; gap: 6px; background: #334155; color: white; border: none;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                Subir Otra Foto
+                <input type="file" id="cameraRetryFileInput" accept="image/*" capture="environment" style="display: none;" />
+              </label>
+              <button type="button" class="btn btn-secondary" id="btnContinueManualWithPhoto" style="background: transparent; border: 1px solid #475569; color: #cbd5e1; display: inline-flex; align-items: center; gap: 6px;">
+                Usar esta foto y llenar datos
+              </button>
+            </div>
+          </div>
         </div>
 
         <div style="margin-top: 0.85rem; display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center;">

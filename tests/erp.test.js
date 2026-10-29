@@ -1860,6 +1860,14 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.ok(jsTextExp.includes('function compressImageFile('), 'Debe existir función compressImageFile');
     assert.ok(jsTextExp.includes('openImageLightbox(this.src'), 'La imagen del comprobante debe abrirse en lightbox');
     assert.ok(!jsTextExp.includes('onclick="window.open(this.src)"'), 'No debe usar window.open en comprobantes para evitar bloqueo del navegador');
+
+    // Verificación de ventana elegante de reintento ante fallos de lectura de imagen
+    const htmlIndex = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    assert.ok(htmlIndex.includes('id="cameraErrorState"'), 'index.html debe contener el panel de error elegante');
+    assert.ok(htmlIndex.includes('id="btnRetryCamera"'), 'index.html debe contener el botón de reintentar con cámara');
+    assert.ok(htmlIndex.includes('id="cameraRetryFileInput"'), 'index.html debe contener input para subir otra foto');
+    assert.ok(htmlIndex.includes('id="btnContinueManualWithPhoto"'), 'index.html debe contener opción de continuar manualmente con la foto');
+    assert.ok(jsTextExp.includes("errorState.style.display = 'flex'"), 'Debe mostrar la ventana de error elegante al fallar la lectura');
   });
 
   it('Module 3 (Ventas): Pedidos de venta confirmados bloquean edición de cliente y productos, y se remueven instrucciones bancarias de representaciones gráficas', async () => {
