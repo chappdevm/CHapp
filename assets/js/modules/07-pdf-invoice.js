@@ -224,6 +224,7 @@
     const netPayable = Math.max(0, totalAmount - totalRetentions);
 
     const hasDiscounts = lines.some((l) => Number(l.discount || 0) > 0);
+    const totalGross = lines.reduce((sum, l) => sum + (Number(l.quantity || 1) * Number(l.price_unit || 0)), 0);
     const totalDiscount = lines.reduce((sum, l) => {
       const gross = Number(l.quantity || 1) * Number(l.price_unit || 0);
       return sum + (gross * (Number(l.discount || 0) / 100));
@@ -372,7 +373,7 @@
               const qty = Number(l.quantity || 1);
               const price = Number(l.price_unit || 0);
               const disc = Number(l.discount || 0);
-              const calcSub = l.subtotal !== undefined && l.subtotal !== null ? Number(l.subtotal) : (qty * price * (1 - disc / 100));
+              const lineGross = qty * price;
               return `
                 <tr>
                   <td class="text-center" style="color: #64748b;">${idx + 1}</td>
@@ -382,7 +383,7 @@
                   <td class="text-end">${formatMoney(price)}</td>
                   ${hasDiscounts ? `<td class="text-center" style="color: ${disc > 0 ? '#b91c1c' : '#64748b'};">${disc > 0 ? `-${disc}%` : '0%'}</td>` : ''}
                   <td class="text-center">${l.tax_rate ?? 19}%</td>
-                  <td class="text-end"><strong>${formatMoney(calcSub)}</strong></td>
+                  <td class="text-end"><strong>${formatMoney(lineGross)}</strong></td>
                 </tr>
               `;
             }).join('')}
@@ -401,7 +402,7 @@
             <table class="o_pdf_totals_table">
               <tr>
                 <td>Subtotal:</td>
-                <td style="text-align: right;"><strong>${formatMoney(totalUntaxed)}</strong></td>
+                <td style="text-align: right;"><strong>${formatMoney(totalGross)}</strong></td>
               </tr>
               ${totalDiscount > 0 ? `
                 <tr style="color: #b91c1c; font-size: 0.76rem;">

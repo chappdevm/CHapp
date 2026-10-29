@@ -71,10 +71,14 @@
     ];
 
     const draftLines = draft.lines;
-    const calcUntaxed = draftLines.reduce((acc, l) => {
-      const sub = Number(l.quantity || 0) * Number(l.price_unit || 0) * (1 - Number(l.discount || 0) / 100);
-      return acc + sub;
+    const calcGross = draftLines.reduce((acc, l) => {
+      return acc + (Number(l.quantity || 0) * Number(l.price_unit || 0));
     }, 0);
+    const calcDiscount = draftLines.reduce((acc, l) => {
+      const gross = Number(l.quantity || 0) * Number(l.price_unit || 0);
+      return acc + (gross * (Number(l.discount || 0) / 100));
+    }, 0);
+    const calcUntaxed = calcGross - calcDiscount;
     const calcTax = draftLines.reduce((acc, l) => {
       const sub = Number(l.quantity || 0) * Number(l.price_unit || 0) * (1 - Number(l.discount || 0) / 100);
       return acc + sub * (Number(l.tax_rate || 0) / 100);
@@ -240,7 +244,7 @@
                           const prod = (state.data.products || []).find((p) => Number(p.id) === Number(l.product_id));
                           const uomName = l.uom || (prod ? prod.uom : '') || 'Metro Cuadrado';
                           const measureVal = l.measure !== undefined && l.measure !== null ? Number(l.measure) : 1;
-                          const sub = Number(l.quantity || 0) * Number(l.price_unit || 0) * (1 - Number(l.discount || 0) / 100);
+                          const lineGrossSub = Number(l.quantity || 0) * Number(l.price_unit || 0);
                           return `
                           <tr data-line-idx="${idx}">
                             <th>
@@ -266,7 +270,7 @@
                                   .join('')}
                               </select>
                             </td>
-                            <td class="text-end"><strong>${formatMoney(sub)}</strong></td>
+                            <td class="text-end"><strong>${formatMoney(lineGrossSub)}</strong></td>
                             ${isEditable ? `<td><button type="button" class="btn btn-sm btn-danger btn-remove-line" data-idx="${idx}" title="Quitar línea">Quitar</button></td>` : ''}
                           </tr>
                         `;
@@ -280,7 +284,17 @@
 
                 <div class="o_totals_box">
                   <div class="o_totals_row">
-                    <span>Base Imponible:</span>
+                    <span>Subtotal:</span>
+                    <strong>${formatMoney(calcGross)}</strong>
+                  </div>
+                  ${calcDiscount > 0 ? `
+                  <div class="o_totals_row" style="color: #b91c1c;">
+                    <span>Descuento Comercial:</span>
+                    <span>- ${formatMoney(calcDiscount)}</span>
+                  </div>
+                  ` : ''}
+                  <div class="o_totals_row">
+                    <span>Base Gravable:</span>
                     <strong>${formatMoney(calcUntaxed)}</strong>
                   </div>
                   <div class="o_totals_row">

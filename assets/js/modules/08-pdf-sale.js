@@ -51,12 +51,18 @@
     const docNumber = esc(sale.name || 'Nueva Cotización');
     const paymentTerm = sale.payment_term || partner.payment_term || 'Contado';
 
-    const calcUntaxed = lines.reduce((acc, l) => {
+    const totalGross = lines.reduce((acc, l) => {
       const qty = Number(l.quantity || 0);
       const pr = Number(l.price_unit || 0);
-      const disc = Number(l.discount || 0);
-      return acc + (qty * pr * (1 - disc / 100));
+      return acc + (qty * pr);
     }, 0);
+
+    const totalDiscount = lines.reduce((sum, l) => {
+      const gross = Number(l.quantity || 0) * Number(l.price_unit || 0);
+      return sum + (gross * (Number(l.discount || 0) / 100));
+    }, 0);
+
+    const calcUntaxed = totalGross - totalDiscount;
 
     const calcTax = lines.reduce((acc, l) => {
       const qty = Number(l.quantity || 0);
@@ -71,10 +77,6 @@
     const totalAmount = sale.amount_total !== undefined ? Number(sale.amount_total) : (totalUntaxed + totalTax);
 
     const hasDiscounts = lines.some((l) => Number(l.discount || 0) > 0);
-    const totalDiscount = lines.reduce((sum, l) => {
-      const gross = Number(l.quantity || 1) * Number(l.price_unit || 0);
-      return sum + (gross * (Number(l.discount || 0) / 100));
-    }, 0);
 
     const logoData = typeof getLogoDataUrl === 'function' ? getLogoDataUrl() : '';
     const logoSrc = logoData && logoData.startsWith('data:') ? logoData : '/assets/icons/logo.png';
@@ -165,7 +167,7 @@
               const qty = Number(l.quantity || 1);
               const price = Number(l.price_unit || 0);
               const disc = Number(l.discount || 0);
-              const calcSub = l.subtotal !== undefined && l.subtotal !== null ? Number(l.subtotal) : (qty * price * (1 - disc / 100));
+              const lineGrossSub = qty * price;
               const prodName = l.product_name || l.name || 'Producto / Servicio';
               const measureVal = l.measure !== undefined && l.measure !== null ? Number(l.measure) : 1;
               const uomDisplay = typeof formatUomShort === 'function' ? formatUomShort(l.uom) : (l.uom || 'm²');
@@ -179,7 +181,7 @@
                   <td class="text-end">${formatMoney(price)}</td>
                   ${hasDiscounts ? `<td class="text-center" style="color: ${disc > 0 ? '#b91c1c' : '#64748b'};">${disc > 0 ? `-${disc}%` : '0%'}</td>` : ''}
                   <td class="text-center">${l.tax_rate ?? 19}%</td>
-                  <td class="text-end"><strong>${formatMoney(calcSub)}</strong></td>
+                  <td class="text-end"><strong>${formatMoney(lineGrossSub)}</strong></td>
                 </tr>
               `;
             }).join('')}
@@ -205,7 +207,7 @@
             <table class="o_pdf_totals_table">
               <tr>
                 <td>Subtotal:</td>
-                <td style="text-align: right;"><strong>${formatMoney(totalUntaxed)}</strong></td>
+                <td style="text-align: right;"><strong>${formatMoney(totalGross)}</strong></td>
               </tr>
               ${totalDiscount > 0 ? `
                 <tr style="color: #b91c1c; font-size: 0.76rem;">
