@@ -150,15 +150,14 @@
         <table class="o_pdf_items_table">
           <thead>
             <tr>
-              <th style="width: 28px; text-align: center;">#</th>
+              <th style="width: 30px; text-align: center;">#</th>
               <th>Concepto / Producto</th>
-              <th style="width: 60px; text-align: center;">Medida</th>
-              <th style="width: 65px; text-align: center;">Und. Medida</th>
-              <th style="width: 50px; text-align: center;">Cant.</th>
-              <th style="width: 105px; text-align: right;">Vr. Unitario</th>
+              <th style="width: 85px; text-align: center;">Medida</th>
+              <th style="width: 55px; text-align: center;">Cant.</th>
+              <th style="width: 110px; text-align: right;">Vr. Unitario</th>
               ${hasDiscounts ? '<th style="width: 55px; text-align: center;">Dcto.</th>' : ''}
               <th style="width: 55px; text-align: center;">IVA</th>
-              <th style="width: 110px; text-align: right;">Subtotal</th>
+              <th style="width: 115px; text-align: right;">Subtotal</th>
             </tr>
           </thead>
           <tbody>
@@ -170,12 +169,12 @@
               const prodName = l.product_name || l.name || 'Producto / Servicio';
               const measureVal = l.measure !== undefined && l.measure !== null ? Number(l.measure) : 1;
               const uomDisplay = typeof formatUomShort === 'function' ? formatUomShort(l.uom) : (l.uom || 'm²');
+              const measureUnified = `${measureVal} ${uomDisplay}`;
               return `
                 <tr>
                   <td class="text-center" style="color: #64748b;">${idx + 1}</td>
                   <td><strong>${esc(prodName)}</strong></td>
-                  <td class="text-center" style="font-weight: 600; color: #0f172a;">${measureVal}</td>
-                  <td class="text-center" style="font-weight: 700; color: #074073;">${esc(uomDisplay)}</td>
+                  <td class="text-center" style="font-weight: 700; color: #074073;">${esc(measureUnified)}</td>
                   <td class="text-center">${qty}</td>
                   <td class="text-end">${formatMoney(price)}</td>
                   ${hasDiscounts ? `<td class="text-center" style="color: ${disc > 0 ? '#b91c1c' : '#64748b'};">${disc > 0 ? `-${disc}%` : '0%'}</td>` : ''}
