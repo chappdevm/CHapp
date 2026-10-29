@@ -207,14 +207,31 @@
 
         <div class="o_pdf_brand_header">
           <div class="o_pdf_brand_identity">
-            <div class="o_pdf_logo_col">
-              <img src="${logoSrc}" alt="CH Aluminios" class="o_pdf_company_logo" onerror="if(!this.src.startsWith('data:'))this.style.display='none'" />
+            <div class="o_pdf_brand_top">
+              <div class="o_pdf_logo_col">
+                <img src="${logoSrc}" alt="CH Aluminios" class="o_pdf_company_logo" onerror="if(!this.src.startsWith('data:'))this.style.display='none'" />
+              </div>
+              <div class="o_pdf_company_title_box">
+                <h2 class="o_pdf_brand_title"><span class="brand-ch">CH</span> <span class="brand-aluminios">ALUMINIOS</span></h2>
+                <div class="o_pdf_brand_tagline">CARPINTERÍA METÁLICA & ARQUITECTÓNICA</div>
+              </div>
             </div>
             <div class="o_pdf_company_info">
-              <h2>${esc(company.company_name || 'CH Aluminios')}</h2>
-              <p><strong>NIT:</strong> ${esc(company.company_vat || '900.876.543-1')} · <span>${esc(company.fiscal_regime || 'Responsable de IVA - Régimen Ordinario')}</span></p>
-              <p>${esc(company.company_address || 'Cra. 7 #18-45')} · ${esc(company.company_city || 'Pereira')}, ${esc(company.company_country || 'Colombia')}</p>
-              <p>Email: ${esc(company.company_email || 'chappdevm@gmail.com')} · PBX: (606) 315-0000</p>
+              <div class="o_pdf_company_details">
+                <div class="o_pdf_detail_row">
+                  <span><strong>NIT:</strong> ${esc(company.company_vat || '900.876.543-1')}</span>
+                  <span class="detail-sep">·</span>
+                  <span>${esc(company.fiscal_regime || 'Responsable de IVA - Régimen Ordinario')}</span>
+                </div>
+                <div class="o_pdf_detail_row">
+                  <span><strong>Dirección:</strong> ${esc(company.company_address || 'Cra. 7 #18-45')} · ${esc(company.company_city || 'Pereira')}, ${esc(company.company_country || 'Colombia')}</span>
+                </div>
+                <div class="o_pdf_detail_row">
+                  <span><strong>PBX:</strong> (606) 315-0000</span>
+                  <span class="detail-sep">·</span>
+                  <span><strong>Email:</strong> ${esc(company.company_email || 'chappdevm@gmail.com')}</span>
+                </div>
+              </div>
             </div>
           </div>
           <div class="o_pdf_doc_box">
@@ -543,9 +560,8 @@
     }
     .o_pdf_stamp.is-paid { color: #22b053; border-color: #22b053; background: #ecfdf5; }
     .o_pdf_stamp.is-draft { color: #5593c2; border-color: #93bee0; background: #f0f7fc; }
-    .o_pdf_stamp.is-cancel { color: #cb2f2f; border-color: #cb2f2f; background: #fef2f2; }
+    .o_pdf_stamp.is-cancel, .o_pdf_stamp.is-overdue { color: #cb2f2f; border-color: #cb2f2f; background: #fef2f2; }
     .o_pdf_stamp.is-partial { color: #074073; border-color: #14B5D9; background: #f0f9ff; }
-    .o_pdf_stamp.is-overdue { color: #cb2f2f; border-color: #cb2f2f; background: #fef2f2; }
     .o_pdf_stamp.is-posted { color: #074073; border-color: #14B5D9; background: #f0f7fc; }
     .o_pdf_stamp .stamp-inner { font-size: 0.8rem; font-weight: 800; }
     .o_pdf_stamp .stamp-sub { font-size: 0.62rem; font-weight: 700; opacity: 0.85; letter-spacing: 0.06em; }
@@ -554,43 +570,56 @@
       z-index: 2;
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(240px, 280px);
-      align-items: center;
+      align-items: start;
       border-bottom: 2.5px solid #074073;
       padding-bottom: 0.95rem;
       margin-bottom: 0.95rem;
       gap: 1.5rem;
     }
-    .o_pdf_brand_identity {
-      display: flex;
-      align-items: center;
-      gap: 1.25rem;
-      min-width: 0;
-    }
-    .o_pdf_logo_col {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex: 0 0 auto;
-      width: 105px;
-      height: 105px;
-    }
+    .o_pdf_brand_identity { display: flex; flex-direction: column; gap: 0.75rem; min-width: 0; }
+    .o_pdf_brand_top { display: flex; align-items: center; gap: 1.15rem; min-width: 0; }
+    .o_pdf_logo_col { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 95px; height: 95px; }
     .o_pdf_company_logo {
-      max-height: 105px;
-      max-width: 105px;
+      max-height: 95px;
+      max-width: 95px;
       width: auto;
       height: auto;
       object-fit: contain;
       margin: 0 auto;
       display: block;
+      filter: drop-shadow(0 2px 4px rgba(7, 64, 115, 0.12));
     }
-    .o_pdf_company_info {
+    .o_pdf_company_title_box { display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+    .o_pdf_brand_title {
+      font-size: 1.65rem;
+      font-weight: 900;
+      letter-spacing: 0.07em;
+      margin: 0 0 0.15rem 0;
+      line-height: 1.15;
+      white-space: nowrap;
+      text-transform: uppercase;
+    }
+    .o_pdf_brand_title .brand-ch { color: #074073; font-weight: 900; }
+    .o_pdf_brand_title .brand-aluminios {
+      color: #0284c7;
+      background: linear-gradient(135deg, #074073 15%, #0284c7 65%, #14B5D9 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .o_pdf_brand_tagline { font-size: 0.72rem; font-weight: 700; color: #64748b; letter-spacing: 0.16em; text-transform: uppercase; }
+    .o_pdf_company_details {
       display: flex;
       flex-direction: column;
-      justify-content: center;
-      min-width: 0;
-      flex: 1;
+      gap: 0.3rem;
+      font-size: 0.88rem;
+      color: #334155;
+      line-height: 1.45;
+      border-top: 1px dashed #cbd5e1;
+      padding-top: 0.65rem;
     }
-    .o_pdf_company_info h2 { font-size: 1.45rem; font-weight: 800; color: #074073; margin: 0 0 0.35rem 0; letter-spacing: 0.01em; white-space: nowrap; }
+    .o_pdf_detail_row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.6rem; }
+    .o_pdf_detail_row strong { color: #074073; font-weight: 700; }
+    .o_pdf_detail_row .detail-sep { color: #94a3b8; font-weight: bold; }
     .o_pdf_company_info p { margin: 0.2rem 0; font-size: 0.82rem; color: #475569; line-height: 1.45; }
     .o_pdf_company_info p strong { color: #074073; }
     .o_pdf_doc_box {
@@ -765,15 +794,7 @@
     }
     .o_pdf_totals_table .is-residual-row td { color: #cb2f2f; font-weight: 700; background: #fef2f2; }
     .o_pdf_totals_table .is-paid-row td { color: #22b053; font-weight: 700; background: #ecfdf5; }
-    .o_pdf_signatures_section {
-      position: relative;
-      z-index: 2;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 2rem;
-      margin: 1.25rem 0 1rem 0;
-      padding-top: 0.5rem;
-    }
+    .o_pdf_signatures_section { position: relative; z-index: 2; display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin: 1.25rem 0 1rem 0; padding-top: 0.5rem; }
     .o_pdf_sign_box { text-align: center; padding: 0 1rem; }
     .o_pdf_sign_box .sign_line { border-bottom: 1.5px solid #074073; margin-bottom: 0.45rem; height: 38px; }
     .o_pdf_sign_box .sign_name { font-size: 0.78rem; font-weight: 700; color: #074073; }
@@ -781,10 +802,7 @@
     .o_pdf_sign_box .sign_sub { font-size: 0.66rem; color: #4b5563; margin-top: 0.15rem; }
 
     @media print {
-      @page {
-        size: A4 portrait;
-        margin: 8mm 10mm 10mm 10mm;
-      }
+      @page { size: A4 portrait; margin: 8mm 10mm 10mm 10mm; }
       html, body {
         background: #ffffff !important;
         color: #000000 !important;
@@ -793,36 +811,15 @@
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
-      .o_pdf_sheet {
-        box-shadow: none !important;
-        border: none !important;
-        padding: 0 !important;
-        max-width: 100% !important;
-        background: #ffffff !important;
-      }
-      .o_pdf_brand_header {
-        display: grid !important;
-        grid-template-columns: minmax(0, 1fr) 270px !important;
-        align-items: center !important;
-        gap: 1.25rem !important;
-      }
-      .o_pdf_brand_identity {
-        display: flex !important;
-        align-items: center !important;
-        gap: 1.25rem !important;
-      }
-      .o_pdf_logo_col {
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        flex: 0 0 auto !important;
-        width: 105px !important;
-        height: 105px !important;
-      }
+      .o_pdf_sheet { box-shadow: none !important; border: none !important; padding: 0 !important; max-width: 100% !important; background: #ffffff !important; }
+      .o_pdf_brand_header { display: grid !important; grid-template-columns: minmax(0, 1fr) 270px !important; align-items: start !important; gap: 1.25rem !important; }
+      .o_pdf_brand_identity { display: flex !important; flex-direction: column !important; gap: 0.65rem !important; }
+      .o_pdf_brand_top { display: flex !important; align-items: center !important; gap: 1.15rem !important; }
+      .o_pdf_logo_col { display: flex !important; align-items: center !important; justify-content: center !important; flex: 0 0 auto !important; width: 95px !important; height: 95px !important; }
       .o_pdf_company_logo {
         display: block !important;
-        max-height: 105px !important;
-        max-width: 105px !important;
+        max-height: 95px !important;
+        max-width: 95px !important;
         width: auto !important;
         height: auto !important;
         -webkit-print-color-adjust: exact !important;
@@ -830,16 +827,10 @@
         object-fit: contain !important;
         margin: 0 auto !important;
       }
-      .o_pdf_company_info h2 {
-        white-space: nowrap !important;
-      }
-      .o_pdf_doc_box {
-        width: 100% !important;
-      }
-      .o_pdf_watermark {
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
+      .o_pdf_brand_title { white-space: nowrap !important; }
+      .o_pdf_company_details { font-size: 0.88rem !important; }
+      .o_pdf_doc_box { width: 100% !important; }
+      .o_pdf_watermark { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     }
   </style>
 </head>

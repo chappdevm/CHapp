@@ -85,14 +85,31 @@
 
         <div class="o_pdf_brand_header">
           <div class="o_pdf_brand_identity">
-            <div class="o_pdf_logo_col">
-              <img src="${logoSrc}" alt="CH Aluminios" class="o_pdf_company_logo" onerror="if(!this.src.startsWith('data:'))this.style.display='none'" />
+            <div class="o_pdf_brand_top">
+              <div class="o_pdf_logo_col">
+                <img src="${logoSrc}" alt="CH Aluminios" class="o_pdf_company_logo" onerror="if(!this.src.startsWith('data:'))this.style.display='none'" />
+              </div>
+              <div class="o_pdf_company_title_box">
+                <h2 class="o_pdf_brand_title"><span class="brand-ch">CH</span> <span class="brand-aluminios">ALUMINIOS</span></h2>
+                <div class="o_pdf_brand_tagline">CARPINTERÍA METÁLICA & ARQUITECTÓNICA</div>
+              </div>
             </div>
             <div class="o_pdf_company_info">
-              <h2>${esc(company.company_name || 'CH Aluminios')}</h2>
-              <p><strong>NIT:</strong> ${esc(company.company_vat || '900.876.543-1')} · <span>${esc(company.fiscal_regime || 'Responsable de IVA - Régimen Ordinario')}</span></p>
-              <p>${esc(company.company_address || 'Cra. 7 #18-45')} · ${esc(company.company_city || 'Pereira')}, ${esc(company.company_country || 'Colombia')}</p>
-              <p>Email: ${esc(company.company_email || 'chappdevm@gmail.com')} · PBX: (606) 315-0000</p>
+              <div class="o_pdf_company_details">
+                <div class="o_pdf_detail_row">
+                  <span><strong>NIT:</strong> ${esc(company.company_vat || '900.876.543-1')}</span>
+                  <span class="detail-sep">·</span>
+                  <span>${esc(company.fiscal_regime || 'Responsable de IVA - Régimen Ordinario')}</span>
+                </div>
+                <div class="o_pdf_detail_row">
+                  <span><strong>Dirección:</strong> ${esc(company.company_address || 'Cra. 7 #18-45')} · ${esc(company.company_city || 'Pereira')}, ${esc(company.company_country || 'Colombia')}</span>
+                </div>
+                <div class="o_pdf_detail_row">
+                  <span><strong>PBX:</strong> (606) 315-0000</span>
+                  <span class="detail-sep">·</span>
+                  <span><strong>Email:</strong> ${esc(company.company_email || 'chappdevm@gmail.com')}</span>
+                </div>
+              </div>
             </div>
           </div>
           <div class="o_pdf_doc_box">
@@ -320,7 +337,7 @@
       z-index: 2;
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(240px, 280px);
-      align-items: center;
+      align-items: start;
       gap: 1.5rem;
       border-bottom: 2.5px solid #074073;
       padding-bottom: 0.95rem;
@@ -328,8 +345,14 @@
     }
     .o_pdf_brand_identity {
       display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      min-width: 0;
+    }
+    .o_pdf_brand_top {
+      display: flex;
       align-items: center;
-      gap: 1.25rem;
+      gap: 1.15rem;
       min-width: 0;
     }
     .o_pdf_logo_col {
@@ -337,26 +360,75 @@
       align-items: center;
       justify-content: center;
       flex: 0 0 auto;
-      width: 105px;
-      height: 105px;
+      width: 95px;
+      height: 95px;
     }
     .o_pdf_company_logo {
-      max-height: 105px;
-      max-width: 105px;
+      max-height: 95px;
+      max-width: 95px;
       width: auto;
       height: auto;
       object-fit: contain;
       margin: 0 auto;
       display: block;
+      filter: drop-shadow(0 2px 4px rgba(7, 64, 115, 0.12));
     }
-    .o_pdf_company_info {
+    .o_pdf_company_title_box {
       display: flex;
       flex-direction: column;
       justify-content: center;
       min-width: 0;
-      flex: 1;
     }
-    .o_pdf_company_info h2 { font-size: 1.45rem; font-weight: 800; color: #074073; margin: 0 0 0.35rem 0; letter-spacing: 0.01em; white-space: nowrap; }
+    .o_pdf_brand_title {
+      font-size: 1.65rem;
+      font-weight: 900;
+      letter-spacing: 0.07em;
+      margin: 0 0 0.15rem 0;
+      line-height: 1.15;
+      white-space: nowrap;
+      text-transform: uppercase;
+    }
+    .o_pdf_brand_title .brand-ch {
+      color: #074073;
+      font-weight: 900;
+    }
+    .o_pdf_brand_title .brand-aluminios {
+      color: #0284c7;
+      background: linear-gradient(135deg, #074073 15%, #0284c7 65%, #14B5D9 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .o_pdf_brand_tagline {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #64748b;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+    .o_pdf_company_details {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      font-size: 0.88rem;
+      color: #334155;
+      line-height: 1.45;
+      border-top: 1px dashed #cbd5e1;
+      padding-top: 0.65rem;
+    }
+    .o_pdf_detail_row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.35rem 0.6rem;
+    }
+    .o_pdf_detail_row strong {
+      color: #074073;
+      font-weight: 700;
+    }
+    .o_pdf_detail_row .detail-sep {
+      color: #94a3b8;
+      font-weight: bold;
+    }
     .o_pdf_company_info p { margin: 0.2rem 0; font-size: 0.82rem; color: #475569; line-height: 1.45; }
     .o_pdf_company_info p strong { color: #074073; }
     .o_pdf_doc_box {
@@ -435,26 +507,31 @@
       .o_pdf_brand_header {
         display: grid !important;
         grid-template-columns: minmax(0, 1fr) 270px !important;
-        align-items: center !important;
+        align-items: start !important;
         gap: 1.25rem !important;
       }
       .o_pdf_brand_identity {
         display: flex !important;
+        flex-direction: column !important;
+        gap: 0.65rem !important;
+      }
+      .o_pdf_brand_top {
+        display: flex !important;
         align-items: center !important;
-        gap: 1.25rem !important;
+        gap: 1.15rem !important;
       }
       .o_pdf_logo_col {
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
         flex: 0 0 auto !important;
-        width: 105px !important;
-        height: 105px !important;
+        width: 95px !important;
+        height: 95px !important;
       }
       .o_pdf_company_logo {
         display: block !important;
-        max-height: 105px !important;
-        max-width: 105px !important;
+        max-height: 95px !important;
+        max-width: 95px !important;
         width: auto !important;
         height: auto !important;
         -webkit-print-color-adjust: exact !important;
@@ -462,8 +539,11 @@
         object-fit: contain !important;
         margin: 0 auto !important;
       }
-      .o_pdf_company_info h2 {
+      .o_pdf_brand_title {
         white-space: nowrap !important;
+      }
+      .o_pdf_company_details {
+        font-size: 0.88rem !important;
       }
       .o_pdf_doc_box {
         width: 100% !important;
