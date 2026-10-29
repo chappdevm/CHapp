@@ -1,0 +1,149 @@
+/* ==========================================================================
+   CH Aluminios ERP -- CSS Module: 01-variables-base.css
+   Theme Variables (Dark/Light), Reset & Base Layout
+   ========================================================================== */
+/* ==========================================================================
+   CHapp ERP — Enterprise Design System & Stylesheet
+   Diseño profesional y responsivo para GH Aluminios
+   Fully responsive across Mobile (<600px), Tablet (600-1024px), Laptop & Desktop (>1200px)
+   ========================================================================== */
+
+:root,
+[data-theme="dark"] {
+  --o-white: #000000;
+  --o-black: #ffffff;
+  --o-gray-100: #051a2c;
+  --o-gray-200: #072640;
+  --o-gray-300: #0a3556;
+  --o-gray-400: #104874;
+  --o-gray-500: #256a9a;
+  --o-gray-600: #5593c2;
+  --o-gray-700: #93bee0;
+  --o-gray-800: #cbe0f1;
+  --o-gray-900: #F2F2F2;
+
+  --o-brand-odoo: #074073;
+  --o-brand-primary: #074073;
+  --o-brand-primary-hover: #0c5292;
+  --o-action: #14B5D9;
+  --o-action-subtle: rgba(20, 181, 217, 0.16);
+  --o-highlight: #41F2F2;
+
+  --o-success: #22b053;
+  --o-success-bg: #0d3715;
+  --o-success-text: #b0e8b5;
+
+  --o-info: #14B5D9;
+  --o-info-bg: #03253d;
+  --o-info-text: #41F2F2;
+
+  --o-warning: #e39c50;
+  --o-warning-bg: #542d06;
+  --o-warning-text: #fecca6;
+
+  --o-danger: #cb2f2f;
+  --o-danger-bg: #58271f;
+  --o-danger-text: #fec9bf;
+
+  --o-webclient-bg: #031626;
+  --o-view-bg: #05213b;
+  --o-sheet-bg: #072c4d;
+  --o-navbar-bg: #031626;
+  --o-border-color: #0d4370;
+  --o-text-main: #F2F2F2;
+  --o-text-muted: #95b8d4;
+
+  /* Home Menu Dark Variables */
+  --AppSwitcherBg-base: #031626;
+  --AppSwitcherBg-contrastRadial: rgba(3, 22, 38, 0.94);
+  --AppSwitcherBg-dots: rgba(65, 242, 242, 0.18);
+  --AppSwitcherIcon-background: #074073;
+  --AppSwitcherIcon-inset-shadow: inset 0 0 0 1px #0e4e8a, 0 8px 18px -6px rgba(0, 0, 0, 0.55);
+  --AppSwitcherIcon-inset-shadow-hover: inset 0 0 0 1px #41F2F2, 0 12px 24px -6px rgba(20, 181, 217, 0.45);
+  --homeMenuCaption-color: #F2F2F2;
+  --homeMenuCaption-shadow: 0 1px 2px rgba(0, 0, 0, 0.75), 0 2px 5px rgba(0, 0, 0, 0.05), 0 0 5px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] {
+  --o-white: #ffffff;
+  --o-black: #031626;
+  --o-gray-100: #F2F2F2;
+  --o-gray-200: #e2eaf0;
+  --o-gray-300: #c9dbe7;
+  --o-gray-400: #9fc1da;
+  --o-gray-500: #6b96bb;
+  --o-gray-600: #426f95;
+  --o-gray-700: #234d73;
+  --o-gray-800: #074073;
+  --o-gray-900: #031626;
+
+  --o-brand-odoo: #074073;
+  --o-brand-primary: #074073;
+  --o-brand-primary-hover: #052e54;
+  --o-action: #0b8fae;
+  --o-action-subtle: rgba(20, 181, 217, 0.12);
+  --o-highlight: #14B5D9;
+
+  --o-success: #00a945;
+  --o-success-bg: #dcfce7;
+  --o-success-text: #166534;
+
+  --o-info: #074073;
+  --o-info-bg: #e1f5fb;
+  --o-info-text: #053b6b;
+
+  --o-warning: #d97706;
+  --o-warning-bg: #fef3c7;
+  --o-warning-text: #92400e;
+
+  --o-danger: #dc2626;
+  --o-danger-bg: #fee2e2;
+  --o-danger-text: #991b1b;
+
+  --o-webclient-bg: #F2F2F2;
+  --o-view-bg: #ffffff;
+  --o-sheet-bg: #ffffff;
+  --o-navbar-bg: #ffffff;
+  --o-border-color: #c9dbe7;
+  --o-text-main: #031626;
+  --o-text-muted: #426f95;
+
+  --AppSwitcherBg-base: #F2F2F2;
+  --AppSwitcherBg-contrastRadial: rgba(226, 234, 240, 0.92);
+  --AppSwitcherBg-dots: rgba(7, 64, 115, 0.14);
+  --AppSwitcherIcon-background: #ffffff;
+  --AppSwitcherIcon-inset-shadow: rgba(7, 64, 115, 0.09) 0px 0px 0px 1px, rgba(3, 22, 38, 0.08) 0px 4px 10px -2px;
+  --AppSwitcherIcon-inset-shadow-hover: rgba(7, 64, 115, 0.25) 0px 6px 14px -2px, rgba(20, 181, 217, 0.3) 0px 0px 0px 1px;
+  --homeMenuCaption-color: #031626;
+  --homeMenuCaption-shadow: none;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  height: 100dvh;
+  min-height: -webkit-fill-available;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Ubuntu, sans-serif;
+  font-size: 14px;
+  color: var(--o-text-main);
+  background-color: var(--o-webclient-bg);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  overflow-x: hidden;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+

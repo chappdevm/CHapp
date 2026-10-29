@@ -1,0 +1,288 @@
+/* ==========================================================================
+   CH Aluminios ERP -- CSS Module: 04-control-panel.css
+   Control Panel, Breadcrumbs, Searchview, Filter Pills & Pager
+   ========================================================================== */
+/* ==========================================================================
+   3. CONTROL PANEL (Action Buttons, Breadcrumbs, Search, View Switcher)
+   ========================================================================== */
+
+.o_control_panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 1.25rem;
+  background-color: var(--o-webclient-bg);
+  border-bottom: 1px solid var(--o-border-color);
+  z-index: 15;
+}
+
+.o_cp_left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.o_cp_breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--o-text-main);
+  flex-wrap: wrap;
+}
+
+.o_cp_breadcrumbs .o_breadcrumb_link {
+  color: var(--o-action);
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.o_cp_breadcrumbs .o_breadcrumb_link:hover {
+  text-decoration: underline;
+}
+
+.o_cp_center {
+  flex: 1;
+  max-width: 480px;
+  min-width: 220px;
+}
+
+.o_searchview {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  background-color: var(--o-view-bg);
+  border: 1px solid var(--o-border-color);
+  border-radius: 6px;
+  padding: 0.35rem 0.75rem;
+  min-height: 38px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.o_searchview:focus-within {
+  border-color: var(--o-action);
+  box-shadow: 0 0 0 2px var(--o-action-subtle);
+}
+
+.o_searchview input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 0.88rem;
+  color: var(--o-text-main);
+}
+
+.o_search_facet {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: var(--o-action-subtle);
+  color: var(--o-action);
+  border: 1px solid rgba(20, 181, 217, 0.35);
+  border-radius: 4px;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.o_search_facet button {
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.o_cp_right {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.o_cp_filter_pills {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.o_filter_pill {
+  padding: 0.3rem 0.65rem;
+  font-size: 0.78rem;
+  border-radius: 6px;
+  border: 1px solid var(--o-border-color);
+  background: var(--o-view-bg);
+  color: var(--o-gray-800);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  touch-action: manipulation;
+  white-space: nowrap;
+}
+
+.o_filter_pill:hover {
+  border-color: var(--o-gray-500);
+}
+
+.o_filter_pill.is-active {
+  background: var(--o-action-subtle);
+  border-color: var(--o-action);
+  color: var(--o-action);
+  font-weight: 600;
+}
+
+.o_cp_pager {
+  font-size: 0.8rem;
+  color: var(--o-text-muted);
+  white-space: nowrap;
+}
+
+.o_cp_switch_buttons {
+  display: inline-flex;
+  background: var(--o-view-bg);
+  border: 1px solid var(--o-border-color);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.o_switch_btn {
+  padding: 0.35rem 0.65rem;
+  min-height: 36px;
+  border: none;
+  background: transparent;
+  color: var(--o-gray-700);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.12s ease, color 0.12s ease;
+  touch-action: manipulation;
+}
+
+.o_switch_btn:hover {
+  background: var(--o-gray-300);
+  color: var(--o-text-main);
+}
+
+.o_switch_btn.is-active {
+  background: var(--o-action-subtle);
+  color: var(--o-action);
+}
+
+/* Tablet & Mobile Control Panel Responsiveness */
+@media (max-width: 1024px) {
+  .o_control_panel {
+    padding: 0.6rem 1rem;
+    gap: 0.6rem;
+  }
+  .o_cp_center {
+    flex: 1 1 240px;
+    max-width: 380px;
+  }
+  .o_cp_filter_pills {
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    max-width: 100%;
+  }
+  .o_cp_filter_pills::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .o_control_panel {
+    padding: 0.6rem 0.75rem;
+    gap: 0.55rem;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .o_cp_left {
+    width: 100%;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  #cpActionButtons {
+    display: flex;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+  }
+
+  #cpActionButtons .btn {
+    min-height: 44px;
+    padding: 0.45rem 1rem;
+  }
+
+  .o_cp_breadcrumbs {
+    font-size: 0.95rem;
+    line-height: 1.25;
+  }
+
+  .o_cp_center {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    margin: 0.1rem 0;
+  }
+
+  .o_searchview {
+    min-height: 44px;
+    padding: 0.35rem 0.75rem;
+  }
+
+  .o_searchview input {
+    font-size: 16px;
+  }
+
+  .o_cp_right {
+    width: 100%;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .o_cp_filter_pills {
+    display: flex;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    flex: 1;
+    min-width: 0;
+    padding: 0.15rem 0;
+    gap: 0.35rem;
+  }
+
+  .o_cp_filter_pills::-webkit-scrollbar {
+    display: none;
+  }
+
+  .o_filter_pill {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .o_cp_switch_buttons {
+    flex-shrink: 0;
+  }
+
+  .o_switch_btn {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0.4rem 0.75rem;
+  }
+}
+

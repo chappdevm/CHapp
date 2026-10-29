@@ -1,0 +1,688 @@
+/* ==========================================================================
+   CH Aluminios ERP -- JS Module: 12-accounting-dashboard.js
+   Module 4 (Part 1): Contabilidad -- SVG Financial Charts, Dashboard, Kanban & Move List
+   ========================================================================== */
+'use strict';
+
+  // ==================== MODULE 4: CONTABILIDAD (account.move) ====================
+  function paymentStateBadge(st) {
+    const map = {
+      paid: { cls: 'o_badge_success', text: 'Pagado' },
+      partial: { cls: 'o_badge_warning', text: 'Pago Parcial' },
+      not_paid: { cls: 'o_badge_danger', text: 'No Pagado' }
+    };
+    const item = map[st] || { cls: 'o_badge_muted', text: st };
+    return `<span class="o_badge ${item.cls}">${esc(item.text)}</span>`;
+  }
+
+  function generateMonthBalanceSvg(m) {
+    const data = m || { inflow: 0, outflow: 0, net: 0, margin_pct: 0 };
+    const maxVal = Math.max(Number(data.inflow || 0), Number(data.outflow || 0), Math.abs(Number(data.net || 0)), 1);
+    const chartH = 120;
+    const baseY = 165;
+
+    const hInflow = Math.round((Math.max(0, Number(data.inflow || 0)) / maxVal) * chartH);
+    const hOutflow = Math.round((Math.max(0, Number(data.outflow || 0)) / maxVal) * chartH);
+    const hNet = Math.round((Math.abs(Number(data.net || 0)) / maxVal) * chartH);
+    const isNetPos = Number(data.net || 0) >= 0;
+
+    return `
+      <svg viewBox="0 0 600 230" style="width: 100%; height: auto; max-height: 250px; font-family: inherit;" role="img" aria-label="Gráfica comparativa de balance del mes actual">
+        <!-- Lineas de escala -->
+        <line x1="40" y1="45" x2="560" y2="45" stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" />
+        <line x1="40" y1="85" x2="560" y2="85" stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" />
+        <line x1="40" y1="125" x2="560" y2="125" stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" />
+        <line x1="40" y1="${baseY}" x2="560" y2="${baseY}" stroke="currentColor" stroke-opacity="0.25" stroke-width="1.5" />
+
+        <!-- Distintivo Margen Neto -->
+        <rect x="400" y="10" width="160" height="26" rx="13" fill="rgba(14, 165, 233, 0.12)" />
+        <text x="480" y="27" font-size="11" font-weight="700" fill="#0ea5e9" text-anchor="middle">Margen Operativo: ${data.margin_pct >= 0 ? '+' : ''}${data.margin_pct}%</text>
+
+        <!-- Barra 1: Recaudado -->
+        <g>
+          <rect x="85" y="${baseY - hInflow}" width="85" height="${hInflow}" rx="5" fill="#10b981" />
+          <text x="127" y="${Math.max(30, baseY - hInflow - 8)}" font-size="12" font-weight="700" fill="#10b981" text-anchor="middle">${formatMoney(data.inflow)}</text>
+          <text x="127" y="${baseY + 22}" font-size="12" font-weight="600" fill="var(--o-text-main)" text-anchor="middle">Recaudado</text>
+          <text x="127" y="${baseY + 38}" font-size="10" fill="var(--o-text-muted)" text-anchor="middle">Cobros Reales</text>
+        </g>
+
+        <!-- Barra 2: Gastos Pagados -->
+        <g>
+          <rect x="255" y="${baseY - hOutflow}" width="85" height="${hOutflow}" rx="5" fill="#ef4444" />
+          <text x="297" y="${Math.max(30, baseY - hOutflow - 8)}" font-size="12" font-weight="700" fill="#ef4444" text-anchor="middle">${formatMoney(data.outflow)}</text>
+          <text x="297" y="${baseY + 22}" font-size="12" font-weight="600" fill="var(--o-text-main)" text-anchor="middle">Gastos Pagados</text>
+          <text x="297" y="${baseY + 38}" font-size="10" fill="var(--o-text-muted)" text-anchor="middle">Compras / Mat.</text>
+        </g>
+
+        <!-- Barra 3: Balance Neto -->
+        <g>
+          <rect x="425" y="${baseY - hNet}" width="85" height="${hNet}" rx="5" fill="${isNetPos ? '#0ea5e9' : '#f59e0b'}" />
+          <text x="467" y="${Math.max(30, baseY - hNet - 8)}" font-size="12" font-weight="700" fill="${isNetPos ? '#0ea5e9' : '#f59e0b'}" text-anchor="middle">${formatMoney(data.net)}</text>
+          <text x="467" y="${baseY + 22}" font-size="12" font-weight="600" fill="var(--o-text-main)" text-anchor="middle">Balance Neto</text>
+          <text x="467" y="${baseY + 38}" font-size="10" fill="var(--o-text-muted)" text-anchor="middle">Cajas / Bancos</text>
+        </g>
+      </svg>
+    `;
+  }
+
+  function generateTrendSvg(monthlyList) {
+    const list = Array.isArray(monthlyList) && monthlyList.length > 0 ? monthlyList : [];
+    if (list.length === 0) {
+      return `<p style="padding: 2.5rem; text-align: center; color: var(--o-text-muted);">Sin datos históricos suficientes para graficar.</p>`;
+    }
+    const maxVal = Math.max(...list.map((m) => Math.max(Number(m.inflow || 0), Number(m.outflow || 0), Math.abs(Number(m.net || 0)))), 1);
+    const chartH = 110;
+    const baseY = 160;
+    const count = list.length;
+    const colW = 540 / count;
+
+    const netPoints = [];
+
+    const barsSvg = list.map((m, i) => {
+      const centerX = 40 + i * colW + colW / 2;
+      const hIn = Math.round((Math.max(0, Number(m.inflow || 0)) / maxVal) * chartH);
+      const hOut = Math.round((Math.max(0, Number(m.outflow || 0)) / maxVal) * chartH);
+      const hNet = Math.round((Number(m.net || 0) / maxVal) * chartH);
+      const netY = baseY - hNet;
+      netPoints.push(`${centerX},${netY}`);
+
+      return `
+        <g>
+          <rect x="${centerX - 24}" y="${baseY - hIn}" width="22" height="${hIn}" rx="3" fill="#10b981" />
+          <rect x="${centerX + 2}" y="${baseY - hOut}" width="22" height="${hOut}" rx="3" fill="#ef4444" />
+          <text x="${centerX}" y="${baseY + 20}" font-size="11" font-weight="600" fill="var(--o-text-muted)" text-anchor="middle">${esc(m.label)}</text>
+        </g>
+      `;
+    }).join('');
+
+    const polylineSvg = netPoints.length > 1
+      ? `<polyline points="${netPoints.join(' ')}" fill="none" stroke="#0ea5e9" stroke-width="2" stroke-dasharray="3,3" />`
+      : '';
+
+    const dotsSvg = list.map((m, i) => {
+      const centerX = 40 + i * colW + colW / 2;
+      const hNet = Math.round((Number(m.net || 0) / maxVal) * chartH);
+      const netY = baseY - hNet;
+      return `<circle cx="${centerX}" cy="${netY}" r="4" fill="#0ea5e9" stroke="#ffffff" stroke-width="1.5" />`;
+    }).join('');
+
+    return `
+      <svg viewBox="0 0 620 220" style="width: 100%; height: auto; max-height: 250px; font-family: inherit;" role="img" aria-label="Evolución financiera de 6 meses">
+        <!-- Leyenda -->
+        <g transform="translate(130, 10)">
+          <rect x="0" y="2" width="12" height="12" rx="2" fill="#10b981" />
+          <text x="18" y="12" font-size="11" fill="var(--o-text-main)">Recaudado</text>
+          <rect x="110" y="2" width="12" height="12" rx="2" fill="#ef4444" />
+          <text x="128" y="12" font-size="11" fill="var(--o-text-main)">Gastos</text>
+          <circle cx="216" cy="8" r="5" fill="#0ea5e9" />
+          <text x="228" y="12" font-size="11" fill="var(--o-text-main)">Balance Neto</text>
+        </g>
+
+        <!-- Escalas -->
+        <line x1="30" y1="45" x2="590" y2="45" stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" />
+        <line x1="30" y1="85" x2="590" y2="85" stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" />
+        <line x1="30" y1="125" x2="590" y2="125" stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3,3" />
+        <line x1="30" y1="${baseY}" x2="590" y2="${baseY}" stroke="currentColor" stroke-opacity="0.25" stroke-width="1.5" />
+
+        ${barsSvg}
+        ${polylineSvg}
+        ${dotsSvg}
+      </svg>
+    `;
+  }
+
+  function generateDonutSvg(items, title, emptyMsg) {
+    const list = Array.isArray(items) && items.length > 0 ? items : [];
+    const total = list.reduce((s, it) => s + Number(it.amount || 0), 0);
+    if (total <= 0 || list.length === 0) {
+      return `
+        <div style="background: var(--o-view-bg); border: 1px dashed var(--o-border-color); border-radius: 8px; padding: 1.5rem; text-align: center;">
+          <h4 style="font-size: 0.95rem; margin-bottom: 0.35rem;">${esc(title)}</h4>
+          <p style="font-size: 0.82rem; color: var(--o-text-muted); margin: 0;">${esc(emptyMsg || 'Sin movimientos registrados')}</p>
+        </div>
+      `;
+    }
+
+    const palette = ['#10b981', '#0ea5e9', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
+    const r = 58;
+    const circ = 2 * Math.PI * r;
+    let accumulatedPct = 0;
+
+    const circlesSvg = list.map((it, idx) => {
+      const pct = Math.max(0, Math.min(100, Number(it.percentage || 0)));
+      const strokeDash = (pct / 100) * circ;
+      const strokeOffset = -((accumulatedPct / 100) * circ);
+      accumulatedPct += pct;
+      const color = palette[idx % palette.length];
+      return `<circle cx="90" cy="90" r="${r}" fill="none" stroke="${color}" stroke-width="22" stroke-dasharray="${strokeDash.toFixed(2)} ${(circ - strokeDash).toFixed(2)}" stroke-dashoffset="${strokeOffset.toFixed(2)}" transform="rotate(-90 90 90)" />`;
+    }).join('');
+
+    const legendHtml = list.map((it, idx) => {
+      const color = palette[idx % palette.length];
+      return `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.45rem; font-size: 0.82rem;">
+          <div style="display: flex; align-items: center; gap: 0.45rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px;">
+            <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: ${color}; flex-shrink: 0;"></span>
+            <span style="overflow: hidden; text-overflow: ellipsis;" title="${esc(it.name)}">${esc(it.name)}</span>
+          </div>
+          <div style="text-align: end; margin-left: 0.5rem; white-space: nowrap;">
+            <strong>${formatMoney(it.amount)}</strong>
+            <span style="color: var(--o-text-muted); font-size: 0.75rem; margin-left: 0.2rem;">(${it.percentage}%)</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div style="background: var(--o-view-bg); border: 1px solid var(--o-border-color); border-radius: 8px; padding: 1.15rem;">
+        <h4 style="font-size: 0.95rem; margin: 0 0 1rem 0; font-weight: 600;">${esc(title)}</h4>
+        <div style="display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap;">
+          <div style="width: 180px; height: 180px; flex-shrink: 0; position: relative; margin: 0 auto;">
+            <svg viewBox="0 0 180 180" style="width: 100%; height: 100%;" role="img" aria-label="${esc(title)}">
+              <circle cx="90" cy="90" r="${r}" fill="none" stroke="currentColor" stroke-opacity="0.08" stroke-width="22" />
+              ${circlesSvg}
+              <text x="90" y="86" font-size="10" font-weight="600" fill="var(--o-text-muted)" text-anchor="middle">Total</text>
+              <text x="90" y="103" font-size="11" font-weight="700" fill="var(--o-text-main)" text-anchor="middle">${formatMoney(total)}</text>
+            </svg>
+          </div>
+          <div style="flex: 1; min-width: 200px;">
+            ${legendHtml}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderAccountingModule() {
+    const container = document.getElementById('moduleContent');
+    const acc = state.data.accounting || { moves: [], journals: [], accounts: [], payments: [] };
+    const kpis = state.data.kpis || {};
+
+    if (state.viewType === 'form' && state.submenu !== 'accounts' && state.submenu !== 'payments') {
+      renderAccountMoveForm(container);
+      return;
+    }
+    // Facturas y documentos contables siempre se visualizan en lista por defecto
+    state.viewType = 'list';
+
+    if (state.submenu === 'dashboard') {
+      updatePager(acc.journals.length, acc.journals.length);
+      const outUnpaid = acc.moves.filter((m) => m.move_type === 'out_invoice' && m.state === 'posted' && m.amount_residual > 0);
+      const inUnpaid = acc.moves.filter((m) => m.move_type === 'in_invoice' && m.state === 'posted' && m.amount_residual > 0);
+      const bankCashAccounts = (kpis.accounts_summary && kpis.accounts_summary.length > 0)
+        ? kpis.accounts_summary
+        : (acc.journals || []).filter((j) => (j.type === 'bank' || j.type === 'cash') && j.active !== false).map((j) => ({
+            id: j.id,
+            code: j.code,
+            name: j.name,
+            type: j.type,
+            balance: Number(j.balance || 0),
+            inbound_total: 0,
+            outbound_total: 0
+          }));
+
+      container.innerHTML = `
+        <div class="o_dashboard_banner">
+          <div class="o_stat_card">
+            <span class="o_stat_label">Total de Ingresos</span>
+            <span class="o_stat_value">${formatMoney(kpis.invoiced_revenue || 0)}</span>
+            <span class="o_stat_sub">Ingresos operacionales causados</span>
+          </div>
+          <div class="o_stat_card">
+            <span class="o_stat_label">Total Recaudado (Cobros Reales)</span>
+            <span class="o_stat_value" style="color: #10b981;">${formatMoney(kpis.collected_revenue || 0)}</span>
+            <span class="o_stat_sub">Ingresos cobrados en cuentas</span>
+          </div>
+          <div class="o_stat_card">
+            <span class="o_stat_label">Total Gastos / Compras</span>
+            <span class="o_stat_value" style="color: #ef4444;">${formatMoney(kpis.expenses_paid_total || 0)}</span>
+            <span class="o_stat_sub">Pagado en compras y materiales</span>
+          </div>
+          <div class="o_stat_card">
+            <span class="o_stat_label">Balance Neto en Cajas y Bancos</span>
+            <span class="o_stat_value" style="color: ${(kpis.net_cash_balance || 0) >= 0 ? '#0ea5e9' : '#ef4444'};">${formatMoney(kpis.net_cash_balance || 0)}</span>
+            <span class="o_stat_sub">Efectivo real disponible</span>
+          </div>
+          <div class="o_stat_card">
+            <span class="o_stat_label">Cartera por Cobrar (Clientes)</span>
+            <span class="o_stat_value">${formatMoney(kpis.receivables_residual || 0)}</span>
+            <span class="o_stat_sub">${outUnpaid.length} factura(s) pendiente(s) de cobro</span>
+          </div>
+        </div>
+
+        <!-- Panel de Gráficas y Balances Financieros -->
+        <div class="o_chart_card">
+          <div class="o_chart_header">
+            <div>
+              <h3 style="font-size: 1.05rem; margin: 0;">Análisis Financiero y Flujo de Caja</h3>
+              <span style="font-size: 0.82rem; color: var(--o-text-muted);">Comparativa de recaudo real vs compras de materiales y balance disponible</span>
+            </div>
+            <div class="o_chart_tabs" role="tablist">
+              <button type="button" class="o_chart_tab is-active" data-chart-tab="month">Balance Mes Actual</button>
+              <button type="button" class="o_chart_tab" data-chart-tab="trend">Evolución 6 Meses</button>
+              <button type="button" class="o_chart_tab" data-chart-tab="distribution">Distribución de Flujos</button>
+            </div>
+          </div>
+          <div id="chartTabMonth" style="display: block;">
+            ${generateMonthBalanceSvg(kpis.current_month_financials)}
+          </div>
+          <div id="chartTabTrend" style="display: none;">
+            ${generateTrendSvg(kpis.monthly_financials)}
+          </div>
+          <div id="chartTabDistribution" style="display: none;">
+            <div class="o_donut_grid">
+              ${generateDonutSvg(kpis.inflow_by_account, 'Recaudos por Cuenta / Medio de Pago', 'Sin recaudos registrados este mes')}
+              ${generateDonutSvg(kpis.expense_breakdown, 'Gastos por Proveedor / Material', 'Sin compras registradas este mes')}
+            </div>
+          </div>
+        </div>
+
+        <!-- Cuentas Financieras y Medios de Pago -->
+        <div style="margin-bottom: 0.85rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+          <div>
+            <h3 style="font-size: 1.1rem; margin: 0;">Cuentas Financieras y Cajas (Nequi, Daviplata, Efectivo, Bancos)</h3>
+            <span style="font-size: 0.82rem; color: var(--o-text-muted);">Saldos y flujos discriminados por cuenta bancaria y medio de pago</span>
+          </div>
+          <button type="button" class="btn btn-sm btn-secondary" id="btnManageJournalsFromAcc">Configurar Cuentas en Ajustes</button>
+        </div>
+
+        <div class="o_financial_grid">
+          ${bankCashAccounts
+            .map(
+              (a) => `
+              <div class="o_journal_card ${a.type === 'bank' ? 'is-bank' : 'is-cash'}">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.45rem;">
+                  <div>
+                    <span class="o_badge ${a.code === 'NEQ' ? 'o_badge_info' : a.code === 'DVP' ? 'o_badge_danger' : a.type === 'bank' ? 'o_badge_success' : 'o_badge_warning'}">${esc(a.code)}</span>
+                    <h4 style="margin: 0.35rem 0 0 0; font-size: 1rem;">${esc(a.name)}</h4>
+                  </div>
+                  <span style="font-size: 0.72rem; color: var(--o-text-muted); text-transform: uppercase;">${a.type === 'bank' ? 'Banco / Billetera' : 'Caja Efectivo'}</span>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin: 0.65rem 0; padding: 0.5rem; background: var(--o-gray-100); border-radius: 6px; font-size: 0.8rem;">
+                  <div>
+                    <span style="color: var(--o-text-muted); display: block; font-size: 0.75rem;">Recaudado (+)</span>
+                    <strong style="color: #10b981;">+${formatMoney(a.inbound_total || 0)}</strong>
+                  </div>
+                  <div>
+                    <span style="color: var(--o-text-muted); display: block; font-size: 0.75rem;">Gastos (-)</span>
+                    <strong style="color: #ef4444;">-${formatMoney(a.outbound_total || 0)}</strong>
+                  </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--o-border-color); padding-top: 0.65rem; margin-top: 0.25rem;">
+                  <div>
+                    <span style="font-size: 0.75rem; color: var(--o-text-muted); display: block;">Saldo en Libros</span>
+                    <strong style="font-size: 1.15rem; color: var(--o-action);">${formatMoney(a.balance || 0)}</strong>
+                  </div>
+                  <button type="button" class="btn btn-sm btn-secondary" data-journal-action="payments">Ver Pagos</button>
+                </div>
+              </div>
+            `
+            )
+            .join('')}
+        </div>
+
+        <!-- Tabla de Últimos Movimientos de Caja y Bancos -->
+        <div class="o_chart_card" style="margin-bottom: 1.75rem;">
+          <div class="o_chart_header" style="margin-bottom: 0.75rem;">
+            <div>
+              <h3 style="font-size: 1.05rem; margin: 0;">Últimos Movimientos de Caja y Bancos</h3>
+              <span style="font-size: 0.82rem; color: var(--o-text-muted);">Transacciones reales registradas en Nequi, Daviplata, Efectivo y Bancos</span>
+            </div>
+            <button type="button" class="btn btn-sm btn-secondary" data-journal-action="payments">Ver Todos los Pagos</button>
+          </div>
+          <div tabindex="0" role="region" aria-label="Tabla de últimos movimientos" class="table-wrapper">
+            <table class="o_list_table" style="--label-2: 'Fecha'; --label-3: 'Comprobante'; --label-4: 'Cuenta'; --label-5: 'Tercero'; --label-6: 'Referencia'; --label-7: 'Tipo'; --label-8: 'Importe';">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Comprobante</th>
+                  <th>Cuenta / Medio</th>
+                  <th>Tercero</th>
+                  <th>Referencia</th>
+                  <th>Tipo</th>
+                  <th class="text-end">Importe</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${(kpis.recent_cash_flows || []).length === 0 ? `
+                  <tr><td colspan="7" class="text-center" style="padding: 1.5rem; color: var(--o-text-muted);">Sin movimientos de caja recientes.</td></tr>
+                ` : (kpis.recent_cash_flows || []).map((m) => `
+                  <tr>
+                    <td>${esc(m.date || '')}</td>
+                    <th>${esc(m.name || '')}</th>
+                    <td><span class="o_badge ${m.journal_code === 'NEQ' ? 'o_badge_info' : m.journal_code === 'DVP' ? 'o_badge_danger' : 'o_badge_success'}">${esc(m.journal_name || m.journal_code || '')}</span></td>
+                    <td>${esc(m.partner_name || '')}</td>
+                    <td>${esc(m.ref || '—')}</td>
+                    <td><span class="o_badge ${m.type === 'inbound' ? 'o_badge_success' : 'o_badge_warning'}">${m.type === 'inbound' ? 'Recaudo Cliente' : 'Pago Gasto'}</span></td>
+                    <td class="text-end"><strong style="color: ${m.type === 'inbound' ? '#10b981' : '#ef4444'};">${m.type === 'inbound' ? '+' : '-'}${formatMoney(m.amount)}</strong></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Diarios Operativos Estándar Odoo -->
+        <h3 style="font-size: 1.1rem; margin-bottom: 0.85rem;">Diarios Operativos y Facturación</h3>
+        <div class="o_journal_dashboard">
+          <div class="o_journal_card is-sale">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="font-size: 1.05rem;">Facturas de Clientes (INV)</h3>
+                <span class="o_badge o_badge_info">Ventas</span>
+              </div>
+              <p style="font-size: 0.82rem; color: var(--o-text-muted); margin-top: 0.35rem;">
+                Diario de facturación electrónica y cuentas por cobrar (130505).
+              </p>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="font-size: 0.75rem; color: var(--o-text-muted);">Por Cobrar</div>
+                <strong style="font-size: 1.15rem;">${formatMoney(kpis.receivables_residual || 0)}</strong>
+              </div>
+              <div style="display: flex; gap: 0.4rem;">
+                <button type="button" class="btn btn-sm btn-primary" data-journal-action="new_out">Nueva Factura</button>
+                <button type="button" class="btn btn-sm btn-secondary" data-journal-action="list_out">Ver (${outUnpaid.length})</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="o_journal_card is-purchase">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="font-size: 1.05rem;">Facturas de Proveedores (BILL)</h3>
+                <span class="o_badge o_badge_warning">Compras</span>
+              </div>
+              <p style="font-size: 0.82rem; color: var(--o-text-muted); margin-top: 0.35rem;">
+                Causación de compras, servicios y cuentas por pagar (220505).
+              </p>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="font-size: 0.75rem; color: var(--o-text-muted);">Por Pagar</div>
+                <strong style="font-size: 1.15rem;">${formatMoney(kpis.payables_residual || 0)}</strong>
+              </div>
+              <div style="display: flex; gap: 0.4rem;">
+                <button type="button" class="btn btn-sm btn-primary" data-journal-action="new_in">Nueva Factura Prov.</button>
+                <button type="button" class="btn btn-sm btn-secondary" data-journal-action="list_in">Ver (${inUnpaid.length})</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="o_journal_card is-cash">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="font-size: 1.05rem;">Gastos y Operaciones Varias (EXJ)</h3>
+                <span class="o_badge o_badge_info">Contabilidad</span>
+              </div>
+              <p style="font-size: 0.82rem; color: var(--o-text-muted); margin-top: 0.35rem;">
+                Asientos contables integrados con el módulo de Gastos y Ventas.
+              </p>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="font-size: 0.75rem; color: var(--o-text-muted);">Asientos Publicados</div>
+                <strong style="font-size: 1.15rem;">${acc.moves.length}</strong>
+              </div>
+              <button type="button" class="btn btn-sm btn-secondary" data-journal-action="entries">Ver Asientos</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Chart tabs switcher
+      container.querySelectorAll('[data-chart-tab]').forEach((tabBtn) => {
+        tabBtn.addEventListener('click', () => {
+          const tab = tabBtn.getAttribute('data-chart-tab');
+          container.querySelectorAll('.o_chart_tab').forEach((t) => t.classList.remove('is-active'));
+          tabBtn.classList.add('is-active');
+
+          const tabMonth = container.querySelector('#chartTabMonth');
+          const tabTrend = container.querySelector('#chartTabTrend');
+          const tabDist = container.querySelector('#chartTabDistribution');
+          if (tabMonth) tabMonth.style.display = tab === 'month' ? 'block' : 'none';
+          if (tabTrend) tabTrend.style.display = tab === 'trend' ? 'block' : 'none';
+          if (tabDist) tabDist.style.display = tab === 'distribution' ? 'block' : 'none';
+        });
+      });
+
+      const btnManageJournals = container.querySelector('#btnManageJournalsFromAcc');
+      if (btnManageJournals) {
+        btnManageJournals.addEventListener('click', () => {
+          openApp('settings', { submenu: 'accounting' });
+        });
+      }
+
+      container.querySelectorAll('[data-journal-action]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const act = btn.getAttribute('data-journal-action');
+          const app = APPS.find((a) => a.id === 'accounting');
+          if (act === 'new_out') {
+            state.submenu = 'out_invoice';
+            state.activeRecordId = 'new';
+            state.formDraft = null;
+            state.viewType = 'form';
+          } else if (act === 'list_out') {
+            state.submenu = 'out_invoice';
+            state.viewType = 'list';
+          } else if (act === 'new_in') {
+            state.submenu = 'in_invoice';
+            state.activeRecordId = 'new';
+            state.formDraft = null;
+            state.viewType = 'form';
+          } else if (act === 'list_in') {
+            state.submenu = 'in_invoice';
+            state.viewType = 'list';
+          } else if (act === 'payments') {
+            state.submenu = 'payments';
+            state.viewType = 'list';
+          } else if (act === 'entries') {
+            state.submenu = 'entries';
+            state.viewType = 'list';
+          }
+          renderSubmenus(app);
+          renderModuleWorkspace();
+        });
+      });
+      return;
+    }
+
+    if (state.submenu === 'payments') {
+      const payments = acc.payments || [];
+      updatePager(payments.length, payments.length);
+      container.innerHTML = `
+        <div tabindex="0" role="region" aria-labelledby="payments-table-caption" class="table-wrapper">
+          <table class="o_list_table" style="--label-2: 'Fecha'; --label-3: 'Diario'; --label-4: 'Tercero'; --label-5: 'Referencia'; --label-6: 'Importe'; --label-7: 'Tipo';">
+            <caption id="payments-table-caption">Comprobantes de pago registrados</caption>
+            <thead>
+              <tr>
+                <th>Comprobante</th>
+                <th>Fecha</th>
+                <th>Diario</th>
+                <th>Cliente / Proveedor / Empleado</th>
+                <th>Referencia</th>
+                <th class="text-end">Importe</th>
+                <th>Tipo</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${payments
+                .map(
+                  (p) => `
+                  <tr>
+                    <th>${esc(p.name)}</th>
+                    <td>${esc(p.date)}</td>
+                    <td>${esc(p.journal_name)}</td>
+                    <td>${esc(p.partner_name)}</td>
+                    <td>${esc(p.ref)}</td>
+                    <td class="text-end"><strong>${formatMoney(p.amount)}</strong></td>
+                    <td><span class="o_badge ${p.payment_type === 'inbound' ? 'o_badge_success' : 'o_badge_warning'}">${p.payment_type === 'inbound' ? 'Recaudo Cliente' : 'Egreso / Pago'}</span></td>
+                  </tr>
+                `
+                )
+                .join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+      return;
+    }
+
+    if (state.submenu === 'accounts') {
+      const accounts = acc.accounts || [];
+      updatePager(accounts.length, accounts.length);
+      container.innerHTML = `
+        <div class="o_form_sheet" style="margin-bottom: 1rem;">
+          <h3 style="margin-bottom: 0.75rem;">Agregar Cuenta al Plan Único de Cuentas (PUC)</h3>
+          <div class="o_group o_acc_add_grid" style="align-items: end; margin-bottom: 0;">
+            <div class="o_field_row">
+              <label for="newAccCode">Código PUC</label>
+              <input type="text" id="newAccCode" class="o_input" placeholder="Ej. 513515" />
+            </div>
+            <div class="o_field_row">
+              <label for="newAccName">Nombre de la Cuenta</label>
+              <input type="text" id="newAccName" class="o_input" placeholder="Ej. Asesoría Técnica y Jurídica" />
+            </div>
+            <div class="o_field_row">
+              <label for="newAccType">Naturaleza / Tipo</label>
+              <select id="newAccType" class="o_select">
+                <option value="" disabled selected>— Seleccione Naturaleza / Tipo —</option>
+                <option value="Activo Corriente">Activo Corriente</option>
+                <option value="Por Cobrar">Por Cobrar</option>
+                <option value="Por Pagar">Por Pagar</option>
+                <option value="Ingresos Operacionales">Ingresos Operacionales</option>
+                <option value="Gastos Operacionales">Gastos Operacionales</option>
+              </select>
+            </div>
+            <button type="button" class="btn btn-action" id="btnAddAccount">Crear Cuenta</button>
+          </div>
+        </div>
+
+        <div tabindex="0" role="region" aria-labelledby="accounts-table-caption" class="table-wrapper">
+          <table class="o_list_table" style="--label-2: 'Nombre'; --label-3: 'Tipo'; --label-4: 'Conciliable';">
+            <caption id="accounts-table-caption">Plan de cuentas contables</caption>
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Nombre de la Cuenta</th>
+                <th>Tipo de Cuenta</th>
+                <th>Permite Conciliación</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${accounts
+                .map(
+                  (a) => `
+                  <tr>
+                    <th>${esc(a.code)}</th>
+                    <td>${esc(a.name)}</td>
+                    <td>${esc(a.type)}</td>
+                    <td><span class="o_badge ${a.reconcile ? 'o_badge_success' : 'o_badge_muted'}">${a.reconcile ? 'Sí' : 'No'}</span></td>
+                  </tr>
+                `
+                )
+                .join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      document.getElementById('btnAddAccount').addEventListener('click', async () => {
+        try {
+          const code = document.getElementById('newAccCode').value;
+          const name = document.getElementById('newAccName').value;
+          const type = document.getElementById('newAccType').value;
+          if (!type) {
+            showToast('Debe seleccionar la naturaleza o tipo de cuenta.', true);
+            return;
+          }
+          await apiCall('/api/accounting/accounts', 'POST', { code, name, type, reconcile: type.includes('Cobrar') || type.includes('Pagar') });
+          showToast('Cuenta contable creada.');
+          renderModuleWorkspace();
+        } catch (err) {
+          showToast(err.message, true);
+        }
+      });
+      return;
+    }
+
+    // Moves list (out_invoice, in_invoice, entries)
+    let moves = acc.moves || [];
+    if (state.submenu === 'out_invoice') moves = moves.filter((m) => m.move_type === 'out_invoice');
+    else if (state.submenu === 'in_invoice') moves = moves.filter((m) => m.move_type === 'in_invoice');
+
+    if (state.partnerContextFilter) {
+      moves = moves.filter((m) => Number(m.partner_id) === Number(state.partnerContextFilter.id));
+    }
+
+    const q = state.searchQuery.trim().toLowerCase();
+    if (q) {
+      moves = moves.filter(
+        (m) =>
+          (m.name || '').toLowerCase().includes(q) ||
+          (m.partner_name || '').toLowerCase().includes(q) ||
+          (m.ref || '').toLowerCase().includes(q)
+      );
+    }
+
+    updatePager(moves.length, moves.length);
+    const totalAmountSum = moves.reduce((s, m) => s + Number(m.amount_total || 0), 0);
+    const totalResidualSum = moves.reduce((s, m) => s + Number(m.amount_residual || 0), 0);
+
+    container.innerHTML = `
+      <div tabindex="0" role="region" aria-labelledby="moves-table-caption" class="table-wrapper">
+        <table class="o_list_table" style="--label-2: 'Tercero'; --label-3: 'Fecha'; --label-4: 'Vencimiento'; --label-5: 'Diario / Origen'; --label-6: 'Total'; --label-7: 'Saldo Pendiente'; --label-8: 'Estado Pago'; --label-9: 'Estado';">
+          <caption id="moves-table-caption">Facturas y asientos contables</caption>
+          <thead>
+            <tr>
+              <th>Número</th>
+              <th>Cliente / Proveedor</th>
+              <th>Fecha</th>
+              <th>Vencimiento</th>
+              <th>Diario / Origen</th>
+              <th class="text-end">Total</th>
+              <th class="text-end">Saldo Pendiente</th>
+              <th>Estado Pago</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${moves
+              .map(
+                (m) => `
+                <tr data-move-id="${m.id}">
+                  <th>${esc(m.name)}</th>
+                  <td>${esc(m.partner_name)}</td>
+                  <td>${esc(m.invoice_date)}</td>
+                  <td>${esc(m.invoice_date_due)}</td>
+                  <td>${esc(m.journal_code)} · ${esc(m.origin || m.ref || '')}</td>
+                  <td class="text-end"><strong>${formatMoney(m.amount_total)}</strong></td>
+                  <td class="text-end">${formatMoney(m.amount_residual)}</td>
+                  <td>${paymentStateBadge(m.payment_state, m.state)}</td>
+                  <td><span class="o_badge ${m.state === 'posted' ? 'o_badge_success' : m.state === 'cancel' ? 'o_badge_danger' : 'o_badge_info'}">${m.state === 'posted' ? 'Publicado' : m.state === 'cancel' ? 'Cancelado' : 'Borrador'}</span></td>
+                </tr>
+              `
+              )
+              .join('')}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="5">Totales</td>
+              <td class="text-end">${formatMoney(totalAmountSum)}</td>
+              <td class="text-end">${formatMoney(totalResidualSum)}</td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    `;
+
+    container.querySelectorAll('tbody tr').forEach((row) => {
+      row.addEventListener('click', () => {
+        state.activeRecordId = Number(row.getAttribute('data-move-id'));
+        state.formDraft = null;
+        state.viewType = 'form';
+        renderModuleWorkspace();
+      });
+    });
+  }

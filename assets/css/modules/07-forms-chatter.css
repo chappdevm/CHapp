@@ -1,0 +1,474 @@
+/* ==========================================================================
+   CH Aluminios ERP -- CSS Module: 07-forms-chatter.css
+   Form View, Statusbar, Sheet, Smart Buttons, Notebook & Chatter
+   ========================================================================== */
+/* ==========================================================================
+   7. FORM VIEW (Statusbar Header + Sheet + Smart Buttons + Chatter)
+   ========================================================================== */
+
+.o_form_view {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .o_form_view {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+.o_form_sheet_bg {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.o_form_statusbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background-color: var(--o-view-bg);
+  border: 1px solid var(--o-border-color);
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+}
+
+.o_statusbar_buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.o_statusbar_status {
+  display: inline-flex;
+  align-items: center;
+  background: var(--o-gray-100);
+  border: 1px solid var(--o-border-color);
+  border-radius: 999px;
+  padding: 0.15rem;
+  gap: 0.15rem;
+}
+
+.o_arrow_button {
+  padding: 0.22rem 0.7rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  border-radius: 999px;
+  color: var(--o-text-muted);
+  white-space: nowrap;
+}
+
+.o_arrow_button.is-current {
+  background-color: var(--o-action);
+  color: #081c1b;
+}
+
+.o_form_sheet {
+  background-color: var(--o-sheet-bg);
+  border: 1px solid var(--o-border-color);
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+}
+
+.o_button_box {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--o-border-color);
+}
+
+.o_stat_button,
+.oe_stat_button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 1.25rem;
+  min-height: 52px;
+  background-color: var(--o-view-bg);
+  border: 1.5px solid var(--o-border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: start;
+  transition: all 0.15s ease;
+  touch-action: manipulation;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.o_stat_button:hover,
+.oe_stat_button:hover {
+  border-color: var(--o-action);
+  background-color: var(--o-hover-bg);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+}
+
+.o_stat_button .o_stat_info,
+.oe_stat_button .o_stat_info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.o_stat_button .o_stat_value,
+.oe_stat_button .o_stat_value {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--o-action);
+}
+
+.o_stat_button .o_stat_text,
+.oe_stat_button .o_stat_text {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--o-text-muted);
+}
+
+.o_form_title_group {
+  margin-bottom: 1.25rem;
+}
+
+.o_form_title_group label {
+  display: block;
+  font-size: 0.76rem;
+  color: var(--o-text-muted);
+  text-transform: uppercase;
+  margin-bottom: 0.25rem;
+}
+
+.o_input_title {
+  width: 100%;
+  font-size: clamp(1.15rem, 3.5vw, 1.4rem);
+  font-weight: 700;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid var(--o-border-color);
+  padding: 0.35rem 0;
+  color: var(--o-text-main);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.o_input_title:focus {
+  border-bottom-color: var(--o-action);
+}
+
+.o_group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.o_field_row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.o_field_row label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--o-text-muted);
+}
+
+.o_input,
+.o_select,
+.o_textarea {
+  width: 100%;
+  padding: 0.48rem 0.75rem;
+  min-height: 40px;
+  background-color: var(--o-gray-100);
+  border: 1px solid var(--o-border-color);
+  border-radius: 6px;
+  color: var(--o-text-main);
+  outline: none;
+  transition: border-color 0.12s ease;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.o_input:focus,
+.o_select:focus,
+.o_textarea:focus {
+  border-color: var(--o-action);
+}
+
+/* Notebook Tabs inside Form Sheet */
+.o_notebook_headers {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--o-border-color);
+  margin: 1rem 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.o_notebook_headers::-webkit-scrollbar {
+  display: none;
+}
+
+.o_notebook_tab {
+  padding: 0.55rem 1rem;
+  min-height: 42px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--o-text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  touch-action: manipulation;
+}
+
+.o_notebook_tab.is-active {
+  color: var(--o-action);
+  border-bottom-color: var(--o-action);
+}
+
+/* Totals Box at bottom right of Sale Order / Invoice */
+.o_totals_box {
+  margin-left: auto;
+  width: 100%;
+  max-width: 320px;
+  margin-top: 1rem;
+  background: var(--o-gray-100);
+  border: 1px solid var(--o-border-color);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.o_totals_row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.88rem;
+  color: var(--o-gray-800);
+}
+
+.o_totals_row.is-grand {
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--o-border-color);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--o-action);
+}
+
+/* Chatter Sidebar */
+.o_chatter {
+  background-color: var(--o-view-bg);
+  border: 1px solid var(--o-border-color);
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.o_chatter_header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 0.88rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--o-border-color);
+}
+
+.o_chatter_composer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.o_chatter_messages {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  max-height: 420px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.o_chatter_msg {
+  padding: 0.55rem 0.7rem;
+  background: var(--o-gray-100);
+  border-left: 3px solid var(--o-action);
+  border-radius: 4px;
+  font-size: 0.82rem;
+}
+
+.o_chatter_msg_meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.73rem;
+  color: var(--o-text-muted);
+  margin-bottom: 0.2rem;
+}
+
+/* Responsive Form View Adjustments */
+@media (max-width: 720px) {
+  .o_group {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .o_form_sheet {
+    padding: 1rem 0.85rem;
+  }
+
+  .o_form_statusbar {
+    padding: 0.6rem 0.75rem;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+  }
+
+  .o_statusbar_buttons {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+
+  .o_statusbar_buttons .btn {
+    min-height: 44px;
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .o_statusbar_status {
+    width: 100%;
+    display: flex;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 0.25rem 0.35rem;
+  }
+
+  .o_statusbar_status::-webkit-scrollbar {
+    display: none;
+  }
+
+  .o_arrow_button {
+    min-height: 44px;
+    padding: 0.35rem 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .o_button_box {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    width: 100%;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .o_stat_button,
+  .oe_stat_button {
+    min-height: 48px;
+    padding: 0.55rem 0.95rem;
+    justify-content: flex-start;
+  }
+
+  .o_input,
+  .o_select,
+  .o_textarea {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .o_notebook_tab {
+    min-height: 44px;
+    padding: 0.6rem 1rem;
+  }
+
+  .o_totals_box {
+    max-width: 100%;
+    margin-left: 0;
+  }
+
+  .o_chatter {
+    padding: 0.85rem;
+  }
+
+  .o_chatter_composer button {
+    min-height: 44px;
+    width: 100%;
+  }
+
+  .o_chatter_composer textarea {
+    min-height: 60px;
+    font-size: 16px;
+  }
+}
+
+/* Quick Add Grids for Products and Accounts */
+.o_prod_add_grid {
+  grid-template-columns: 2fr 1fr 1fr 1fr auto;
+  gap: 0.65rem;
+}
+
+@media (max-width: 900px) {
+  .o_prod_add_grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .o_prod_add_grid button {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 500px) {
+  .o_prod_add_grid {
+    grid-template-columns: 1fr;
+  }
+  .o_prod_add_grid button {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
+.o_acc_add_grid {
+  grid-template-columns: 1fr 2fr 1.5fr auto;
+  gap: 0.65rem;
+}
+
+@media (max-width: 900px) {
+  .o_acc_add_grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .o_acc_add_grid button {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 500px) {
+  .o_acc_add_grid {
+    grid-template-columns: 1fr;
+  }
+  .o_acc_add_grid button {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+

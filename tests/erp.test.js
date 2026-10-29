@@ -6,6 +6,37 @@ const path = require('path');
 const os = require('os');
 const { createAppServer } = require('../index');
 
+const ROOT_DIR = path.join(__dirname, '..');
+const origReadFileSync = fs.readFileSync.bind(fs);
+fs.readFileSync = function testModularReadFileSync(filePath, options) {
+  if (typeof filePath === 'string') {
+    const norm = path.resolve(filePath);
+    const appJsTarget = path.resolve(ROOT_DIR, 'assets', 'js', 'app.js');
+    const cssTarget = path.resolve(ROOT_DIR, 'assets', 'css', 'odoo20.css');
+    if (norm === appJsTarget) {
+      const modulesDir = path.join(ROOT_DIR, 'assets', 'js', 'modules');
+      if (fs.existsSync(modulesDir)) {
+        const files = fs.readdirSync(modulesDir).filter((f) => f.endsWith('.js')).sort();
+        const combined = files
+          .map((f) => origReadFileSync(path.join(modulesDir, f), 'utf8'))
+          .concat([origReadFileSync(appJsTarget, 'utf8')])
+          .join('\n');
+        return options ? combined : Buffer.from(combined, 'utf8');
+      }
+    } else if (norm === cssTarget) {
+      const modulesDir = path.join(ROOT_DIR, 'assets', 'css', 'modules');
+      if (fs.existsSync(modulesDir)) {
+        const files = fs.readdirSync(modulesDir).filter((f) => f.endsWith('.css')).sort();
+        const combined = [origReadFileSync(cssTarget, 'utf8')]
+          .concat(files.map((f) => origReadFileSync(path.join(modulesDir, f), 'utf8')))
+          .join('\n');
+        return options ? combined : Buffer.from(combined, 'utf8');
+      }
+    }
+  }
+  return origReadFileSync(filePath, options);
+};
+
 describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
   let server;
   let baseUrl;
@@ -1780,5 +1811,181 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     });
     assert.equal(note2.status, 200);
     assert.equal((note2.json.record.chatter || []).length, countBefore, 'Identical consecutive chatter note within the same minute must be ignored');
+  });
+
+  it('verifies modular JS and CSS architecture, HTTP module delivery, and cross-module runtime execution', async () => {
+    const vm = require('vm');
+    const jsModulesDir = path.join(__dirname, '..', 'assets', 'js', 'modules');
+    const cssModulesDir = path.join(__dirname, '..', 'assets', 'css', 'modules');
+
+    const jsModuleFiles = fs.readdirSync(jsModulesDir).filter((f) => f.endsWith('.js')).sort();
+    const cssModuleFiles = fs.readdirSync(cssModulesDir).filter((f) => f.endsWith('.css')).sort();
+
+    assert.equal(jsModuleFiles.length, 14, 'Should have 14 modular JS files in assets/js/modules/');
+    assert.equal(cssModuleFiles.length, 10, 'Should have 10 modular CSS files in assets/css/modules/');
+
+    // Verify raw entrypoint files are modularized (not monolithic)
+    const rawAppJs = origReadFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
+    const rawOdooCss = origReadFileSync(path.join(__dirname, '..', 'assets', 'css', 'odoo20.css'), 'utf8');
+    assert.ok(rawAppJs.split(/\r?\n/).length <= 200, 'Raw assets/js/app.js entrypoint must be <= 200 lines');
+    assert.ok(rawOdooCss.split(/\r?\n/).length <= 25, 'Raw assets/css/odoo20.css entrypoint must be <= 25 lines');
+
+    // Verify every CSS and JS module is served over HTTP with status 200 and stays under 900 lines
+    for (const cssFile of cssModuleFiles) {
+      const res = await fetch(`${baseUrl}/assets/css/modules/${cssFile}`);
+      assert.equal(res.status, 200, `CSS module ${cssFile} should be served with 200`);
+      const text = await res.text();
+      assert.ok(text.length > 100, `CSS module ${cssFile} should not be empty`);
+      assert.ok(text.split(/\r?\n/).length < 900, `CSS module ${cssFile} should be < 900 lines`);
+      assert.ok(rawOdooCss.includes(`./modules/${cssFile}`), `odoo20.css must @import ${cssFile}`);
+    }
+
+    for (const jsFile of jsModuleFiles) {
+      const res = await fetch(`${baseUrl}/assets/js/modules/${jsFile}`);
+      assert.equal(res.status, 200, `JS module ${jsFile} should be served with 200`);
+      const text = await res.text();
+      assert.ok(text.length > 100, `JS module ${jsFile} should not be empty`);
+      assert.ok(text.split(/\r?\n/).length < 900, `JS module ${jsFile} should be < 900 lines`);
+    }
+
+    // Verify index.html references all 14 JS module scripts in order before app.js
+    const htmlRes = await fetch(`${baseUrl}/`);
+    const htmlText = await htmlRes.text();
+    let lastPos = -1;
+    for (const jsFile of jsModuleFiles) {
+      const pos = htmlText.indexOf(`/assets/js/modules/${jsFile}`);
+      assert.ok(pos > lastPos, `index.html must include ${jsFile} in ascending module order`);
+      lastPos = pos;
+    }
+    assert.ok(htmlText.indexOf('/assets/js/app.js') > lastPos, 'index.html must load /assets/js/app.js after all 14 modules');
+
+    // Execute all 14 JS modules + raw app.js sequentially in a shared VM browser-like context
+    const elements = {};
+    function makeEl(id) {
+      if (!elements[id]) {
+        elements[id] = {
+          id,
+          value: '',
+          textContent: '',
+          innerHTML: '',
+          style: {},
+          dataset: {},
+          classList: { add: () => {}, remove: () => {}, toggle: () => {}, contains: () => false },
+          addEventListener: () => {},
+          querySelector: () => makeEl('sub'),
+          querySelectorAll: () => [],
+          setAttribute: () => {},
+          getAttribute: () => null,
+          close: () => {},
+          showModal: () => {},
+          focus: () => {}
+        };
+      }
+      return elements[id];
+    }
+
+    const bootstrapRes = await fetch(`${baseUrl}/api/bootstrap`);
+    const bootstrapJson = await bootstrapRes.json();
+
+    const sandbox = {
+      window: {},
+      HTMLDialogElement: { prototype: { closedBy: true } },
+      document: {
+        addEventListener: () => {},
+        getElementById: (id) => makeEl(id),
+        querySelector: () => makeEl('qs'),
+        querySelectorAll: () => [],
+        createElement: (tag) => makeEl(tag),
+        documentElement: { setAttribute: () => {}, getAttribute: () => 'dark' }
+      },
+      localStorage: { getItem: () => null, setItem: () => {} },
+      fetch: async () => ({
+        ok: true,
+        status: 200,
+        json: async () => bootstrapJson
+      }),
+      console,
+      setTimeout,
+      clearTimeout,
+      setInterval,
+      clearInterval,
+      Intl,
+      Number,
+      String,
+      Boolean,
+      Array,
+      Object,
+      Math,
+      Date,
+      RegExp,
+      Set,
+      Map,
+      Promise,
+      Error
+    };
+    sandbox.window = sandbox;
+    const ctx = vm.createContext(sandbox);
+
+    for (const jsFile of jsModuleFiles) {
+      const code = origReadFileSync(path.join(jsModulesDir, jsFile), 'utf8');
+      new vm.Script(code, { filename: jsFile }).runInContext(ctx);
+    }
+    new vm.Script(rawAppJs, { filename: 'app.js' }).runInContext(ctx);
+
+    // Run init() and exercise all 5 modules (list, kanban, form) + submenus + command palette
+    const checkResult = await new vm.Script(`
+      (async () => {
+        await init();
+        const renderedViews = [];
+        for (const app of ['contacts', 'expenses', 'sales', 'accounting', 'settings']) {
+          openApp(app);
+          renderedViews.push(app + ':list:' + document.getElementById('moduleContent').innerHTML.length);
+          state.viewType = 'kanban';
+          renderModuleWorkspace();
+          renderedViews.push(app + ':kanban:' + document.getElementById('moduleContent').innerHTML.length);
+          state.viewType = 'form';
+          state.activeRecordId = 1;
+          renderModuleWorkspace();
+          renderedViews.push(app + ':form1:' + document.getElementById('moduleContent').innerHTML.length);
+          state.viewType = 'form';
+          state.activeRecordId = 'new';
+          renderModuleWorkspace();
+          renderedViews.push(app + ':formNew:' + document.getElementById('moduleContent').innerHTML.length);
+        }
+        openApp('sales', { submenu: 'products' });
+        state.viewType = 'kanban'; renderModuleWorkspace();
+        state.viewType = 'form'; state.activeRecordId = 1; renderModuleWorkspace();
+        state.viewType = 'form'; state.activeRecordId = 'new'; renderModuleWorkspace();
+        for (const sub of ['dashboard', 'out_invoice', 'in_invoice', 'payments']) {
+          openApp('accounting', { submenu: sub });
+        }
+        openCommandPalette();
+        renderCommandPaletteResults('S00001');
+        return {
+          hasState: typeof state === 'object' && Array.isArray(APPS) && APPS.length === 5,
+          renderedCount: renderedViews.length,
+          allNonEmpty: renderedViews.every((v) => Number(v.split(':')[2]) > 50),
+          escWorks: esc('<script>"test"</script>') === '&lt;script&gt;&quot;test&quot;&lt;/script&gt;',
+          escapeHtmlAlias: typeof escapeHtml === 'function' && escapeHtml('&') === '&amp;',
+          zeroWords: numberToWordsSpanish(0),
+          negWords: numberToWordsSpanish(-1500),
+          moneyZero: formatMoney(0),
+          svgBalance: generateMonthBalanceSvg({ inflow: 100000, outflow: 40000, net: 60000, margin_pct: 60 }).includes('<svg'),
+          svgDonutEmpty: generateDonutSvg([], 'Total', 'Sin movimientos').includes('Sin movimientos'),
+          svgDonutPopulated: generateDonutSvg([{ name: 'Nequi', amount: 100000, percentage: 100 }], 'Total', 'Sin movimientos').includes('<svg')
+        };
+      })()
+    `).runInContext(ctx);
+
+    assert.equal(checkResult.hasState, true);
+    assert.equal(checkResult.renderedCount, 20);
+    assert.equal(checkResult.allNonEmpty, true);
+    assert.equal(checkResult.escWorks, true);
+    assert.equal(checkResult.escapeHtmlAlias, true);
+    assert.equal(checkResult.zeroWords, 'CERO PESOS M/CTE');
+    assert.ok(checkResult.negWords.includes('MENOS'));
+    assert.equal(checkResult.svgBalance, true);
+    assert.equal(checkResult.svgDonutEmpty, true);
+    assert.equal(checkResult.svgDonutPopulated, true);
   });
 });

@@ -1,0 +1,425 @@
+/* ==========================================================================
+   CH Aluminios ERP -- CSS Module: 08-accounting-dialogs.css
+   Accounting Dashboard, Modal Dialogs, Command Palette, Toasts & Linked Panels
+   ========================================================================== */
+/* ==========================================================================
+   8. ACCOUNTING JOURNAL DASHBOARD & SETTINGS LAYOUT
+   ========================================================================== */
+
+.o_journal_dashboard {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.o_journal_card {
+  background: var(--o-view-bg);
+  border: 1px solid var(--o-border-color);
+  border-left: 4px solid var(--o-action);
+  border-radius: 8px;
+  padding: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.o_journal_card.is-sale { border-left-color: #074073; }
+.o_journal_card.is-purchase { border-left-color: #e39c50; }
+.o_journal_card.is-bank { border-left-color: #14B5D9; }
+.o_journal_card.is-cash { border-left-color: #22b053; }
+
+@media (max-width: 1024px) {
+  .o_journal_dashboard {
+    grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+    gap: 0.75rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .o_journal_dashboard {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  .o_journal_card {
+    padding: 0.95rem;
+  }
+  .o_journal_card > div:last-child {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .o_journal_card .btn-sm {
+    min-height: 44px;
+    font-size: 0.82rem;
+  }
+}
+
+.o_settings_layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 840px) {
+  .o_settings_layout {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .o_settings_sidebar {
+    flex-direction: row;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 0.4rem;
+    padding: 0.4rem;
+  }
+
+  .o_settings_sidebar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .o_settings_tab {
+    min-height: 44px;
+    padding: 0.5rem 0.85rem;
+    flex-shrink: 0;
+  }
+
+  .o_settings_block {
+    padding: 1rem;
+  }
+}
+
+.o_settings_sidebar {
+  background: var(--o-view-bg);
+  border: 1px solid var(--o-border-color);
+  border-radius: 8px;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.o_settings_tab {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.55rem 0.75rem;
+  min-height: 40px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--o-gray-800);
+  font-weight: 500;
+  cursor: pointer;
+  text-align: start;
+  touch-action: manipulation;
+}
+
+.o_settings_tab img {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.o_settings_tab.is-active {
+  background: var(--o-action-subtle);
+  color: var(--o-action);
+  font-weight: 600;
+}
+
+.o_settings_block {
+  background: var(--o-view-bg);
+  border: 1px solid var(--o-border-color);
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.o_settings_block h3 {
+  font-size: 1rem;
+  margin-bottom: 0.85rem;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid var(--o-border-color);
+  color: var(--o-text-main);
+}
+
+/* ==========================================================================
+   9. MODAL DIALOGS (Following modern-web-guidance light-dismiss-a-dialog)
+   ========================================================================== */
+
+dialog.o_dialog {
+  margin: auto;
+  width: min(560px, calc(100vw - 1.5rem));
+  max-height: calc(100dvh - 2rem);
+  background: var(--o-sheet-bg);
+  color: var(--o-text-main);
+  border: 1px solid var(--o-border-color);
+  border-radius: 10px;
+  padding: 0;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+dialog.o_dialog::backdrop {
+  background-color: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.o_dialog_content {
+  padding: 1.25rem 1.4rem;
+}
+
+.o_dialog_header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 0.75rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--o-border-color);
+}
+
+.o_dialog_header button {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.o_dialog_group {
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 600px) {
+  .o_dialog_group {
+    grid-template-columns: 1fr;
+  }
+  .o_dialog_content {
+    padding: 1rem;
+  }
+}
+
+.o_dialog_footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding-top: 1rem;
+  margin-top: 1rem;
+  border-top: 1px solid var(--o-border-color);
+}
+
+@media (max-width: 600px) {
+  .o_dialog_footer .btn {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 480px) {
+  .o_dialog_footer {
+    flex-direction: column-reverse;
+    gap: 0.5rem;
+  }
+  .o_dialog_footer .btn {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
+/* Command Palette items */
+.o_cmd_entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 44px;
+  text-align: start;
+  padding: 0.5rem 0.75rem;
+  background: var(--o-gray-100);
+  border: 1px solid var(--o-border-color);
+  border-radius: 6px;
+  color: var(--o-text-main);
+  cursor: pointer;
+  gap: 0.5rem;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+  touch-action: manipulation;
+}
+
+.o_cmd_entry:hover,
+.o_cmd_entry:focus {
+  background: var(--o-gray-200);
+  border-color: var(--o-action);
+}
+
+.o_cmd_label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.88rem;
+}
+
+/* Toast Notification */
+.o_toast_container {
+  position: fixed;
+  bottom: 1.25rem;
+  right: 1.25rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.o_toast {
+  background: var(--o-gray-200);
+  border: 1px solid var(--o-action);
+  border-left: 4px solid var(--o-action);
+  color: var(--o-text-main);
+  padding: 0.65rem 1rem;
+  border-radius: 6px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.45);
+  font-size: 0.85rem;
+  font-weight: 500;
+  pointer-events: auto;
+}
+
+.o_toast.is-error {
+  border-color: var(--o-danger);
+  border-left-color: var(--o-danger);
+}
+
+@media (max-width: 600px) {
+  .o_toast_container {
+    left: 1rem;
+    right: 1rem;
+    bottom: 1rem;
+    align-items: center;
+  }
+  .o_toast {
+    width: 100%;
+    text-align: center;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+/* ==========================================================================
+   Autocompletado de Tercero en Ventas (sale.order)
+   ========================================================================== */
+.o_partner_details_card {
+  grid-column: 1 / -1;
+  background-color: var(--o-hover-bg);
+  border: 1px solid var(--o-border-color);
+  border-left: 4px solid var(--o-action);
+  border-radius: 8px;
+  padding: 0.85rem 1.15rem;
+  margin-top: 0.25rem;
+  margin-bottom: 0.65rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  align-items: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.o_partner_details_card.is-empty {
+  border-left-color: var(--o-border-color);
+  background: transparent;
+  border-style: dashed;
+  padding: 0.6rem 1rem;
+}
+
+.o_partner_details_row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.o_partner_details_row .o_detail_label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--o-text-muted);
+  letter-spacing: 0.03em;
+}
+
+.o_partner_details_row .o_detail_value {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--o-text-main);
+}
+
+/* ==========================================================================
+   Panel de Facturas Vinculadas a la Orden (sale.order)
+   ========================================================================== */
+.o_linked_invoices_panel {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  background: var(--o-hover-bg);
+  border: 1px solid var(--o-border-color);
+  border-radius: 10px;
+}
+
+.o_linked_invoices_header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.o_linked_invoices_header h3 {
+  font-size: 1.1rem;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.o_invoicing_progress {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: var(--o-view-bg);
+  border: 1px solid var(--o-border-color);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.o_progress_item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.o_progress_item span {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  color: var(--o-text-muted);
+}
+
+.o_progress_item strong {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--o-text-main);
+}
+
+.o_progress_item.is-residual strong {
+  color: var(--o-warning, #d97706);
+}
+
+.o_progress_item.is-invoiced strong {
+  color: var(--o-success, #059669);
+}
+

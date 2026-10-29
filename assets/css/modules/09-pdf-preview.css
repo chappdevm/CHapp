@@ -1,0 +1,842 @@
+/* ==========================================================================
+   CH Aluminios ERP -- CSS Module: 09-pdf-preview.css
+   Split View, Kanban Board Columns, A4 Sheet PDF Preview, Watermarks & Print Rules
+   ========================================================================== */
+/* ==========================================================================
+   Split View y Previsualización Lateral de Factura PDF / Cotización (60% Form / 40% PDF)
+   ========================================================================== */
+.o_invoice_split_container {
+  display: grid;
+  grid-template-columns: minmax(0, 60fr) minmax(0, 40fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .o_invoice_split_container {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+.o_invoice_left_col {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 0;
+  width: 100%;
+}
+
+.o_invoice_left_col .o_form_sheet_bg {
+  width: 100%;
+}
+
+.o_invoice_left_col .o_chatter {
+  width: 100%;
+}
+
+.o_invoice_link_row {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.o_invoice_link_row:hover td,
+.o_invoice_link_row:hover th {
+  background-color: rgba(235, 130, 60, 0.08) !important;
+}
+
+/* ==========================================================================
+   Kanban Stage Columns Board (Columnas por Etapa)
+   ========================================================================== */
+.o_kanban_board {
+  display: flex;
+  gap: 1.15rem;
+  overflow-x: auto;
+  padding: 0.25rem 0.25rem 1rem 0.25rem;
+  align-items: flex-start;
+  min-height: 480px;
+}
+
+.o_kanban_column {
+  flex: 1 1 320px;
+  min-width: 300px;
+  max-width: 420px;
+  background-color: var(--o-kanban-col-bg, #0d1b26);
+  border: 1px solid var(--o-border-color);
+  border-top: 3.5px solid var(--col-accent, var(--o-primary));
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.o_kanban_col_header {
+  padding: 0.85rem 1rem;
+  background-color: var(--o-view-bg);
+  border-bottom: 1px solid var(--o-border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.o_kanban_col_title_wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.o_kanban_col_title {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--o-text-main, #f3f4f6);
+}
+
+.o_kanban_col_sum {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--o-text-muted);
+}
+
+.o_kanban_col_cards {
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex: 1;
+  min-height: 120px;
+}
+
+.o_kanban_col_empty {
+  padding: 1.75rem 1rem;
+  text-align: center;
+  color: var(--o-text-muted);
+  font-size: 0.82rem;
+  border: 1.5px dashed var(--o-border-color);
+  border-radius: 8px;
+  margin: 0.5rem 0;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.o_invoice_pdf_panel {
+  background: var(--o-view-bg);
+  border: 1px solid var(--o-border-color);
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100vh - 2rem);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.o_pdf_panel_header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1.15rem;
+  background: var(--o-navbar-bg, #031626);
+  color: #fff;
+  border-bottom: 1px solid var(--o-border-color);
+}
+
+.o_pdf_panel_title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.o_pdf_panel_actions {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.o_pdf_paper_viewport {
+  padding: 1.25rem;
+  overflow: auto;
+  background: #525659;
+  flex: 1;
+}
+
+/* Simulación física de Hoja A4 / Factura Legal */
+.o_pdf_sheet {
+  position: relative;
+  overflow: hidden;
+  background: #ffffff;
+  color: #1e293b;
+  padding: 2rem 1.85rem;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  margin: 0 auto;
+  max-width: 100%;
+}
+
+.o_pdf_sheet * {
+  box-sizing: border-box;
+}
+
+.o_pdf_sheet h1, .o_pdf_sheet h2, .o_pdf_sheet h3, .o_pdf_sheet h4 {
+  color: #031626;
+  margin-top: 0;
+  font-weight: 700;
+}
+
+/* Marca de Agua Dinámica */
+.o_pdf_watermark {
+  position: absolute;
+  top: 48%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-28deg);
+  font-size: 4.8rem;
+  font-weight: 900;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  pointer-events: none;
+  user-select: none;
+  z-index: 1;
+  border: 6px dashed currentColor;
+  padding: 0.6rem 2.2rem;
+  border-radius: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.o_pdf_watermark.is-paid {
+  color: #22b053;
+  opacity: 0.16;
+  border-style: double;
+  border-width: 8px;
+}
+
+.o_pdf_watermark.is-draft {
+  color: #5593c2;
+  opacity: 0.14;
+}
+
+.o_pdf_watermark.is-cancel {
+  color: #cb2f2f;
+  opacity: 0.16;
+}
+
+.o_pdf_watermark.is-partial {
+  color: #14B5D9;
+  opacity: 0.16;
+}
+
+.o_pdf_watermark.is-overdue {
+  color: #cb2f2f;
+  opacity: 0.16;
+}
+
+/* Sello Oficial de Estado */
+.o_pdf_stamp {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid currentColor;
+  border-radius: 6px;
+  padding: 3px 10px;
+  text-transform: uppercase;
+  font-weight: 800;
+  line-height: 1.15;
+  margin-top: 6px;
+  letter-spacing: 0.04em;
+}
+
+.o_pdf_stamp.is-paid {
+  color: #22b053;
+  border-color: #22b053;
+  background: #ecfdf5;
+}
+
+.o_pdf_stamp.is-draft {
+  color: #5593c2;
+  border-color: #93bee0;
+  background: #f0f7fc;
+}
+
+.o_pdf_stamp.is-cancel {
+  color: #cb2f2f;
+  border-color: #cb2f2f;
+  background: #fef2f2;
+}
+
+.o_pdf_stamp.is-partial {
+  color: #074073;
+  border-color: #14B5D9;
+  background: #f0f9ff;
+}
+
+.o_pdf_stamp.is-overdue {
+  color: #cb2f2f;
+  border-color: #cb2f2f;
+  background: #fef2f2;
+}
+
+.o_pdf_stamp.is-posted {
+  color: #074073;
+  border-color: #14B5D9;
+  background: #f0f7fc;
+}
+
+.o_pdf_stamp .stamp-inner {
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.o_pdf_stamp .stamp-sub {
+  font-size: 0.62rem;
+  font-weight: 700;
+  opacity: 0.85;
+  letter-spacing: 0.06em;
+}
+
+/* Encabezado Corporativo y Logo (Identidad Unificada y Tarjeta de Documento) */
+.o_pdf_brand_header {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 280px);
+  align-items: center;
+  border-bottom: 2.5px solid #074073;
+  padding-bottom: 0.95rem;
+  margin-bottom: 0.95rem;
+  gap: 1.5rem;
+}
+
+.o_pdf_brand_identity {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.o_pdf_logo_col {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 105px;
+  height: 105px;
+}
+
+.o_pdf_company_logo {
+  max-height: 105px;
+  max-width: 105px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  margin: 0 auto;
+  display: block;
+}
+
+.o_pdf_company_info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  flex: 1;
+}
+
+.o_pdf_company_info h2 {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #074073;
+  margin: 0 0 0.35rem 0;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.o_pdf_company_info p {
+  margin: 0.2rem 0;
+  font-size: 0.82rem;
+  color: #475569;
+  line-height: 1.45;
+}
+
+.o_pdf_company_info p strong {
+  color: #074073;
+}
+
+/* Recuadro de Documento / Numeración */
+.o_pdf_doc_box {
+  background: rgba(248, 250, 252, 0.85);
+  border: 2px solid #074073;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  text-align: center;
+  width: 100%;
+  box-shadow: 0 2px 4px rgba(7, 64, 115, 0.08);
+}
+
+.o_pdf_doc_box .doc_type_title {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #ffffff;
+  background: #074073;
+  border-bottom: 2px solid #14B5D9;
+  margin: -0.75rem -1rem 0.6rem -1rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: 5px 5px 0 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.o_pdf_doc_box .doc_number {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #074073;
+  margin: 0.25rem 0 0.4rem 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.o_pdf_doc_meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.4rem;
+  border-top: 1px dashed #cbd5e1;
+  padding-top: 0.45rem;
+}
+
+.o_pdf_doc_meta_row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.80rem;
+  color: #4b5563;
+}
+
+.o_pdf_doc_meta_row strong {
+  color: #074073;
+  font-weight: 700;
+}
+
+/* Barra de Resolución DIAN / Cotización */
+.o_pdf_resolution_bar {
+  position: relative;
+  z-index: 2;
+  background: rgba(240, 247, 252, 0.85);
+  border: 1px solid #cbe0f1;
+  border-left: 3px solid #14B5D9;
+  border-radius: 4px;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.76rem;
+  color: #074073;
+  text-align: center;
+  margin-bottom: 0.95rem;
+  line-height: 1.4;
+}
+
+.o_pdf_resolution_bar.is-quote {
+  background: linear-gradient(90deg, #074073, #14B5D9) !important;
+  color: #ffffff !important;
+  font-weight: 600;
+  border: none;
+  box-shadow: 0 2px 6px rgba(7, 64, 115, 0.25);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+/* Sección de Cliente / Adquiriente */
+.o_pdf_client_section {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  background: rgba(248, 250, 252, 0.85);
+  border: 1px solid #cbe0f1;
+  border-top: 2px solid #074073;
+  border-radius: 6px;
+  padding: 0.95rem 1.15rem;
+  margin-bottom: 0.95rem;
+}
+
+.o_pdf_client_col .o_pdf_col_title {
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #074073;
+  margin-bottom: 0.4rem;
+  border-bottom: 1.5px solid #14B5D9;
+  padding-bottom: 0.25rem;
+}
+
+.o_pdf_client_col p {
+  margin: 0.24rem 0;
+  font-size: 0.84rem;
+  color: #334155;
+}
+
+.o_pdf_client_col p strong {
+  color: #074073;
+}
+
+/* Cajas de Trazabilidad */
+.o_pdf_trace_box {
+  position: relative;
+  z-index: 2;
+  background: rgba(240, 249, 255, 0.85);
+  border: 1.5px dashed #14B5D9;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.85rem;
+  font-size: 0.79rem;
+}
+
+.o_pdf_trace_box strong {
+  color: #074073;
+}
+
+.o_pdf_payments_history_box {
+  position: relative;
+  z-index: 2;
+  background: rgba(240, 253, 244, 0.85);
+  border: 1px solid #bbf7d0;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.o_pdf_subtable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.74rem;
+  margin-top: 0.35rem;
+}
+
+.o_pdf_subtable th {
+  background: rgba(220, 252, 231, 0.85);
+  color: #166534;
+  padding: 0.3rem 0.5rem;
+  text-align: left;
+  font-weight: 700;
+  border-bottom: 1px solid #86efac;
+}
+
+.o_pdf_subtable td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid #bbf7d0;
+}
+
+/* Tabla de Líneas e Ítems */
+.o_pdf_items_table {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1.25rem;
+  font-size: 0.84rem;
+}
+
+.o_pdf_items_table thead {
+  display: table-header-group !important;
+}
+
+.o_pdf_items_table tbody {
+  display: table-row-group;
+}
+
+.o_pdf_items_table th {
+  background: #074073;
+  color: #ffffff;
+  border-bottom: 2px solid #14B5D9;
+  padding: 0.65rem 0.75rem;
+  text-align: left;
+  font-weight: 700;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.o_pdf_items_table th:first-child {
+  border-top-left-radius: 4px;
+}
+
+.o_pdf_items_table th:last-child {
+  border-top-right-radius: 4px;
+}
+
+.o_pdf_items_table td {
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid #e2e8f0;
+  color: #334155;
+  background: rgba(255, 255, 255, 0.70);
+  vertical-align: middle;
+}
+
+.o_pdf_items_table tr:nth-child(even) td {
+  background: rgba(248, 250, 252, 0.75);
+}
+
+.o_pdf_items_table .text-center {
+  text-align: center;
+}
+
+.o_pdf_items_table .text-end {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Grid Inferior: Letras, Banco y Totales */
+.o_pdf_bottom_grid {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 1.25fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .o_pdf_bottom_grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.o_pdf_bottom_left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.o_pdf_amount_words {
+  background: rgba(240, 247, 252, 0.85);
+  border-left: 4px solid #14B5D9;
+  border-top: 1px solid #cbe0f1;
+  border-right: 1px solid #cbe0f1;
+  border-bottom: 1px solid #cbe0f1;
+  border-radius: 0 4px 4px 0;
+  padding: 0.65rem 0.95rem;
+  font-size: 0.82rem;
+  color: #074073;
+  line-height: 1.45;
+}
+
+.o_pdf_amount_words .label {
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  color: #5593c2;
+  display: block;
+  margin-bottom: 0.2rem;
+}
+
+.o_pdf_amount_words .words {
+  font-weight: 800;
+  color: #074073;
+}
+
+.o_pdf_bank_info {
+  background: rgba(240, 247, 252, 0.85);
+  border: 1px solid #cbe0f1;
+  border-left: 4px solid #074073;
+  border-radius: 0 4px 4px 0;
+  padding: 0.55rem 0.8rem;
+  font-size: 0.72rem;
+  color: #074073;
+  line-height: 1.45;
+}
+
+.o_pdf_bank_info strong {
+  color: #074073;
+}
+
+/* Tabla de Totales */
+.o_pdf_totals_section {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.o_pdf_totals_table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid #cbe0f1;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.o_pdf_totals_table td {
+  padding: 0.45rem 0.75rem;
+  border-bottom: 1px solid #f1f5f9;
+  background: transparent;
+}
+
+.o_pdf_totals_table .is-cancel-row td {
+  color: #cb2f2f;
+  font-weight: 800;
+  background: rgba(254, 242, 242, 0.88);
+}
+
+.o_pdf_totals_table .is-grand-total td {
+  font-size: 1.12rem;
+  font-weight: 900;
+  border-top: 2px solid #14B5D9;
+  border-bottom: 2px solid #14B5D9;
+  background: #074073;
+  color: #ffffff;
+  padding: 0.55rem 0.75rem;
+}
+
+.o_pdf_totals_table .is-residual-row td {
+  color: #cb2f2f;
+  font-weight: 700;
+  background: #fef2f2;
+}
+
+.o_pdf_totals_table .is-paid-row td {
+  color: #22b053;
+  font-weight: 700;
+  background: #ecfdf5;
+}
+
+/* Sección de Firmas */
+.o_pdf_signatures_section {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2.5rem;
+  margin: 2.25rem 0 1.25rem 0;
+  padding-top: 0.5rem;
+}
+
+.o_pdf_sign_box {
+  text-align: center;
+  padding: 0 1rem;
+}
+
+.o_pdf_sign_box .sign_line {
+  border-bottom: 1.5px solid #074073;
+  margin-bottom: 0.55rem;
+  height: 48px;
+}
+
+.o_pdf_sign_box .sign_name {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #074073;
+}
+
+.o_pdf_sign_box .sign_title {
+  font-size: 0.78rem;
+  color: #14B5D9;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.o_pdf_sign_box .sign_sub {
+  font-size: 0.74rem;
+  color: #4b5563;
+  margin-top: 0.2rem;
+}
+
+/* Pie Legal */
+.o_pdf_legal_footer {
+  position: relative;
+  z-index: 2;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 0.85rem;
+  margin-top: 1.5rem;
+  text-align: center;
+  font-size: 0.74rem;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm 10mm 10mm 10mm;
+  }
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  body * {
+    visibility: hidden;
+  }
+  .o_pdf_sheet, .o_pdf_sheet * {
+    visibility: visible;
+  }
+  .o_pdf_sheet {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+  }
+  .o_pdf_paper_viewport {
+    background: transparent !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  .o_pdf_items_table thead {
+    display: table-header-group !important;
+  }
+  .o_pdf_items_table tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .o_pdf_bottom_grid, .o_pdf_signatures_section, .o_pdf_legal_footer {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .o_pdf_brand_header {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 270px !important;
+    align-items: center !important;
+    gap: 1.25rem !important;
+  }
+  .o_pdf_brand_identity {
+    display: flex !important;
+    align-items: center !important;
+    gap: 1.25rem !important;
+  }
+  .o_pdf_logo_col {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex: 0 0 auto !important;
+    width: 105px !important;
+    height: 105px !important;
+  }
+  .o_pdf_company_logo {
+    display: block !important;
+    max-height: 105px !important;
+    max-width: 105px !important;
+    width: auto !important;
+    height: auto !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    object-fit: contain !important;
+    margin: 0 auto !important;
+  }
+  .o_pdf_company_info h2 {
+    white-space: nowrap !important;
+  }
+  .o_pdf_doc_box {
+    width: 100% !important;
+  }
+}
+
+

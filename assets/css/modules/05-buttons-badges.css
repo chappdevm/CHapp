@@ -1,0 +1,146 @@
+/* ==========================================================================
+   CH Aluminios ERP -- CSS Module: 05-buttons-badges.css
+   Buttons, Status Badges & Semantic Tags
+   ========================================================================== */
+/* ==========================================================================
+   4. BUTTONS & BADGES
+   ========================================================================== */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.38rem 0.85rem;
+  min-height: 38px;
+  font-size: 0.86rem;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  white-space: nowrap;
+  text-decoration: none;
+  touch-action: manipulation;
+}
+
+@media (max-width: 768px) {
+  .btn {
+    min-height: 44px;
+    padding: 0.45rem 1rem;
+    font-size: 0.88rem;
+  }
+
+  .btn-sm {
+    min-height: 44px;
+    padding: 0.4rem 0.85rem;
+    font-size: 0.82rem;
+  }
+}
+
+.btn-primary {
+  background-color: var(--o-brand-primary);
+  border-color: var(--o-brand-primary);
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  background-color: var(--o-brand-primary-hover);
+  border-color: var(--o-brand-primary-hover);
+}
+
+.btn-secondary {
+  background-color: var(--o-view-bg);
+  border-color: var(--o-border-color);
+  color: var(--o-text-main);
+}
+
+.btn-secondary:hover {
+  background-color: var(--o-gray-300);
+}
+
+.btn-action {
+  background-color: var(--o-action);
+  border-color: var(--o-action);
+  color: #031626;
+  font-weight: 600;
+}
+
+.btn-action:hover {
+  background-color: var(--o-highlight);
+  border-color: var(--o-highlight);
+  color: #031626;
+  box-shadow: 0 0 10px rgba(65, 242, 242, 0.4);
+}
+
+.btn-danger {
+  background-color: transparent;
+  border-color: var(--o-danger);
+  color: #ff6b6b;
+}
+
+.btn-danger:hover {
+  background-color: var(--o-danger);
+  color: #ffffff;
+}
+
+.btn-sm {
+  padding: 0.24rem 0.6rem;
+  font-size: 0.78rem;
+}
+
+.o_badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.o_badge_success {
+  background-color: var(--o-success-bg);
+  color: var(--o-success-text);
+  border: 1px solid rgba(117, 199, 127, 0.35);
+}
+
+.o_badge_info {
+  background-color: var(--o-info-bg);
+  color: var(--o-info-text);
+  border: 1px solid rgba(55, 194, 239, 0.35);
+}
+
+.o_badge_warning {
+  background-color: var(--o-warning-bg);
+  color: var(--o-warning-text);
+  border: 1px solid rgba(238, 155, 86, 0.35);
+}
+
+.o_badge_danger {
+  background-color: var(--o-danger-bg);
+  color: var(--o-danger-text);
+  border: 1px solid rgba(248, 144, 126, 0.35);
+}
+
+.o_badge_muted {
+  background-color: var(--o-gray-200);
+  color: var(--o-gray-700);
+  border: 1px solid var(--o-border-color);
+}
+
+/* Tag Palette (1-11) */
+.o_tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: 999px;
+  background: #172d53;
+  color: #c3d9fe;
+  border: 1px solid rgba(134, 177, 253, 0.35);
+}
+
