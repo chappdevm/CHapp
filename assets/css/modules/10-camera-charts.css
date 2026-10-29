@@ -6,7 +6,9 @@
 /* ==================== EXPENSE AI CAMERA & SCANNER ==================== */
 .o_dialog_camera {
   max-width: 600px;
+  width: min(600px, calc(100vw - 1.5rem));
 }
+
 
 .o_ai_spinner {
   width: 44px;

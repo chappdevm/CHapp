@@ -17,6 +17,40 @@
     grid-template-columns: 1fr;
     gap: 1rem;
   }
+
+  .o_invoice_pdf_panel {
+    position: static;
+    max-height: none;
+  }
+}
+
+@media (max-width: 650px) {
+  .o_pdf_panel_header {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.75rem 0.85rem;
+  }
+
+  .o_pdf_panel_actions {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .o_pdf_panel_actions .btn {
+    flex: 1 1 auto;
+    min-height: 44px;
+    justify-content: center;
+  }
+
+  .o_pdf_paper_viewport {
+    padding: 0.5rem 0.25rem;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .o_pdf_sheet {
+    min-width: 540px;
+    padding: 1.25rem 0.85rem;
+  }
 }
 
 .o_invoice_left_col {
@@ -214,25 +248,11 @@
   border-width: 8px;
 }
 
-.o_pdf_watermark.is-draft {
-  color: #5593c2;
-  opacity: 0.14;
-}
+.o_pdf_watermark.is-draft { color: #5593c2; opacity: 0.14; }
+.o_pdf_watermark.is-cancel { color: #cb2f2f; opacity: 0.16; }
+.o_pdf_watermark.is-partial { color: #14B5D9; opacity: 0.16; }
+.o_pdf_watermark.is-overdue { color: #cb2f2f; opacity: 0.16; }
 
-.o_pdf_watermark.is-cancel {
-  color: #cb2f2f;
-  opacity: 0.16;
-}
-
-.o_pdf_watermark.is-partial {
-  color: #14B5D9;
-  opacity: 0.16;
-}
-
-.o_pdf_watermark.is-overdue {
-  color: #cb2f2f;
-  opacity: 0.16;
-}
 
 /* Sello Oficial de Estado */
 .o_pdf_stamp {
@@ -853,5 +873,4 @@
     width: 100% !important;
   }
 }
-
 

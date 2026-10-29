@@ -374,5 +374,34 @@
   .table-wrapper {
     max-block-size: min(560px, 72vh);
   }
+
+  .o_kanban_record {
+    padding: 0.75rem 0.85rem;
+    gap: 0.65rem;
+  }
+
+  .o_kanban_avatar {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    font-size: 0.9rem;
+  }
 }
+
+@media (max-width: 380px) {
+  .o_list_table tbody td {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+    text-align: start;
+  }
+
+  .o_list_table tbody td .o_input,
+  .o_list_table tbody td .o_select {
+    max-width: 100%;
+    width: 100%;
+    text-align: start;
+  }
+}
+
 

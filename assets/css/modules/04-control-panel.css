@@ -286,3 +286,24 @@
   }
 }
 
+@media (max-width: 420px) {
+  .o_control_panel {
+    padding: 0.5rem 0.6rem;
+  }
+
+  .o_cp_left {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  #cpActionButtons {
+    width: 100%;
+  }
+
+  #cpActionButtons .btn {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+}
+
+
