@@ -158,20 +158,48 @@ Responde EXCLUSIVAMENTE con un JSON válido (sin markdown ni texto adicional) co
   "notes": "Observaciones generales de la factura (NO incluir la lista de artículos ni el NIT aquí)"
 }`;
 
-  const models = ['gemini-3.5-flash', 'gemini-3.7-flash', 'gemini-flash-latest', 'gemini-3.8-flash'];
-  let lastError = null;
+  // Ondas de modelos en paralelo para velocidad extrema y resiliencia ante saturacion (503/429)
+  // Cubre toda la gama desde 3.8, 3.7, 3.6, 3.5, 3-preview, flash-latest y versiones lite
+  const MODEL_WAVES = [
+    ['gemini-3.6-flash', 'gemini-3.8-flash'],
+    ['gemini-3.5-flash', 'gemini-3.7-flash'],
+    ['gemini-3-flash-preview', 'gemini-flash-latest'],
+    ['gemini-flash-lite-latest', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite']
+  ];
 
-  for (const model of models) {
+  let lastErrors = [];
+
+  for (let i = 0; i < MODEL_WAVES.length; i++) {
+    const wave = MODEL_WAVES[i];
     try {
-      const result = await makeGeminiRequest(model, apiKey, prompt, cleanBase64, mimeType);
-      if (result) return normalizeInvoiceData(result);
-    } catch (err) {
-      lastError = err;
-      console.warn(`[Gemini Vision] Fallo con ${model}:`, err.message);
+      const winner = await Promise.any(
+        wave.map((model) => makeGeminiRequest(model, apiKey, prompt, cleanBase64, mimeType))
+      );
+      if (winner) {
+        return normalizeInvoiceData(winner);
+      }
+    } catch (aggErr) {
+      const errList = aggErr.errors || [aggErr];
+      for (const e of errList) {
+        lastErrors.push(e);
+        console.warn(`[Gemini Vision Wave ${i + 1}] Fallo:`, e.message);
+      }
     }
   }
 
-  throw lastError || new Error('No se pudo procesar la factura con la IA de Gemini.');
+  // Si todas las opciones fallan, formatear error amigable
+  const anyDemandIssue = lastErrors.some((e) =>
+    (e.message || '').includes('503') ||
+    (e.message || '').includes('429') ||
+    (e.message || '').includes('demand') ||
+    (e.message || '').includes('quota')
+  );
+  if (anyDemandIssue) {
+    throw new Error('Los servidores de IA de Gemini están temporalmente saturados por alta demanda. Por favor reintenta en unos instantes o continúa manualmente.');
+  }
+
+  const lastMsg = lastErrors.length ? lastErrors[lastErrors.length - 1].message : 'Error desconocido al consultar Gemini.';
+  throw new Error(`No se pudo procesar la factura con la IA de Gemini: ${lastMsg}`);
 }
 
 function makeGeminiRequest(model, apiKey, prompt, base64Data, mimeType) {
@@ -192,7 +220,8 @@ function makeGeminiRequest(model, apiKey, prompt, base64Data, mimeType) {
       ],
       generationConfig: {
         temperature: 0,
-        response_mime_type: 'application/json'
+        response_mime_type: 'application/json',
+        max_output_tokens: 2048
       }
     });
 
@@ -206,7 +235,7 @@ function makeGeminiRequest(model, apiKey, prompt, base64Data, mimeType) {
         'Content-Length': Buffer.byteLength(payload),
         'x-goog-api-key': apiKey
       },
-      timeout: 25000
+      timeout: 9500
     };
 
     const req = https.request(options, (res) => {
@@ -214,31 +243,30 @@ function makeGeminiRequest(model, apiKey, prompt, base64Data, mimeType) {
       res.on('data', (chunk) => (body += chunk));
       res.on('end', () => {
         if (res.statusCode < 200 || res.statusCode >= 300) {
-          return reject(new Error(`HTTP ${res.statusCode}: ${body.slice(0, 300)}`));
+          return reject(new Error(`[${model}] HTTP ${res.statusCode}: ${body.slice(0, 200)}`));
         }
         try {
           const parsed = JSON.parse(body);
           const rawText = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (!rawText) return reject(new Error('Respuesta vacía de Gemini'));
+          if (!rawText) return reject(new Error(`[${model}] Respuesta vacía de Gemini`));
           const data = JSON.parse(rawText);
           resolve(data);
         } catch (e) {
-          reject(new Error(`Error parseando respuesta JSON de Gemini: ${e.message}`));
+          reject(new Error(`[${model}] Error parseando respuesta JSON de Gemini: ${e.message}`));
         }
       });
     });
 
     req.on('timeout', () => {
       req.destroy();
-      reject(new Error('Tiempo de espera agotado al consultar Gemini'));
+      reject(new Error(`[${model}] Tiempo de espera agotado (9.5s)`));
     });
 
-    req.on('error', (err) => reject(err));
+    req.on('error', (err) => reject(new Error(`[${model}] Error de red: ${err.message}`)));
     req.write(payload);
     req.end();
   });
 }
-
 module.exports = {
   getGeminiApiKey,
   analyzeInvoiceImage,

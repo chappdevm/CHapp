@@ -1295,6 +1295,12 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.ok(jsText.includes('openExpenseCameraDialog'), 'JS must define openExpenseCameraDialog');
     assert.ok(jsText.includes('btnExpensesBannerNew'), 'Expenses banner must include New Manual Expense button');
     assert.ok(jsText.includes('btnExpensesBannerScan'), 'Expenses banner must include AI camera scan button');
+    assert.ok(jsText.includes('compressImageFile(file, 1280, 1280, 0.80)'), 'Camera and file upload must optimize image to 1280px quality 0.80 for rapid OCR');
+    const geminiCode = fs.readFileSync(path.join(__dirname, '..', 'server', 'gemini.js'), 'utf8');
+    assert.ok(geminiCode.includes('MODEL_WAVES'), 'gemini.js must define MODEL_WAVES for parallel resilient fallback');
+    assert.ok(geminiCode.includes('gemini-3.8-flash'), 'gemini.js must include gemini-3.8-flash');
+    assert.ok(geminiCode.includes('gemini-3.6-flash'), 'gemini.js must include gemini-3.6-flash');
+    assert.ok(geminiCode.includes('gemini-3.5-flash'), 'gemini.js must include gemini-3.5-flash');
   });
 
   it('Module 2 (Gastos & Proveedores IA): auto-creación de proveedor y fuzzy matching riguroso para variaciones de razón social (ej: Tuberia vs Tuberia SAS)', async () => {

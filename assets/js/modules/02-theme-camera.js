@@ -248,7 +248,7 @@
     if (btnStart) btnStart.textContent = 'Activar Cámara';
   }
 
-  function compressImageFile(file, maxWidth = 1600, maxHeight = 1600, quality = 0.85) {
+  function compressImageFile(file, maxWidth = 1280, maxHeight = 1280, quality = 0.80) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onerror = () => reject(new Error('No se pudo leer el archivo de imagen.'));
@@ -440,7 +440,7 @@
               try {
                 errorState.style.display = 'none';
                 aiLoading.style.display = 'flex';
-                const compressedBase64 = await compressImageFile(file, 1600, 1600, 0.85);
+                const compressedBase64 = await compressImageFile(file, 1280, 1280, 0.80);
                 executeAiScan(compressedBase64, 'image/jpeg');
               } catch (e) {
                 aiLoading.style.display = 'none';
@@ -514,7 +514,7 @@
       canvas.height = video.videoHeight || 720;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
       executeAiScan(dataUrl, 'image/jpeg');
     };
 
@@ -524,7 +524,7 @@
       try {
         placeholder.style.display = 'none';
         aiLoading.style.display = 'flex';
-        const compressedBase64 = await compressImageFile(file, 1600, 1600, 0.85);
+        const compressedBase64 = await compressImageFile(file, 1280, 1280, 0.80);
         executeAiScan(compressedBase64, 'image/jpeg');
       } catch (err) {
         aiLoading.style.display = 'none';
