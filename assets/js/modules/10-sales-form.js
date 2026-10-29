@@ -23,6 +23,8 @@
               product_id: '',
               product_name: '',
               description: '',
+              measure: 1,
+              uom: '',
               quantity: 1,
               price_unit: 0,
               discount: 0,
@@ -52,7 +54,10 @@
         validity_date: existing.validity_date,
         salesperson: existing.salesperson,
         notes: existing.notes || '',
-        lines: JSON.parse(JSON.stringify(existing.lines || []))
+        lines: JSON.parse(JSON.stringify(existing.lines || [])).map((l) => ({
+          ...l,
+          measure: l.measure !== undefined && l.measure !== null ? Number(l.measure) : 1
+        }))
       };
     }
 
@@ -88,6 +93,8 @@
       lines: draftLines.map((l) => ({
         ...l,
         name: l.product_name || l.description || 'Producto / Servicio',
+        measure: Number(l.measure !== undefined && l.measure !== null ? l.measure : 1),
+        uom: l.uom || '',
         quantity: Number(l.quantity || 1),
         price_unit: Number(l.price_unit || 0),
         discount: Number(l.discount || 0),
@@ -213,22 +220,26 @@
                 </div>
 
                 <div tabindex="0" role="region" aria-label="Líneas del pedido de venta" class="table-wrapper" style="margin-bottom: 0.75rem;">
-                  <table class="o_list_table" style="--label-2: 'Descripción'; --label-3: 'Cant.'; --label-4: 'Precio Unit.'; --label-5: 'Desc %'; --label-6: 'IVA %'; --label-7: 'Subtotal'; --label-8: 'Acción';">
+                  <table class="o_list_table" style="--label-2: 'Medida'; --label-3: 'U. Medida'; --label-4: 'Precio Unit.'; --label-5: 'Cant.'; --label-6: 'Desc %'; --label-7: 'IVA %'; --label-8: 'Subtotal'; --label-9: 'Acción';">
                     <thead>
                       <tr>
                         <th>Producto / Servicio</th>
-                        <th>Descripción</th>
+                        <th style="width: 95px;">Medida</th>
+                        <th style="width: 140px;">Unidad de Medida</th>
+                        <th style="width: 135px;">Precio Unit.</th>
                         <th style="width: 85px;">Cant.</th>
-                        <th style="width: 145px;">Precio Unit.</th>
-                        <th style="width: 85px;">Desc.%</th>
-                        <th style="width: 95px;">IVA %</th>
-                        <th class="text-end">Subtotal</th>
+                        <th style="width: 80px;">Desc.%</th>
+                        <th style="width: 90px;">IVA %</th>
+                        <th class="text-end" style="width: 120px;">Subtotal</th>
                         ${isEditable ? `<th style="width: 50px;"></th>` : ''}
                       </tr>
                     </thead>
                     <tbody id="saleLinesTbody">
                       ${draftLines
                         .map((l, idx) => {
+                          const prod = (state.data.products || []).find((p) => Number(p.id) === Number(l.product_id));
+                          const uomName = l.uom || (prod ? prod.uom : '') || 'Metro Cuadrado';
+                          const measureVal = l.measure !== undefined && l.measure !== null ? Number(l.measure) : 1;
                           const sub = Number(l.quantity || 0) * Number(l.price_unit || 0) * (1 - Number(l.discount || 0) / 100);
                           return `
                           <tr data-line-idx="${idx}">
@@ -242,9 +253,10 @@
                                   .join('')}
                               </select>
                             </th>
-                            <td><input type="text" class="o_input line-desc" data-idx="${idx}" value="${esc(l.description || '')}" ${!isEditable ? 'readonly' : ''} /></td>
-                            <td><input type="number" class="o_input line-qty" data-idx="${idx}" min="1" step="any" value="${Number(l.quantity || 1)}" ${!isEditable ? 'readonly' : ''} /></td>
+                            <td><input type="number" class="o_input line-measure" data-idx="${idx}" min="0" step="any" value="${measureVal}" ${!isEditable ? 'readonly' : ''} /></td>
+                            <td><input type="text" class="o_input line-uom" data-idx="${idx}" value="${esc(uomName)}" readonly style="background: var(--o-bg-subtle, #f8fafc); color: var(--o-text-muted, #64748b); font-weight: 500;" /></td>
                             <td><input type="number" class="o_input line-price" data-idx="${idx}" min="0" step="any" value="${Number(l.price_unit || 0)}" ${!isEditable ? 'readonly' : ''} /></td>
+                            <td><input type="number" class="o_input line-qty" data-idx="${idx}" min="1" step="any" value="${Number(l.quantity || 1)}" ${!isEditable ? 'readonly' : ''} /></td>
                             <td><input type="number" class="o_input line-disc" data-idx="${idx}" min="0" max="100" step="any" value="${Number(l.discount || 0)}" ${!isEditable ? 'readonly' : ''} /></td>
                             <td>
                               <select class="o_select line-tax" data-idx="${idx}" ${!isEditable ? 'disabled' : ''}>
@@ -337,12 +349,19 @@
         const idx = Number(tr.getAttribute('data-line-idx'));
         const line = state.formDraft.lines[idx];
         if (!line) return;
-        line.description = tr.querySelector('.line-desc').value;
-        line.quantity = Number(tr.querySelector('.line-qty').value || 1);
-        line.price_unit = Number(tr.querySelector('.line-price').value || 0);
-        line.discount = Number(tr.querySelector('.line-disc').value || 0);
-        const lineTaxVal = tr.querySelector('.line-tax').value;
-        line.tax_rate = lineTaxVal === '' ? '' : Number(lineTaxVal);
+        const measureInp = tr.querySelector('.line-measure');
+        if (measureInp) line.measure = Number(measureInp.value || 1);
+        const qtyInp = tr.querySelector('.line-qty');
+        if (qtyInp) line.quantity = Number(qtyInp.value || 1);
+        const priceInp = tr.querySelector('.line-price');
+        if (priceInp) line.price_unit = Number(priceInp.value || 0);
+        const discInp = tr.querySelector('.line-disc');
+        if (discInp) line.discount = Number(discInp.value || 0);
+        const taxEl = tr.querySelector('.line-tax');
+        if (taxEl) {
+          const lineTaxVal = taxEl.value;
+          line.tax_rate = lineTaxVal === '' ? '' : Number(lineTaxVal);
+        }
       });
     };
 
@@ -371,17 +390,38 @@
         const idx = Number(sel.getAttribute('data-idx'));
         const prod = (state.data.products || []).find((p) => Number(p.id) === Number(sel.value));
         if (prod) {
-          state.formDraft.lines[idx].product_id = prod.id;
-          state.formDraft.lines[idx].product_name = prod.name;
-          state.formDraft.lines[idx].description = prod.name;
-          state.formDraft.lines[idx].price_unit = prod.list_price;
-          state.formDraft.lines[idx].tax_rate = prod.tax_rate !== undefined && prod.tax_rate !== null && prod.tax_rate !== '' ? prod.tax_rate : '';
+          const line = state.formDraft.lines[idx];
+          line.product_id = prod.id;
+          line.product_name = prod.name;
+          line.description = prod.name;
+          line.uom = prod.uom || 'Metro Cuadrado';
+          const m = Number(line.measure !== undefined && line.measure !== null ? line.measure : 1);
+          line.measure = m;
+          line.price_unit = m * Number(prod.list_price || 0);
+          line.tax_rate = prod.tax_rate !== undefined && prod.tax_rate !== null && prod.tax_rate !== '' ? prod.tax_rate : '';
           renderSaleOrderForm(container);
         }
       });
     });
 
-    container.querySelectorAll('.line-qty, .line-price, .line-disc, .line-tax, .line-desc').forEach((inp) => {
+    container.querySelectorAll('.line-measure').forEach((inp) => {
+      inp.addEventListener('change', () => {
+        syncSaleDraft();
+        const idx = Number(inp.getAttribute('data-idx'));
+        const line = state.formDraft.lines[idx];
+        if (line) {
+          const prod = (state.data.products || []).find((p) => Number(p.id) === Number(line.product_id));
+          const m = Number(inp.value || 1);
+          line.measure = m;
+          if (prod) {
+            line.price_unit = m * Number(prod.list_price || 0);
+          }
+          renderSaleOrderForm(container);
+        }
+      });
+    });
+
+    container.querySelectorAll('.line-qty, .line-price, .line-disc, .line-tax').forEach((inp) => {
       inp.addEventListener('change', () => {
         syncSaleDraft();
         renderSaleOrderForm(container);
@@ -409,6 +449,8 @@
           product_id: '',
           product_name: '',
           description: '',
+          measure: 1,
+          uom: '',
           quantity: 1,
           price_unit: 0,
           discount: 0,

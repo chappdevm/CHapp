@@ -281,6 +281,35 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.equal(fullPay.status, 200);
     assert.equal(fullPay.json.move.payment_state, 'paid');
     assert.equal(fullPay.json.move.amount_residual, 0);
+
+    // Verify calculation: measure * product list_price = price_unit, subtotal = price_unit * quantity * (1 - discount/100)
+    const prodRes = await req('/api/products', 'POST', {
+      name: 'Ventana Serie 744 Aluminio Medida Test',
+      list_price: 200000,
+      uom: 'Metro Cuadrado',
+      tax_rate: 19
+    });
+    assert.equal(prodRes.status, 200);
+    const prodId = prodRes.json.product.id;
+
+    const measureSaleRes = await req('/api/sales', 'POST', {
+      partner_id: partnerId,
+      lines: [
+        {
+          product_id: prodId,
+          measure: 2.5,
+          quantity: 4,
+          discount: 10,
+          tax_rate: 19
+        }
+      ]
+    });
+    assert.equal(measureSaleRes.status, 200);
+    const measureLine = measureSaleRes.json.order.lines[0];
+    assert.equal(measureLine.measure, 2.5);
+    assert.equal(measureLine.price_unit, 500000); // 2.5 * 200,000 = 500,000
+    assert.equal(measureLine.subtotal, 1800000); // 500,000 * 4 * (1 - 0.10) = 1,800,000
+    assert.equal(measureLine.uom, 'Metro Cuadrado');
   });
 
   it('Module 5 (Ajustes) & Chatter: updates company settings and logs chatter notes', async () => {

@@ -204,6 +204,7 @@
       const e = existLines[i] || {};
       const d = draftLines[i] || {};
       if (Number(e.product_id || 0) !== Number(d.product_id || 0)) return true;
+      if (Number(e.measure || 1) !== Number(d.measure || 1)) return true;
       if (Number(e.quantity || 0) !== Number(d.quantity || 0)) return true;
       if (Number(e.price_unit || 0) !== Number(d.price_unit || 0)) return true;
       if (Number(e.discount || 0) !== Number(d.discount || 0)) return true;

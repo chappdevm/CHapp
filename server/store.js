@@ -334,6 +334,7 @@ function areSaleLinesSemanticEqual(linesA = [], linesB = []) {
     const a = linesA[i];
     const b = linesB[i];
     if (Number(a.product_id) !== Number(b.product_id)) return false;
+    if (Number(a.measure || 1) !== Number(b.measure || 1)) return false;
     if (Number(a.quantity) !== Number(b.quantity)) return false;
     if (Number(a.price_unit) !== Number(b.price_unit)) return false;
     if (Number(a.discount || 0) !== Number(b.discount || 0)) return false;
@@ -1840,8 +1841,10 @@ class ERPStore {
     }
     return rawLines.map((line, idx) => {
       const product = this.data.products.find((p) => Number(p.id) === Number(line.product_id));
+      const measure = line.measure !== undefined && line.measure !== null && !isNaN(Number(line.measure)) ? Number(line.measure) : 1;
       const qty = Number(line.quantity ?? 1);
-      const price = Number(line.price_unit ?? (product ? product.list_price : 0));
+      const basePrice = product ? Number(product.list_price || 0) : 0;
+      const price = Number(line.price_unit ?? (measure * basePrice || basePrice));
       const discount = Math.min(100, Math.max(0, Number(line.discount ?? 0)));
       const taxRate = Number(line.tax_rate ?? (product ? product.tax_rate : 19));
 
@@ -1862,6 +1865,7 @@ class ERPStore {
         product_id: product ? product.id : (line.product_id ? Number(line.product_id) : null),
         product_name: product ? product.name : String(line.product_name || 'Servicio / Producto').trim(),
         description: String(line.description || (product ? product.name : 'Servicio')).trim(),
+        measure: Number.isFinite(measure) && measure > 0 ? measure : 1,
         quantity: qty,
         uom: String(line.uom || (product ? product.uom : 'Metro Cuadrado')),
         price_unit: price,
@@ -1890,6 +1894,7 @@ class ERPStore {
           product_id: l.product_id ? Number(l.product_id) : '',
           name: String(l.name || l.description || '').trim(),
           description: String(l.description || l.name || '').trim(),
+          measure: Number(l.measure || 1),
           quantity: Number(l.quantity || 0),
           price_unit: Number(l.price_unit || 0),
           discount: Number(l.discount || 0),
@@ -1899,6 +1904,7 @@ class ERPStore {
           product_id: l.product_id ? Number(l.product_id) : '',
           name: String(l.name || l.description || '').trim(),
           description: String(l.description || l.name || '').trim(),
+          measure: Number(l.measure || 1),
           quantity: Number(l.quantity || 0),
           price_unit: Number(l.price_unit || 0),
           discount: Number(l.discount || 0),
