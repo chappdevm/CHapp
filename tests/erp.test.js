@@ -2380,4 +2380,120 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.ok(!saleProducts.some((p) => p.name === 'Vidrio Templado Incoloro 6mm'), 'Insumo must NOT appear in Sales Products');
     assert.ok(!saleProducts.some((p) => p.name === 'Empaque EPDM Burbuja Rollo'), 'Insumo must NOT appear in Sales Products');
   });
+
+  it('Verifies Inventory unit summing without duplicates, Valor Unitario & Valoración Total with IVA, Scanned Invoice Photo in Chatter, and Single-Input Supplier Combobox', async () => {
+    // 1. Create a Customer-only contact and a Supplier contact
+    const custRes = await req('/api/contacts', 'POST', {
+      name: 'Cliente Exclusivo Residencial',
+      vat: '1088999111',
+      customer_rank: 1,
+      supplier_rank: 0,
+      category_ids: ['Cliente']
+    });
+    assert.equal(custRes.status, 200);
+
+    const suppRes = await req('/api/contacts', 'POST', {
+      name: 'Aluminios y Vidrios El Dorado SAS',
+      vat: '901555777-8',
+      customer_rank: 0,
+      supplier_rank: 1,
+      category_ids: ['Proveedor']
+    });
+    assert.equal(suppRes.status, 200);
+    const supplier = suppRes.json.contact;
+
+    // 2. Register first expense with scanned invoice photo (receipt_image) and IVA 19% on insumo
+    // Insumo: "Silicona Estructural Negra" -> 5 units * $20,000 = $100,000 + 19% IVA ($19,000) = $119,000 total
+    const fakePhoto1 = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/yQALCAABAAEBAREA/8wABgAQEAX/2gAIAQEAAD8A0s8g/9k=';
+    const exp1Res = await req('/api/expenses', 'POST', {
+      name: 'Compra Siliconas Estructurales',
+      partner_id: supplier.id,
+      partner_name: supplier.name,
+      supplier_vat: supplier.vat,
+      date: '2026-10-30',
+      receipt_ref: 'FE-8801',
+      total_amount: 119000,
+      receipt_image: fakePhoto1,
+      items: [
+        {
+          id: 1,
+          description: 'Silicona Estructural Negra',
+          quantity: 5,
+          price_unit: 20000,
+          tax_rate: 19,
+          tax_amount: 19000,
+          subtotal: 100000,
+          total: 119000
+        }
+      ]
+    });
+    assert.equal(exp1Res.status, 200);
+    const exp1 = exp1Res.json.expense;
+
+    // Verify requirement 2: Scanned invoice photo is saved as attachment AND registered in Chatter
+    assert.equal(exp1.receipt_image, fakePhoto1, 'Expense must persist receipt_image');
+    assert.ok(Array.isArray(exp1.attachments) && exp1.attachments.length >= 1, 'Expense must store photo in attachments array');
+    assert.equal(exp1.attachments[0].data, fakePhoto1, 'Attachment data must match scanned photo');
+    assert.ok(
+      exp1.chatter.some((m) => m.attachment === fakePhoto1 && m.text.includes('Foto de la factura')),
+      'Chatter must have a registered message containing the scanned invoice photo attachment'
+    );
+
+    // Verify requirement 1 (first entry): Insumo created with qty_available = 5, Valor Unitario = 20000, Valoración Total = 119000 (with IVA applied)
+    let invRes = await req('/api/inventory');
+    let siliconas = invRes.json.products.filter((p) => p.name.toLowerCase().includes('silicona estructural negra'));
+    assert.equal(siliconas.length, 1, 'Must create exactly 1 insumo record for Silicona Estructural Negra');
+    assert.equal(siliconas[0].qty_available, 5, 'Initial stock must be 5 units');
+    assert.equal(siliconas[0].standard_price, 20000, 'Valor Unitario (standard_price) must be 20000');
+    assert.equal(siliconas[0].stock_value, 119000, 'Valoración Total (stock_value) must take line total with IVA applied (119000)');
+
+    // 3. Register second expense with same insumo (plural/case variation: "Siliconas Estructurales Negras")
+    // 3 units * $22,000 = $66,000 + 19% IVA ($12,540) = $78,540 total
+    const exp2Res = await req('/api/expenses', 'POST', {
+      name: 'Reposición Silicona Negra',
+      partner_id: supplier.id,
+      partner_name: supplier.name,
+      supplier_vat: supplier.vat,
+      date: '2026-10-30',
+      receipt_ref: 'FE-8802',
+      total_amount: 78540,
+      items: [
+        {
+          id: 1,
+          description: 'Siliconas Estructurales Negras',
+          quantity: 3,
+          price_unit: 22000,
+          tax_rate: 19,
+          tax_amount: 12540,
+          subtotal: 66000,
+          total: 78540
+        }
+      ]
+    });
+    assert.equal(exp2Res.status, 200);
+
+    // Verify requirement 1 (second entry): Recognizes existing insumo without creating duplicate, sums units (5 + 3 = 8), updates Valor Unitario (22000), and sums Valoración Total with IVA (119000 + 78540 = 197540)
+    invRes = await req('/api/inventory');
+    siliconas = invRes.json.products.filter((p) => p.name.toLowerCase().includes('silicona'));
+    assert.equal(siliconas.length, 1, 'Must NOT duplicate existing insumo even with singular/plural variation');
+    assert.equal(siliconas[0].qty_available, 8, 'Units must be summed (5 + 3 = 8)');
+    assert.equal(siliconas[0].standard_price, 22000, 'Valor Unitario must reflect the unit value (22000)');
+    assert.equal(siliconas[0].stock_value, 197540, 'Valoración Total must equal sum of expense line totals with IVA (119000 + 78540 = 197540)');
+
+    // 4. Verify UI contracts in 15-inventory.js, 14-settings-chatter.js, and 05-expenses.js
+    const invJs = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'modules', '15-inventory.js'), 'utf8');
+    assert.ok(invJs.includes('Valor Unitario'), '15-inventory.js must display Valor Unitario');
+    assert.ok(!invJs.includes('Costo Promedio'), '15-inventory.js must not display Costo Promedio');
+    assert.ok(invJs.includes('Valoración Total'), '15-inventory.js must display Valoración Total');
+
+    const chatterJs = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'modules', '14-settings-chatter.js'), 'utf8');
+    assert.ok(chatterJs.includes('o_chatter_attachments_box'), '14-settings-chatter.js must render attachment box');
+    assert.ok(chatterJs.includes('o_chatter_msg_attachment'), '14-settings-chatter.js must render inline chatter photo attachment');
+
+    const expJs = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'modules', '05-expenses.js'), 'utf8');
+    assert.ok(expJs.includes('fExpSupplierCombobox'), '05-expenses.js must use single unified supplier combobox');
+    assert.ok(expJs.includes('fExpSupplierDropdown'), '05-expenses.js must render live supplier dropdown');
+    assert.ok(expJs.includes('o_supplier_create_option'), '05-expenses.js must offer option to create new supplier when no match exists');
+    assert.ok(expJs.includes('getSupplierContactsList'), '05-expenses.js must filter only suppliers via getSupplierContactsList');
+  });
 });

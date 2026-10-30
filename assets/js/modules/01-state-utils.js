@@ -141,6 +141,18 @@
     return all.filter((p) => !isInsumoItem(p) && p.can_be_sold !== false);
   }
 
+  function isSupplierContact(c) {
+    if (!c) return false;
+    if (Number(c.supplier_rank) > 0) return true;
+    if (Array.isArray(c.category_ids) && c.category_ids.some((t) => String(t).toLowerCase().includes('proveedor'))) return true;
+    return false;
+  }
+
+  function getSupplierContactsList() {
+    const all = (state.data && state.data.contacts) || [];
+    return all.filter(isSupplierContact);
+  }
+
   function formatUomShort(uom) {
     if (!uom) return 'm²';
     const s = String(uom).toLowerCase().trim();

@@ -276,17 +276,34 @@
 
             <div class="o_group">
               <div class="o_field_row">
-                <label for="fExpPartner">Proveedor / Establecimiento</label>
-                <div style="display: flex; gap: 8px; flex-direction: column;">
-                  <select id="fExpPartner" class="o_select">
-                    <option value="" ${!existing.partner_id ? 'selected disabled' : ''}>— Seleccionar Proveedor —</option>
-                    ${(state.data.contacts || [])
-                      .map(
-                        (c) => `<option value="${c.id}" ${Number(existing.partner_id) === Number(c.id) ? 'selected' : ''}>${esc(c.name)}</option>`
-                      )
-                      .join('')}
-                  </select>
-                  <input type="text" id="fExpPartnerName" class="o_input" value="${esc(existing.partner_name || '')}" placeholder="O escribir nombre del proveedor directamente" />
+                <label for="fExpPartnerName">Proveedor / Establecimiento</label>
+                <div class="o_supplier_combobox" id="fExpSupplierCombobox" style="position: relative; width: 100%;">
+                  <input type="hidden" id="fExpPartner" value="${esc(existing.partner_id || '')}" />
+                  <div style="position: relative; display: flex; align-items: center;">
+                    <input
+                      type="text"
+                      id="fExpPartnerName"
+                      class="o_input"
+                      autocomplete="off"
+                      value="${esc(existing.partner_name || ((state.data.contacts || []).find((c) => Number(c.id) === Number(existing.partner_id)) || {}).name || '')}"
+                      placeholder="Escribe o selecciona un proveedor..."
+                      style="padding-right: 32px; width: 100%;"
+                    />
+                    <button
+                      type="button"
+                      id="btnToggleSupplierDropdown"
+                      tabindex="-1"
+                      title="Mostrar lista de proveedores"
+                      style="position: absolute; right: 6px; background: transparent; border: none; color: var(--o-muted); cursor: pointer; padding: 4px; display: inline-flex; align-items: center;"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </button>
+                  </div>
+                  <div
+                    id="fExpSupplierDropdown"
+                    class="o_supplier_dropdown_menu"
+                    style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; max-height: 230px; overflow-y: auto; background: var(--o-surface, #1e293b); border: 1px solid var(--o-border, #334155); border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.28); z-index: 60;"
+                  ></div>
                 </div>
               </div>
               <div class="o_field_row">
@@ -321,6 +338,7 @@
             </div>
 
             <div style="display: none;" aria-hidden="true">
+              <select id="fExpPartnerLegacy"><option value="" ${!existing.partner_id ? 'selected disabled' : ''}>— Seleccionar Proveedor —</option></select>
               <select id="fExpProduct">
                 <option value="" ${!existing.product_id ? 'selected disabled' : ''}>— Seleccione Categoría de Gasto —</option>
                 ${(state.data.products || []).map((p) => `<option value="${p.id}" ${Number(existing.product_id) === Number(p.id) ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
@@ -366,6 +384,11 @@
                   <tbody id="expenseItemsTbody">
                   </tbody>
                 </table>
+                <datalist id="expenseInsumosDatalist">
+                  ${(typeof getInventoryInsumosList === 'function' ? getInventoryInsumosList() : [])
+                    .map((ins) => `<option value="${esc(ins.name)}">${esc(ins.default_code || '')} · Stock: ${Number(ins.qty_available || 0)} ${esc(ins.uom || 'Und')}</option>`)
+                    .join('')}
+                </datalist>
               </div>
               <div id="expenseItemsSummary" style="display: flex; gap: 1.25rem; justify-content: flex-end; flex-wrap: wrap; font-size: 0.9rem; margin-bottom: 0.75rem;"></div>
             </div>
@@ -375,20 +398,40 @@
               <textarea id="fExpNotes" class="o_textarea" rows="2" placeholder="Observaciones generales (el NIT y los artículos ya tienen sus campos correspondientes)">${esc(existing.notes || '')}</textarea>
             </div>
 
-            <!-- Foto o Soporte de la Factura -->
+            <!-- Foto o Soporte de la Factura (Archivo Adjunto) -->
             <div style="margin-top: 1rem; padding: 1rem; background: var(--o-bg-subtle, rgba(0,0,0,0.02)); border: 1px dashed var(--o-border); border-radius: 8px;">
-              <div style="font-weight: 600; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
-                <span>Foto de la Factura / Comprobante</span>
-                <button type="button" class="btn btn-sm btn-secondary" id="btnFormCameraTrigger">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
-                  ${existing.receipt_image ? 'Cambiar Foto / Escanear Factura' : 'Escanear Factura'}
-                </button>
+              <div style="font-weight: 600; margin-bottom: 0.65rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                <span style="display: inline-flex; align-items: center; gap: 6px;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                  Archivo Adjunto — Foto de la Factura / Comprobante
+                </span>
+                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                  <label class="btn btn-sm btn-secondary" style="cursor: pointer; margin: 0; display: inline-flex; align-items: center; gap: 4px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    Adjuntar Foto
+                    <input type="file" id="fExpDirectFileAttach" accept="image/*" style="display: none;" />
+                  </label>
+                  <button type="button" class="btn btn-sm btn-secondary" id="btnFormCameraTrigger">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                    ${existing.receipt_image ? 'Cambiar / Escanear con IA' : 'Escanear Factura con IA'}
+                  </button>
+                </div>
               </div>
               <div id="formReceiptPreviewWrap">
                 ${
                   existing.receipt_image
-                    ? `<img src="${existing.receipt_image}" class="o_expense_receipt_preview" alt="Comprobante factura" onclick="openImageLightbox(this.src, 'Comprobante de Factura')" title="Clic para ver tamaño grande" />`
-                    : `<span style="font-size: 0.85rem; color: var(--o-muted);">Sin foto adjunta. Puedes tomarla con la cámara en vivo o subir un archivo.</span>`
+                    ? `<div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                        <img src="${existing.receipt_image}" class="o_expense_receipt_preview" alt="Comprobante factura" onclick="openImageLightbox(this.src, 'Comprobante de Factura')" title="Clic para ver tamaño grande" />
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                          <span class="o_badge o_badge_success" style=" align-self: flex-start;">✓ Foto de Factura Adjuntada</span>
+                          <span style="font-size: 0.82rem; color: var(--o-muted);">Este archivo queda guardado en el gasto y registrado en el Chatter.</span>
+                          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <button type="button" class="btn btn-sm btn-secondary" onclick="openImageLightbox(document.querySelector('#formReceiptPreviewWrap img')?.src, 'Comprobante de Factura')">Ver Tamaño Completo</button>
+                            <a href="${existing.receipt_image}" download="Factura_${esc((existing.receipt_ref || existing.reference || 'Gasto').replace(/[\/\\]/g, '_'))}.jpg" class="btn btn-sm btn-secondary" style="text-decoration: none;">Descargar Adjunto</a>
+                          </div>
+                        </div>
+                      </div>`
+                    : `<span style="font-size: 0.85rem; color: var(--o-muted);">Sin foto adjunta. Al escanear la factura o adjuntar una foto, se guardará como archivo adjunto y quedará registrada en el Chatter.</span>`
                 }
               </div>
             </div>
@@ -408,75 +451,28 @@
       const rate = Number(it.tax_rate || 0);
       let total = it.total !== undefined && it.total !== null && it.total !== '' && Number(it.total) > 0
         ? Number(it.total)
-        : (it.subtotal !== undefined && it.subtotal !== null && it.subtotal !== ''
-            ? Number(it.subtotal) + Number(it.tax_amount || 0)
-            : Math.round(qty * price * (1 + rate / 100) * 100) / 100);
+        : (it.subtotal !== undefined && it.subtotal !== null && it.subtotal !== '' ? Number(it.subtotal) + Number(it.tax_amount || 0) : Math.round(qty * price * (1 + rate / 100) * 100) / 100);
       total = Math.round(total * 100) / 100;
-      const sub = it.subtotal !== undefined && it.subtotal !== null && it.subtotal !== ''
-        ? Number(it.subtotal)
-        : (rate > 0 ? Math.round((total / (1 + rate / 100)) * 100) / 100 : total);
-      const tax = it.tax_amount !== undefined && it.tax_amount !== null && it.tax_amount !== ''
-        ? Number(it.tax_amount)
-        : Math.round((total - sub) * 100) / 100;
-      return {
-        ...it,
-        description: it.description || it.name || '',
-        quantity: qty,
-        price_unit: price || (qty > 0 ? Math.round((sub / qty) * 100) / 100 : 0),
-        tax_rate: rate,
-        tax_amount: tax,
-        subtotal: sub,
-        total: total
-      };
+      const sub = it.subtotal !== undefined && it.subtotal !== null && it.subtotal !== '' ? Number(it.subtotal) : (rate > 0 ? Math.round((total / (1 + rate / 100)) * 100) / 100 : total);
+      const tax = it.tax_amount !== undefined && it.tax_amount !== null && it.tax_amount !== '' ? Number(it.tax_amount) : Math.round((total - sub) * 100) / 100;
+      return { ...it, description: it.description || it.name || '', quantity: qty, price_unit: price || (qty > 0 ? Math.round((sub / qty) * 100) / 100 : 0), tax_rate: rate, tax_amount: tax, subtotal: sub, total };
     };
     let recoveredItems = null;
     if (!isNew && (!Array.isArray(existing.items) || existing.items.length === 0)) {
-      const invMoves = ((state.data && state.data.inventory_moves) || []).filter(
-        (m) => m.origin_type === 'expense' && Number(m.origin_id) === Number(existing.id) && m.state !== 'cancel'
-      );
+      const invMoves = ((state.data && state.data.inventory_moves) || []).filter((m) => m.origin_type === 'expense' && Number(m.origin_id) === Number(existing.id) && m.state !== 'cancel');
       if (invMoves.length > 0) {
-        recoveredItems = invMoves.map((m, idx) => ({
-          id: m.item_id || idx + 1,
-          product_id: m.product_id || null,
-          description: m.product_name || existing.name || '',
-          quantity: Number(m.quantity || 1),
-          price_unit: Number(m.price_unit || 0),
-          subtotal: Number(m.total_value || 0),
-          total: Number(m.total_value || 0)
-        }));
+        recoveredItems = invMoves.map((m, idx) => ({ id: m.item_id || idx + 1, product_id: m.product_id || null, description: m.product_name || existing.name || '', quantity: Number(m.quantity || 1), price_unit: Number(m.price_unit || 0), subtotal: Number(m.total_value || 0), total: Number(m.total_value || 0) }));
       } else if (existing.move_id || existing.bill_id) {
-        const linkedMove = ((state.data && state.data.accounting && state.data.accounting.moves) || []).find(
-          (mv) => Number(mv.id) === Number(existing.move_id || existing.bill_id)
-        );
+        const linkedMove = ((state.data && state.data.accounting && state.data.accounting.moves) || []).find((mv) => Number(mv.id) === Number(existing.move_id || existing.bill_id));
         if (linkedMove && Array.isArray(linkedMove.lines) && linkedMove.lines.length > 0) {
-          recoveredItems = linkedMove.lines.map((l, idx) => ({
-            id: l.id || idx + 1,
-            product_id: l.product_id || null,
-            description: l.name || l.description || existing.name || '',
-            quantity: Number(l.quantity || 1),
-            price_unit: Number(l.price_unit || 0),
-            tax_rate: Number(l.tax_rate || 0),
-            tax_amount: Number(l.tax_amount || 0),
-            subtotal: Number(l.subtotal || 0),
-            total: Number(l.total || 0)
-          }));
+          recoveredItems = linkedMove.lines.map((l, idx) => ({ id: l.id || idx + 1, product_id: l.product_id || null, description: l.name || l.description || existing.name || '', quantity: Number(l.quantity || 1), price_unit: Number(l.price_unit || 0), tax_rate: Number(l.tax_rate || 0), tax_amount: Number(l.tax_amount || 0), subtotal: Number(l.subtotal || 0), total: Number(l.total || 0) }));
         }
       }
     }
-    let expenseItems = (Array.isArray(existing.items) && existing.items.length > 0
-      ? [...existing.items]
-      : (recoveredItems && recoveredItems.length > 0
-          ? recoveredItems
-          : (draft && Array.isArray(draft.items) && draft.items.length > 0
-              ? [...draft.items]
-              : [{ description: existing.name || '', quantity: existing.quantity || 1, price_unit: existing.price_unit || existing.total_amount || 0, total: existing.total_amount || 0 }]))
-    ).map(normalizeExpenseItem);
+    let expenseItems = (Array.isArray(existing.items) && existing.items.length > 0 ? [...existing.items] : (recoveredItems && recoveredItems.length > 0 ? recoveredItems : (draft && Array.isArray(draft.items) && draft.items.length > 0 ? [...draft.items] : [{ description: existing.name || '', quantity: existing.quantity || 1, price_unit: existing.price_unit || existing.total_amount || 0, total: existing.total_amount || 0 }]))).map(normalizeExpenseItem);
 
-    // Totales literales impresos en la factura escaneada (se conservan hasta que el usuario edite los productos)
     let literalTotals = draft && draft.literal_totals ? { ...draft.literal_totals } : null;
-
     const round2c = (n) => Math.round(Number(n || 0) * 100) / 100;
-
     const renderExpenseSummary = () => {
       const box = document.getElementById('expenseItemsSummary');
       if (!box) return;
@@ -487,68 +483,41 @@
     const renderExpenseItems = () => {
       const tbody = document.getElementById('expenseItemsTbody');
       if (!tbody) return;
-      tbody.innerHTML = expenseItems.map((it, idx) => {
-        return `
-          <tr data-item-idx="${idx}">
-            <td>
-              <input type="text" class="o_input exp-item-desc" data-idx="${idx}" value="${esc(it.description || '')}" placeholder="Ej. Tubo PVC, Almuerzo, Cable..." />
-            </td>
-            <td>
-              <input type="number" class="o_input exp-item-field" data-field="quantity" data-idx="${idx}" min="0" step="any" value="${Number(it.quantity || 1)}" />
-            </td>
-            <td>
-              <input type="number" class="o_input exp-item-field" data-field="price_unit" data-idx="${idx}" min="0" step="any" value="${Number(it.price_unit || 0)}" />
-            </td>
-            <td>
-              <input type="number" class="o_input exp-item-field" data-field="tax_rate" data-idx="${idx}" min="0" step="any" value="${Number(it.tax_rate || 0)}" />
-            </td>
-            <td>
-              <input type="number" class="o_input exp-item-field text-end" data-field="total" data-idx="${idx}" min="0" step="any" value="${Number(it.total || 0)}" style="font-weight: 600;" />
-            </td>
-            <td class="text-center">
-              ${expenseItems.length > 1 ? `<button type="button" class="btn btn-sm btn-danger btn-remove-exp-item" data-idx="${idx}" title="Quitar ítem">Quitar</button>` : ''}
-            </td>
-          </tr>
-        `;
-      }).join('');
+      tbody.innerHTML = expenseItems.map((it, idx) => `
+        <tr data-item-idx="${idx}">
+          <td><input type="text" class="o_input exp-item-desc" list="expenseInsumosDatalist" data-idx="${idx}" value="${esc(it.description || '')}" placeholder="Ej. Tubo PVC, Perfil Aluminio, Tornillos..." /></td>
+          <td><input type="number" class="o_input exp-item-field" data-field="quantity" data-idx="${idx}" min="0" step="any" value="${Number(it.quantity || 1)}" /></td>
+          <td><input type="number" class="o_input exp-item-field" data-field="price_unit" data-idx="${idx}" min="0" step="any" value="${Number(it.price_unit || 0)}" /></td>
+          <td><input type="number" class="o_input exp-item-field" data-field="tax_rate" data-idx="${idx}" min="0" step="any" value="${Number(it.tax_rate || 0)}" /></td>
+          <td><input type="number" class="o_input exp-item-field text-end" data-field="total" data-idx="${idx}" min="0" step="any" value="${Number(it.total || 0)}" style="font-weight: 600;" /></td>
+          <td class="text-center">${expenseItems.length > 1 ? `<button type="button" class="btn btn-sm btn-danger btn-remove-exp-item" data-idx="${idx}" title="Quitar ítem">Quitar</button>` : ''}</td>
+        </tr>`).join('');
 
-      // Wire row inputs
-      tbody.querySelectorAll('.exp-item-desc').forEach(input => {
+      tbody.querySelectorAll('.exp-item-desc').forEach((input) => {
         input.addEventListener('input', (e) => {
-          const idx = Number(e.target.dataset.idx);
-          if (expenseItems[idx]) expenseItems[idx].description = e.target.value;
+          const i = Number(e.target.dataset.idx);
+          if (expenseItems[i]) expenseItems[i].description = e.target.value;
         });
       });
 
-      tbody.querySelectorAll('.exp-item-field').forEach(input => {
+      tbody.querySelectorAll('.exp-item-field').forEach((input) => {
         input.addEventListener('input', (e) => {
-          const idx = Number(e.target.dataset.idx);
+          const i = Number(e.target.dataset.idx);
           const field = e.target.dataset.field;
-          const item = expenseItems[idx];
-          const row = tbody.querySelector(`tr[data-item-idx="${idx}"]`);
+          const item = expenseItems[i];
+          const row = tbody.querySelector(`tr[data-item-idx="${i}"]`);
           if (!row || !item) return;
           item[field] = Number(e.target.value || 0);
-          const setField = (f, v) => {
-            item[f] = v;
-            const el = row.querySelector(`[data-field="${f}"]`);
-            if (el) el.value = v;
-          };
-
+          const setField = (f, v) => { item[f] = v; const el = row.querySelector(`[data-field="${f}"]`); if (el) el.value = v; };
           if (field === 'total') {
-            // Usuario ajusta el total literal del renglón de la factura
             const rate = Number(item.tax_rate || 0);
             const sub = rate > 0 ? round2c(item.total / (1 + rate / 100)) : item.total;
             item.subtotal = sub;
             item.tax_amount = round2c(item.total - sub);
-            if (Number(item.quantity || 0) > 0 && !item.price_unit) {
-              setField('price_unit', round2c(sub / item.quantity));
-            }
+            if (Number(item.quantity || 0) > 0 && !item.price_unit) setField('price_unit', round2c(sub / item.quantity));
           } else if (field === 'quantity' || field === 'price_unit') {
-            const qty = Number(item.quantity || 0);
-            const price = Number(item.price_unit || 0);
-            const rate = Number(item.tax_rate || 0);
-            const sub = round2c(qty * price);
-            const tax = round2c(sub * (rate / 100));
+            const sub = round2c(Number(item.quantity || 0) * Number(item.price_unit || 0));
+            const tax = round2c(sub * (Number(item.tax_rate || 0) / 100));
             item.subtotal = sub;
             item.tax_amount = tax;
             setField('total', round2c(sub + tax));
@@ -571,10 +540,9 @@
         });
       });
 
-      tbody.querySelectorAll('.btn-remove-exp-item').forEach(btn => {
+      tbody.querySelectorAll('.btn-remove-exp-item').forEach((btn) => {
         btn.addEventListener('click', (e) => {
-          const idx = Number(e.currentTarget.dataset.idx);
-          expenseItems.splice(idx, 1);
+          expenseItems.splice(Number(e.currentTarget.dataset.idx), 1);
           literalTotals = null;
           renderExpenseItems();
           recalcExpenseTotal();
@@ -589,7 +557,6 @@
       if (totalInput) totalInput.value = Math.round(sum * 100) / 100;
       renderExpenseSummary();
     };
-
     renderExpenseItems();
 
     const btnAddItem = document.getElementById('btnAddExpenseItem');
@@ -601,22 +568,104 @@
       });
     }
 
-    // Auto fill NIT and Name when partner select changes
-    const partnerSelect = document.getElementById('fExpPartner');
-    if (partnerSelect) {
-      partnerSelect.addEventListener('change', (e) => {
-        const p = (state.data.contacts || []).find((c) => Number(c.id) === Number(e.target.value));
-        if (p) {
-          const nameInput = document.getElementById('fExpPartnerName');
-          if (nameInput) nameInput.value = p.name;
+    // Unified Supplier Combobox (filters only suppliers, searches live, and offers "Crear proveedor" option)
+    const partnerIdInput = document.getElementById('fExpPartner');
+    const partnerNameInputEl = document.getElementById('fExpPartnerName');
+    const supplierDropdown = document.getElementById('fExpSupplierDropdown');
+    const toggleSupplierBtn = document.getElementById('btnToggleSupplierDropdown');
+
+    const renderSupplierDropdownOptions = (filterText = '') => {
+      if (!supplierDropdown) return;
+      const suppliers = typeof getSupplierContactsList === 'function' ? getSupplierContactsList() : (state.data.contacts || []).filter((c) => Number(c.supplier_rank) > 0);
+      const q = String(filterText || '').trim().toLowerCase();
+      const matches = q ? suppliers.filter((c) => (c.name || '').toLowerCase().includes(q) || (c.company_name || '').toLowerCase().includes(q) || (c.vat || '').toLowerCase().includes(q)) : suppliers;
+      const exactMatch = q && suppliers.some((c) => (c.name || '').trim().toLowerCase() === q);
+
+      let html = matches.length === 0 && !q
+        ? `<div style="padding: 10px 12px; font-size: 0.83rem; color: var(--o-muted);">No hay proveedores registrados. Escribe el nombre para crearlo.</div>`
+        : matches.map((c) => `<div class="o_supplier_option" data-supp-id="${c.id}" style="padding: 8px 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(148,163,184,0.12); font-size: 0.88rem;"><div><strong>${esc(c.name)}</strong>${c.vat ? `<span style="font-size: 0.78rem; color: var(--o-muted); margin-left: 6px;">NIT: ${esc(c.vat)}</span>` : ''}</div><span class="o_badge o_badge_info" style="font-size: 0.7rem;">Proveedor</span></div>`).join('');
+
+      if (q && !exactMatch) {
+        const rawTyped = String(filterText || '').trim();
+        html += `<div class="o_supplier_create_option" data-create-name="${esc(rawTyped)}" style="padding: 9px 12px; cursor: pointer; background: rgba(37, 99, 235, 0.12); color: #38bdf8; font-weight: 600; font-size: 0.88rem; display: flex; align-items: center; gap: 6px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Crear proveedor "<strong>${esc(rawTyped)}</strong>"</span></div>`;
+      }
+
+      supplierDropdown.innerHTML = html;
+      supplierDropdown.style.display = 'block';
+
+      supplierDropdown.querySelectorAll('.o_supplier_option').forEach((opt) => {
+        opt.addEventListener('mousedown', (ev) => {
+          ev.preventDefault();
+          const p = suppliers.find((c) => Number(c.id) === Number(opt.getAttribute('data-supp-id')));
+          if (p) {
+            if (partnerIdInput) partnerIdInput.value = String(p.id);
+            if (partnerNameInputEl) partnerNameInputEl.value = p.name;
+            const vatInput = document.getElementById('fExpPartnerVat');
+            if (vatInput) vatInput.value = p.vat || '';
+            existing.partner_id = p.id;
+            existing.partner_name = p.name;
+            existing.supplier_vat = p.vat || '';
+          }
+          supplierDropdown.style.display = 'none';
+        });
+      });
+
+      const createOpt = supplierDropdown.querySelector('.o_supplier_create_option');
+      if (createOpt) {
+        createOpt.addEventListener('mousedown', async (ev) => {
+          ev.preventDefault();
+          const newName = createOpt.getAttribute('data-create-name') || (partnerNameInputEl ? partnerNameInputEl.value.trim() : '');
+          if (!newName) return;
           const vatInput = document.getElementById('fExpPartnerVat');
-          if (vatInput) vatInput.value = p.vat || '';
-          existing.partner_id = p.id;
-          existing.partner_name = p.name;
-          existing.supplier_vat = p.vat || '';
-        }
+          const currentVat = vatInput ? vatInput.value.trim() : '';
+          supplierDropdown.style.display = 'none';
+          try {
+            const res = await apiCall('/api/contacts', 'POST', { name: newName, company_name: newName, is_company: true, doc_type: 'NIT', vat: currentVat, customer_rank: 0, supplier_rank: 1, category_ids: ['Proveedor'], notes: 'Proveedor creado desde el módulo de Gastos.' });
+            const created = res.contact;
+            if (created) {
+              if (partnerIdInput) partnerIdInput.value = String(created.id);
+              if (partnerNameInputEl) partnerNameInputEl.value = created.name;
+              if (vatInput && created.vat) vatInput.value = created.vat;
+              existing.partner_id = created.id;
+              existing.partner_name = created.name;
+              existing.supplier_vat = created.vat || currentVat;
+              showToast(`Proveedor "${created.name}" creado y seleccionado.`);
+            }
+          } catch (err) {
+            showToast(err.message, true);
+          }
+        });
+      }
+    };
+
+    if (partnerNameInputEl) {
+      partnerNameInputEl.addEventListener('focus', () => renderSupplierDropdownOptions(partnerNameInputEl.value));
+      partnerNameInputEl.addEventListener('input', (e) => {
+        const val = e.target.value;
+        const suppliers = typeof getSupplierContactsList === 'function' ? getSupplierContactsList() : [];
+        const matched = suppliers.find((c) => (c.name || '').trim().toLowerCase() === val.trim().toLowerCase());
+        if (partnerIdInput) partnerIdInput.value = matched ? String(matched.id) : '';
+        if (matched && matched.vat && document.getElementById('fExpPartnerVat')) document.getElementById('fExpPartnerVat').value = matched.vat;
+        renderSupplierDropdownOptions(val);
+      });
+      partnerNameInputEl.addEventListener('blur', () => setTimeout(() => { if (supplierDropdown) supplierDropdown.style.display = 'none'; }, 180));
+    }
+
+    if (toggleSupplierBtn) {
+      toggleSupplierBtn.addEventListener('click', () => {
+        if (!supplierDropdown) return;
+        if (supplierDropdown.style.display === 'block') supplierDropdown.style.display = 'none';
+        else { renderSupplierDropdownOptions(''); if (partnerNameInputEl) partnerNameInputEl.focus(); }
       });
     }
+
+    const updateReceiptAttachmentPreview = (imgSrc) => {
+      existing.receipt_image = imgSrc;
+      const wrap = document.getElementById('formReceiptPreviewWrap');
+      if (wrap) {
+        wrap.innerHTML = `<div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;"><img src="${imgSrc}" class="o_expense_receipt_preview" alt="Comprobante factura" onclick="openImageLightbox(this.src, 'Comprobante de Factura')" title="Clic para ver tamaño grande" /><div style="display: flex; flex-direction: column; gap: 6px;"><span class="o_badge o_badge_success" style="align-self: flex-start;">✓ Foto de Factura Adjuntada</span><span style="font-size: 0.82rem; color: var(--o-muted);">Se guardará como archivo adjunto y quedará registrada en el Chatter al guardar el gasto.</span><div style="display: flex; gap: 8px; flex-wrap: wrap;"><button type="button" class="btn btn-sm btn-secondary" onclick="openImageLightbox(document.querySelector('#formReceiptPreviewWrap img')?.src, 'Comprobante de Factura')">Ver Tamaño Completo</button><a href="${imgSrc}" download="Factura_Adjunta.jpg" class="btn btn-sm btn-secondary" style="text-decoration: none;">Descargar Adjunto</a></div></div></div>`;
+      }
+    };
 
     const openCameraForForm = () => {
       openExpenseCameraDialog((scannedData, imageBase64, matched) => {
@@ -646,40 +695,18 @@
         if (scannedData.reference) document.getElementById('fExpReceipt').value = scannedData.reference;
         if (scannedData.date) document.getElementById('fExpDate').value = scannedData.date;
         if (scannedData.total_amount) document.getElementById('fExpTotal').value = scannedData.total_amount;
-        literalTotals = scannedData.total_amount
-          ? {
-              untaxed: Number(scannedData.subtotal_amount || 0) || (Number(scannedData.total_amount) - Number(scannedData.tax_amount || 0)),
-              tax: Number(scannedData.tax_amount || 0),
-              total: Number(scannedData.total_amount)
-            }
-          : null;
-        if (scannedData.notes) {
-          document.getElementById('fExpNotes').value = scannedData.notes;
-        }
+        literalTotals = scannedData.total_amount ? { untaxed: Number(scannedData.subtotal_amount || 0) || (Number(scannedData.total_amount) - Number(scannedData.tax_amount || 0)), tax: Number(scannedData.tax_amount || 0), total: Number(scannedData.total_amount) } : null;
+        if (scannedData.notes) document.getElementById('fExpNotes').value = scannedData.notes;
 
-        // Load items from AI scan
         if (Array.isArray(scannedData.items) && scannedData.items.length > 0) {
           expenseItems = scannedData.items.map(normalizeExpenseItem);
           renderExpenseItems();
         } else if (scannedData.name || scannedData.total_amount) {
-          expenseItems = [normalizeExpenseItem({
-            description: scannedData.name || 'Gasto proveedor',
-            quantity: 1,
-            price_unit: Number(scannedData.subtotal_amount || scannedData.total_amount || 0),
-            tax_amount: Number(scannedData.tax_amount || 0),
-            subtotal: Number(scannedData.subtotal_amount || scannedData.total_amount || 0),
-            total: Number(scannedData.total_amount || 0)
-          })];
+          expenseItems = [normalizeExpenseItem({ description: scannedData.name || 'Gasto proveedor', quantity: 1, price_unit: Number(scannedData.subtotal_amount || scannedData.total_amount || 0), tax_amount: Number(scannedData.tax_amount || 0), subtotal: Number(scannedData.subtotal_amount || scannedData.total_amount || 0), total: Number(scannedData.total_amount || 0) })];
           renderExpenseItems();
         }
 
-        if (imageBase64) {
-          existing.receipt_image = imageBase64;
-          const wrap = document.getElementById('formReceiptPreviewWrap');
-          if (wrap) {
-            wrap.innerHTML = `<img src="${imageBase64}" class="o_expense_receipt_preview" alt="Comprobante factura" onclick="openImageLightbox(this.src, 'Comprobante de Factura')" title="Clic para ver tamaño grande" />`;
-          }
-        }
+        if (imageBase64) updateReceiptAttachmentPreview(imageBase64);
         showToast('Datos de la factura cargados en el formulario.');
       });
     };
@@ -687,33 +714,36 @@
     const expBillBtn = document.getElementById('btnExpenseBillLink');
     if (expBillBtn && existing.move_id) {
       expBillBtn.addEventListener('click', () => {
-        openApp('accounting', {
-          submenu: 'in_invoice',
-          viewType: 'form',
-          recordId: existing.move_id,
-          returnTo: { app: 'expenses', submenu: state.submenu, viewType: 'form', recordId: existing.id }
-        });
+        openApp('accounting', { submenu: 'in_invoice', viewType: 'form', recordId: existing.move_id, returnTo: { app: 'expenses', submenu: state.submenu, viewType: 'form', recordId: existing.id } });
       });
     }
 
     const formScanBtn = document.getElementById('btnFormScanAi');
     if (formScanBtn) formScanBtn.addEventListener('click', openCameraForForm);
-
     const formCamTrig = document.getElementById('btnFormCameraTrigger');
     if (formCamTrig) formCamTrig.addEventListener('click', openCameraForForm);
+
+    const directFileAttach = document.getElementById('fExpDirectFileAttach');
+    if (directFileAttach) {
+      directFileAttach.addEventListener('change', async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        try {
+          const compressed = await compressImageFile(file, 1280, 1280, 0.82);
+          updateReceiptAttachmentPreview(compressed);
+          showToast('Foto adjuntada al gasto.');
+        } catch (err) {
+          showToast(err.message, true);
+        }
+      });
+    }
 
     const cancelBtn = document.getElementById('btnCancelExpense');
     if (cancelBtn) {
       cancelBtn.addEventListener('click', () => {
         if (state.navStack && state.navStack.length > 0) {
           const prev = state.navStack.pop();
-          openApp(prev.app, {
-            submenu: prev.submenu,
-            viewType: prev.viewType,
-            recordId: prev.recordId,
-            partnerFilter: prev.partnerFilter,
-            skipReturnPush: true
-          });
+          openApp(prev.app, { submenu: prev.submenu, viewType: prev.viewType, recordId: prev.recordId, partnerFilter: prev.partnerFilter, skipReturnPush: true });
           return;
         }
         state.activeRecordId = null;
@@ -743,15 +773,9 @@
       saveBtn.addEventListener('click', () => {
         withActionLock(saveBtn, async () => {
           const name = document.getElementById('fExpName').value.trim();
-          if (!name) {
-            showToast('La descripción del gasto es obligatoria.', true);
-            return;
-          }
+          if (!name) { showToast('La descripción del gasto es obligatoria.', true); return; }
           const totalAmount = Number(document.getElementById('fExpTotal').value || 0);
-          if (!totalAmount || totalAmount <= 0) {
-            showToast('El monto total del gasto debe ser mayor a 0.', true);
-            return;
-          }
+          if (!totalAmount || totalAmount <= 0) { showToast('El monto total del gasto debe ser mayor a 0.', true); return; }
 
           const partnerVal = document.getElementById('fExpPartner').value;
           const partnerNameInput = document.getElementById('fExpPartnerName').value.trim();
@@ -763,7 +787,6 @@
           const prodVal = prodEl && prodEl.value ? prodEl.value : (existing.product_id || null);
           const suppVatInput = document.getElementById('fExpPartnerVat') ? document.getElementById('fExpPartnerVat').value.trim() : '';
 
-          // Sincronizar directamente desde el DOM cada fila de insumo para no perder ningún ítem
           const domRows = document.querySelectorAll('#expenseItemsTbody tr[data-item-idx]');
           if (domRows && domRows.length > 0) {
             domRows.forEach((tr) => {
@@ -782,7 +805,6 @@
             });
           }
 
-          // Collect items from table (each insumo preserved individually)
           const cleanItems = expenseItems
             .filter((it) => (it.description && String(it.description).trim()) || Number(it.price_unit) > 0 || Number(it.total) > 0 || Number(it.subtotal) > 0)
             .map((it, idx) => {
@@ -791,23 +813,9 @@
               const rawPrice = Number(it.price_unit || 0);
               const rawTot = Number(it.total || 0);
               const tot = rawTot > 0 ? rawTot : round2c(qty * rawPrice * (1 + rate / 100));
-              const sub = it.subtotal !== undefined && it.subtotal !== null && Number(it.subtotal) > 0
-                ? Number(it.subtotal)
-                : (rate > 0 ? round2c(tot / (1 + rate / 100)) : tot);
-              const tax = it.tax_amount !== undefined && it.tax_amount !== null && Number(it.tax_amount) > 0
-                ? Number(it.tax_amount)
-                : round2c(tot - sub);
-              return {
-                id: it.id || idx + 1,
-                product_id: it.product_id || null,
-                description: String(it.description || name).trim(),
-                quantity: qty,
-                price_unit: rawPrice > 0 ? rawPrice : (qty > 0 ? round2c(sub / qty) : 0),
-                tax_rate: rate,
-                tax_amount: tax,
-                subtotal: sub,
-                total: tot
-              };
+              const sub = it.subtotal !== undefined && it.subtotal !== null && Number(it.subtotal) > 0 ? Number(it.subtotal) : (rate > 0 ? round2c(tot / (1 + rate / 100)) : tot);
+              const tax = it.tax_amount !== undefined && it.tax_amount !== null && Number(it.tax_amount) > 0 ? Number(it.tax_amount) : round2c(tot - sub);
+              return { id: it.id || idx + 1, product_id: it.product_id || null, description: String(it.description || name).trim(), quantity: qty, price_unit: rawPrice > 0 ? rawPrice : (qty > 0 ? round2c(sub / qty) : 0), tax_rate: rate, tax_amount: tax, subtotal: sub, total: tot };
             });
           const useLiteral = Boolean(literalTotals && Math.abs(literalTotals.total - totalAmount) < 0.01);
 
@@ -817,9 +825,7 @@
             employee_name: document.getElementById('fExpEmployee').value.trim() || 'Andrés Salazar',
             department: existing.department || 'Operaciones & Proyectos',
             product_id: prodVal ? Number(prodVal) : null,
-            product_name: prodVal
-              ? ((state.data.products.find((p) => Number(p.id) === Number(prodVal)) || {}).name || name)
-              : (cleanItems[0] ? cleanItems[0].description : name),
+            product_name: prodVal ? ((state.data.products.find((p) => Number(p.id) === Number(prodVal)) || {}).name || name) : (cleanItems[0] ? cleanItems[0].description : name),
             partner_id: matchedPartner ? matchedPartner.id : (existing.partner_id || null),
             partner_name: partnerNameInput || (matchedPartner ? matchedPartner.name : ''),
             supplier_vat: suppVatInput || existing.supplier_vat || '',
@@ -854,4 +860,3 @@
       });
     }
   }
-

@@ -378,6 +378,37 @@ function areExpenseItemsSemanticEqual(itemsA = [], itemsB = []) {
   return true;
 }
 
+function normalizeInsumoKey(str) {
+  if (!str) return '';
+  return String(str)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w && !['de', 'del', 'la', 'el', 'los', 'las', 'para', 'en', 'con', 'por'].includes(w))
+    .map((w) => {
+      if (w.length > 4 && w.endsWith('es') && !['mes', 'tres'].includes(w)) return w.slice(0, -2);
+      if (w.length > 3 && w.endsWith('s')) return w.slice(0, -1);
+      return w;
+    })
+    .join(' ')
+    .trim();
+}
+
+function isInsumoNameMatch(nameA, nameB) {
+  const kA = normalizeInsumoKey(nameA);
+  const kB = normalizeInsumoKey(nameB);
+  if (!kA || !kB) return false;
+  if (kA === kB) return true;
+  const digitsA = kA.replace(/\D/g, '');
+  const digitsB = kB.replace(/\D/g, '');
+  if (digitsA === digitsB && Math.min(kA.length, kB.length) >= 6) {
+    if (levenshteinDist(kA, kB) <= 1) return true;
+  }
+  return false;
+}
+
 function isInsumoProduct(p) {
   if (!p) return false;
   if (p.is_insumo === true || p.type === 'insumo') return true;
@@ -925,8 +956,73 @@ class ERPStore {
 
 
   // ==================== INVENTARIO (stock) ====================
+  deduplicateInsumoProducts() {
+    if (!this.data || !Array.isArray(this.data.products)) return [];
+    const canonicalByKey = new Map();
+    const keptProducts = [];
+    const remapIds = new Map();
+    const removedIds = [];
+
+    for (const p of this.data.products) {
+      if (!isInsumoProduct(p)) {
+        keptProducts.push(p);
+        continue;
+      }
+      const key = normalizeInsumoKey(p.name);
+      if (!key) {
+        keptProducts.push(p);
+        continue;
+      }
+      let existingCanonical = canonicalByKey.get(key);
+      if (!existingCanonical) {
+        for (const [k, cand] of canonicalByKey.entries()) {
+          if (isInsumoNameMatch(k, key)) {
+            existingCanonical = cand;
+            break;
+          }
+        }
+      }
+      if (!existingCanonical) {
+        canonicalByKey.set(key, p);
+        keptProducts.push(p);
+      } else {
+        remapIds.set(Number(p.id), existingCanonical);
+        removedIds.push(Number(p.id));
+        if (Number(p.standard_price || 0) > 0) {
+          existingCanonical.standard_price = Number(p.standard_price);
+        }
+      }
+    }
+
+    if (remapIds.size > 0) {
+      this.data.products = keptProducts;
+      if (Array.isArray(this.data.inventory_moves)) {
+        this.data.inventory_moves.forEach((m) => {
+          const target = remapIds.get(Number(m.product_id));
+          if (target) {
+            m.product_id = target.id;
+            m.product_name = target.name;
+            m.product_code = target.default_code || '';
+          }
+        });
+      }
+      if (Array.isArray(this.data.expenses)) {
+        this.data.expenses.forEach((e) => {
+          if (Array.isArray(e.items)) {
+            e.items.forEach((it) => {
+              const target = remapIds.get(Number(it.product_id));
+              if (target) it.product_id = target.id;
+            });
+          }
+        });
+      }
+    }
+    return removedIds;
+  }
+
   recomputeInventoryStock() {
     if (!this.data) return;
+    this.deduplicateInsumoProducts();
     const moves = this.data.inventory_moves || [];
     const products = this.data.products || [];
 
@@ -935,12 +1031,19 @@ class ERPStore {
       if (m.state !== 'cancel') {
         const pid = Number(m.product_id);
         if (!stockMap.has(pid)) {
-          stockMap.set(pid, { qty: 0, totalVal: 0 });
+          stockMap.set(pid, { qty: 0, totalVal: 0, lastPriceUnit: 0 });
         }
         const entry = stockMap.get(pid);
         const q = Number(m.quantity || 0);
+        const pu = Number(m.price_unit || 0);
+        const lineTotal = m.total_value !== undefined && m.total_value !== null && Number(m.total_value) > 0
+          ? Number(m.total_value)
+          : round2(q * pu);
         entry.qty += q;
-        entry.totalVal += Number(m.total_value || (q * (Number(m.price_unit) || 0)));
+        entry.totalVal += lineTotal;
+        if (!entry.lastPriceUnit && pu > 0) {
+          entry.lastPriceUnit = pu;
+        }
       }
     });
 
@@ -949,13 +1052,14 @@ class ERPStore {
       const stock = stockMap.get(pid);
       if (stock) {
         p.qty_available = Math.max(0, round2(stock.qty));
-        if ((!p.standard_price || p.standard_price <= 0) && stock.qty > 0) {
-          p.standard_price = round2(stock.totalVal / stock.qty);
+        if (stock.lastPriceUnit > 0) {
+          p.standard_price = round2(stock.lastPriceUnit);
         }
+        p.stock_value = round2(stock.totalVal);
       } else {
         p.qty_available = Number(p.qty_available || 0);
+        p.stock_value = round2((p.qty_available || 0) * (p.standard_price || 0));
       }
-      p.stock_value = round2((p.qty_available || 0) * (p.standard_price || 0));
     });
   }
 
@@ -996,23 +1100,22 @@ class ERPStore {
   }
 
   _findOrCreateInsumoProduct(desc, priceUnit, taxRate, explicitProductId = null) {
-    const normDesc = String(desc || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const normCodeTarget = String(desc || '').toLowerCase().trim();
     let product = null;
 
     if (explicitProductId) {
       const candidate = this.data.products.find((p) => Number(p.id) === Number(explicitProductId));
-      if (candidate && (isInsumoProduct(candidate) || (candidate.name || '').trim().toLowerCase() === String(desc || '').trim().toLowerCase())) {
+      if (candidate && (isInsumoProduct(candidate) || isInsumoNameMatch(candidate.name, desc))) {
         product = candidate;
       }
     }
 
-    // 1. Prefer matching existing insumo by normalized name or code
+    // 1. Prefer matching existing insumo by normalized insumo key or SKU code
     if (!product) {
       product = this.data.products.find((p) => {
         if (!isInsumoProduct(p)) return false;
-        const normP = (p.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
         const normCode = (p.default_code || '').toLowerCase().trim();
-        return normP === normDesc || (normCode && normCode === normDesc);
+        return isInsumoNameMatch(p.name, desc) || (normCode && normCode === normCodeTarget);
       });
     }
 
@@ -1020,9 +1123,8 @@ class ERPStore {
     if (!product) {
       product = this.data.products.find((p) => {
         if (p.can_be_sold === true && p.can_be_expensed === false) return false;
-        const normP = (p.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
         const normCode = (p.default_code || '').toLowerCase().trim();
-        return normP === normDesc || (normCode && normCode === normDesc);
+        return isInsumoNameMatch(p.name, desc) || (normCode && normCode === normCodeTarget);
       });
     }
 
@@ -1082,7 +1184,10 @@ class ERPStore {
           description: expense.name,
           quantity: Number(expense.quantity || 1),
           price_unit: Number(expense.price_unit || expense.total_amount || 0),
-          subtotal: Number(expense.total_amount || 0)
+          tax_rate: Number(expense.tax_rate || 0),
+          tax_amount: Number(expense.tax_amount || 0),
+          subtotal: Number(expense.untaxed_amount || expense.total_amount || 0),
+          total: Number(expense.total_amount || 0)
         }];
 
     const touchedProducts = [];
@@ -1093,7 +1198,17 @@ class ERPStore {
       if (!desc) continue;
       const qty = Math.max(0.001, Number(item.quantity || 1));
       const priceUnit = Math.max(0, Number(item.price_unit || 0));
-      const itemTaxRate = item.tax_rate !== undefined ? item.tax_rate : expense.tax_rate;
+      const itemTaxRate = Number(item.tax_rate !== undefined ? item.tax_rate : (expense.tax_rate || 0));
+      const itemSubtotal = item.subtotal !== undefined && item.subtotal !== null && Number(item.subtotal) > 0
+        ? round2(Number(item.subtotal))
+        : round2(qty * priceUnit);
+      const itemTaxAmount = item.tax_amount !== undefined && item.tax_amount !== null && Number(item.tax_amount) >= 0
+        ? round2(Number(item.tax_amount))
+        : round2(itemSubtotal * (itemTaxRate / 100));
+      // Valoración total de la línea de gasto con el IVA ya aplicado
+      const lineTotalWithIva = item.total !== undefined && item.total !== null && Number(item.total) > 0
+        ? round2(Number(item.total))
+        : round2(itemSubtotal + itemTaxAmount);
 
       const product = this._findOrCreateInsumoProduct(desc, priceUnit, itemTaxRate, item.product_id || null);
       item.product_id = product.id;
@@ -1113,7 +1228,10 @@ class ERPStore {
         quantity: qty,
         uom: product.uom || 'Unidad',
         price_unit: priceUnit,
-        total_value: round2(qty * priceUnit),
+        tax_rate: itemTaxRate,
+        tax_amount: itemTaxAmount,
+        subtotal: itemSubtotal,
+        total_value: lineTotalWithIva,
         origin_type: 'expense',
         origin_id: expense.id,
         origin_ref: expense.reference,
@@ -1160,8 +1278,18 @@ class ERPStore {
       if (!desc) continue;
       const qty = Math.max(0.001, Number(line.quantity || 1));
       const priceUnit = Math.max(0, Number(line.price_unit || 0));
+      const lineTaxRate = Number(line.tax_rate ?? 19);
+      const lineSub = line.subtotal !== undefined && line.subtotal !== null && Number(line.subtotal) > 0
+        ? round2(Number(line.subtotal))
+        : round2(qty * priceUnit);
+      const lineTax = line.tax_amount !== undefined && line.tax_amount !== null && Number(line.tax_amount) >= 0
+        ? round2(Number(line.tax_amount))
+        : round2(lineSub * (lineTaxRate / 100));
+      const lineTotalWithIva = line.total !== undefined && line.total !== null && Number(line.total) > 0
+        ? round2(Number(line.total))
+        : round2(lineSub + lineTax);
 
-      const product = this._findOrCreateInsumoProduct(desc, priceUnit, line.tax_rate ?? 19, line.product_id || null);
+      const product = this._findOrCreateInsumoProduct(desc, priceUnit, lineTaxRate, line.product_id || null);
       line.product_id = product.id;
 
       if (!touchedProducts.some((tp) => Number(tp.id) === Number(product.id))) {
@@ -1178,7 +1306,10 @@ class ERPStore {
         quantity: qty,
         uom: product.uom || 'Unidad',
         price_unit: priceUnit,
-        total_value: round2(qty * priceUnit),
+        tax_rate: lineTaxRate,
+        tax_amount: lineTax,
+        subtotal: lineSub,
+        total_value: lineTotalWithIva,
         origin_type: 'bill',
         origin_id: move.id,
         origin_ref: move.name,
@@ -1654,10 +1785,19 @@ class ERPStore {
         analytic_account: String(payload.analytic_account ?? existing.analytic_account).trim(),
         receipt_ref: String(payload.receipt_ref ?? existing.receipt_ref).trim(),
         notes: String(payload.notes ?? existing.notes).trim(),
+        receipt_image: payload.receipt_image !== undefined ? String(payload.receipt_image || '') : (existing.receipt_image || ''),
         items
       };
+      if (updated.receipt_image) {
+        const attName = `Factura_${String(updated.receipt_ref || updated.reference || updated.id).replace(/[\/\\]/g, '_')}.jpg`;
+        updated.attachments = [{ id: 1, name: attName, type: 'image/jpeg', data: updated.receipt_image, date: this.formatNowShort() }];
+      } else {
+        updated.attachments = existing.attachments || [];
+      }
+      const isReceiptImageChanged = Boolean(payload.receipt_image !== undefined && String(payload.receipt_image || '') !== String(existing.receipt_image || ''));
       const isItemsChanged = !areExpenseItemsSemanticEqual(items, existing.items);
       const isExpenseChanged =
+        isReceiptImageChanged ||
         (partner && Number(partner.id) !== Number(existing.partner_id)) ||
         (name && name !== existing.name) ||
         (payload.date && payload.date !== existing.date) ||
@@ -1676,6 +1816,17 @@ class ERPStore {
         date: this.formatNowShort(),
         text: `Gasto actualizado ($ ${totalAmount.toLocaleString('es-CO')}).`
       });
+      if (updated.receipt_image && (isReceiptImageChanged || !updated.chatter.some((m) => Boolean(m.attachment)))) {
+        const attName = `Factura_${String(updated.receipt_ref || updated.reference || updated.id).replace(/[\/\\]/g, '_')}.jpg`;
+        updated.chatter.push({
+          id: this.nextChatterId(),
+          author: this.getActiveAuthor(),
+          date: this.formatNowShort(),
+          text: `Foto de la factura adjuntada como archivo de soporte (${attName}).`,
+          attachment: updated.receipt_image,
+          attachment_name: attName
+        });
+      }
       const oldExpense = { ...existing };
       this.data.expenses[idx] = updated;
       const touchedProducts = this.syncExpenseToInventory(updated) || [];
@@ -1754,6 +1905,16 @@ class ERPStore {
       analytic_account: String(payload.analytic_account || 'General').trim(),
       receipt_ref: String(payload.receipt_ref || '').trim(),
       notes: String(payload.notes || '').trim(),
+      receipt_image: payload.receipt_image ? String(payload.receipt_image) : '',
+      attachments: payload.receipt_image
+        ? [{
+            id: 1,
+            name: `Factura_${String(payload.receipt_ref || reference).replace(/[\/\\]/g, '_')}.jpg`,
+            type: 'image/jpeg',
+            data: String(payload.receipt_image),
+            date: this.formatNowShort()
+          }]
+        : [],
       state: 'draft',
       refuse_reason: '',
       move_id: null,
@@ -1762,7 +1923,17 @@ class ERPStore {
       payment_id: null,
       items,
       chatter: [
-        { id: this.nextChatterId(), author: this.getActiveAuthor(), date: this.formatNowShort(), text: `Gasto ${reference} creado en estado Borrador.` }
+        { id: this.nextChatterId(), author: this.getActiveAuthor(), date: this.formatNowShort(), text: `Gasto ${reference} creado en estado Borrador.` },
+        ...(payload.receipt_image
+          ? [{
+              id: this.nextChatterId(),
+              author: this.getActiveAuthor(),
+              date: this.formatNowShort(),
+              text: `Foto de la factura escaneada guardada como archivo adjunto (Factura_${String(payload.receipt_ref || reference).replace(/[\/\\]/g, '_')}.jpg).`,
+              attachment: String(payload.receipt_image),
+              attachment_name: `Factura_${String(payload.receipt_ref || reference).replace(/[\/\\]/g, '_')}.jpg`
+            }]
+          : [])
       ]
     };
 

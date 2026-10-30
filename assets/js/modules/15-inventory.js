@@ -67,8 +67,18 @@
 
     // Calculate inventory metrics (only Insumos)
     const allProducts = allInsumos;
+    const getProductValuation = (p) => {
+      if (p.stock_value !== undefined && p.stock_value !== null && Number(p.stock_value) > 0) {
+        return Number(p.stock_value);
+      }
+      const pMoves = moves.filter((m) => Number(m.product_id) === Number(p.id));
+      if (pMoves.length > 0) {
+        return pMoves.reduce((sum, m) => sum + (Number(m.total_value) || 0), 0);
+      }
+      return (Number(p.qty_available) || 0) * (Number(p.standard_price) || 0);
+    };
     const totalUnits = allProducts.reduce((sum, p) => sum + (Number(p.qty_available) || 0), 0);
-    const totalValuation = allProducts.reduce((sum, p) => sum + ((Number(p.qty_available) || 0) * (Number(p.standard_price) || 0)), 0);
+    const totalValuation = allProducts.reduce((sum, p) => sum + getProductValuation(p), 0);
     const inStockCount = allProducts.filter((p) => (Number(p.qty_available) || 0) > 0).length;
     const lastMove = moves.length > 0 ? moves[0] : null;
 
@@ -103,7 +113,7 @@
         <div class="o_stat_card">
           <span class="o_stat_label">Valoración Total Inventario</span>
           <span class="o_stat_value" style="color: #059669;">${formatMoney(totalValuation)}</span>
-          <span class="o_stat_sub">Valoración a costo de compra</span>
+          <span class="o_stat_sub">Total líneas de gasto (IVA incluido)</span>
         </div>
         <div class="o_stat_card">
           <span class="o_stat_label">Catálogo de Insumos</span>
@@ -137,7 +147,7 @@
             : products.map((p) => {
                 const q = Number(p.qty_available || 0);
                 const cost = Number(p.standard_price || 0);
-                const val = q * cost;
+                const val = getProductValuation(p);
                 return `
                   <article class="o_kanban_record" data-inv-prod-id="${p.id}" style="cursor: pointer;">
                     <div class="o_kanban_details">
@@ -150,11 +160,11 @@
                       </div>
                       <div style="margin: 0.75rem 0; padding: 0.5rem; background: var(--o-bg-subtle, rgba(0,0,0,0.02)); border-radius: 6px; display: flex; justify-content: space-between;">
                         <div>
-                          <div style="font-size: 0.75rem; color: var(--o-muted);">Costo Unit.</div>
+                          <div style="font-size: 0.75rem; color: var(--o-muted);">Valor Unitario</div>
                           <strong style="font-size: 0.95rem;">${formatMoney(cost)}</strong>
                         </div>
                         <div style="text-align: right;">
-                          <div style="font-size: 0.75rem; color: var(--o-muted);">Valoración Stock</div>
+                          <div style="font-size: 0.75rem; color: var(--o-muted);">Valoración Total</div>
                           <strong style="font-size: 0.95rem; color: #059669;">${formatMoney(val)}</strong>
                         </div>
                       </div>
@@ -172,7 +182,7 @@
     } else {
       container.innerHTML = bannerHtml + `
         <div tabindex="0" role="region" aria-labelledby="inventory-table-caption" class="table-wrapper">
-          <table class="o_list_table" style="--label-2: 'SKU'; --label-3: 'Categoría'; --label-4: 'Stock'; --label-5: 'Unidad'; --label-6: 'Costo'; --label-7: 'Valoración';">
+          <table class="o_list_table" style="--label-2: 'SKU'; --label-3: 'Categoría'; --label-4: 'Stock'; --label-5: 'Unidad'; --label-6: 'Valor Unitario'; --label-7: 'Valoración Total';">
             <caption id="inventory-table-caption" style="display: none;">Existencias de inventario</caption>
             <thead>
               <tr>
@@ -181,7 +191,7 @@
                 <th>Categoría</th>
                 <th class="text-center" style="width: 140px;">Stock en Almacén</th>
                 <th>Unidad</th>
-                <th class="text-end" style="width: 140px;">Costo Promedio</th>
+                <th class="text-end" style="width: 140px;">Valor Unitario</th>
                 <th class="text-end" style="width: 150px;">Valoración Total</th>
                 <th class="text-center" style="width: 120px;">Acciones</th>
               </tr>
@@ -196,7 +206,7 @@
                 : products.map((p) => {
                     const q = Number(p.qty_available || 0);
                     const cost = Number(p.standard_price || 0);
-                    const val = q * cost;
+                    const val = getProductValuation(p);
                     return `
                       <tr data-inv-prod-id="${p.id}" style="cursor: pointer;" title="Haga clic para ver el detalle y trazabilidad de este producto">
                         <td><strong>${esc(p.default_code || '—')}</strong></td>
@@ -325,8 +335,8 @@
               <th>Producto / Material</th>
               <th>Referencia SKU</th>
               <th class="text-center" style="width: 130px;">Cant. Ingresada</th>
-              <th class="text-end" style="width: 130px;">Costo Unit.</th>
-              <th class="text-end" style="width: 140px;">Total Entrada</th>
+              <th class="text-end" style="width: 130px;">Valor Unitario</th>
+              <th class="text-end" style="width: 140px;">Valoración Total</th>
               <th>Proveedor</th>
               <th>Responsable</th>
               <th class="text-center" style="width: 100px;">Estado</th>
@@ -391,7 +401,9 @@
     const moves = (state.data.inventory_moves || []).filter((m) => Number(m.product_id) === pid);
     const q = Number(product.qty_available || 0);
     const cost = Number(product.standard_price || 0);
-    const val = q * cost;
+    const val = (product.stock_value !== undefined && product.stock_value !== null && Number(product.stock_value) > 0)
+      ? Number(product.stock_value)
+      : (moves.length > 0 ? moves.reduce((sum, m) => sum + (Number(m.total_value) || 0), 0) : q * cost);
 
     container.innerHTML = `
       <div class="o_form_view">
@@ -428,14 +440,14 @@
                 <span class="o_stat_sub">Existencias calculadas automáticamente</span>
               </div>
               <div class="o_stat_card">
-                <span class="o_stat_label">Costo Promedio de Compra</span>
+                <span class="o_stat_label">Valor Unitario</span>
                 <span class="o_stat_value">${formatMoney(cost)}</span>
-                <span class="o_stat_sub">Valor unitario ponderado</span>
+                <span class="o_stat_sub">Valor unitario de compra</span>
               </div>
               <div class="o_stat_card">
-                <span class="o_stat_label">Valoración Total en Stock</span>
+                <span class="o_stat_label">Valoración Total</span>
                 <span class="o_stat_value" style="color: #059669;">${formatMoney(val)}</span>
-                <span class="o_stat_sub">Costo total inmovilizado</span>
+                <span class="o_stat_sub">Total líneas de gasto (IVA incluido)</span>
               </div>
             </div>
 
@@ -456,8 +468,8 @@
                       <th>Fecha</th>
                       <th>Comprobante</th>
                       <th class="text-center">Cantidad Entrada</th>
-                      <th class="text-end">Costo Unitario</th>
-                      <th class="text-end">Total</th>
+                      <th class="text-end">Valor Unitario</th>
+                      <th class="text-end">Valoración Total (c/ IVA)</th>
                       <th>Proveedor</th>
                       <th>Responsable</th>
                     </tr>

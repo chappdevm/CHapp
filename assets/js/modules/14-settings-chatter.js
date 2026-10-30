@@ -432,12 +432,33 @@
       `;
     }
     const msgs = (record.chatter || []).slice().reverse();
+    const hasReceiptAttachment = Boolean(record.receipt_image);
+    const anyMsgHasAttachment = msgs.some((m) => Boolean(m.attachment));
+    const defaultAttName = `Factura_${String(record.receipt_ref || record.reference || record.name || 'Soporte').replace(/[\/\\]/g, '_')}.jpg`;
     return `
       <aside class="o_chatter" aria-label="Historial y notas del documento">
         <div class="o_chatter_header">
           <span>Historial y Auditoría ${record.reference || record.name ? `— <strong>${esc(record.reference || record.name)}</strong>` : ''}</span>
-          <span class="o_badge o_badge_muted">${msgs.length} evento(s)</span>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            ${hasReceiptAttachment ? `<span class="o_badge o_badge_info" title="Archivo adjunto registrado">📎 1 Adjunto</span>` : ''}
+            <span class="o_badge o_badge_muted">${msgs.length} evento(s)</span>
+          </div>
         </div>
+        ${hasReceiptAttachment ? `
+          <div class="o_chatter_attachments_box" style="margin-bottom: 0.75rem; padding: 0.65rem 0.85rem; background: var(--o-bg-subtle, rgba(37,99,235,0.06)); border: 1px solid var(--o-border); border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 0.65rem;">
+              <img src="${record.receipt_image}" alt="Adjunto factura" style="width: 44px; height: 44px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 1px solid var(--o-border);" onclick="openImageLightbox(this.src, '${esc(defaultAttName)}')" />
+              <div>
+                <div style="font-size: 0.84rem; font-weight: 700;">${esc(defaultAttName)}</div>
+                <div style="font-size: 0.75rem; color: var(--o-muted);">Archivo adjunto de factura registrada</div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 6px;">
+              <button type="button" class="btn btn-sm btn-secondary" onclick="openImageLightbox('${record.receipt_image}', '${esc(defaultAttName)}')">Ver</button>
+              <a href="${record.receipt_image}" download="${esc(defaultAttName)}" class="btn btn-sm btn-secondary" style="text-decoration: none;">Descargar</a>
+            </div>
+          </div>
+        ` : ''}
         <div class="o_chatter_composer">
           <textarea id="chatterInputText" class="o_textarea" rows="2" placeholder="Escribir una nota interna o seguimiento..."></textarea>
           <button type="button" class="btn btn-sm btn-secondary" id="btnSendChatterNote" style="align-self: flex-end;">Publicar Nota</button>
@@ -445,15 +466,28 @@
         <div class="o_chatter_messages">
           ${msgs
             .map(
-              (m) => `
+              (m, mIdx) => {
+                const msgAttachment = m.attachment || (!anyMsgHasAttachment && hasReceiptAttachment && mIdx === msgs.length - 1 ? record.receipt_image : '');
+                const msgAttName = m.attachment_name || defaultAttName;
+                return `
               <div class="o_chatter_msg">
                 <div class="o_chatter_msg_meta">
                   <strong>${esc(m.author)}</strong>
                   <span>${esc(m.date)}</span>
                 </div>
                 <div>${esc(m.text)}</div>
+                ${msgAttachment ? `
+                  <div class="o_chatter_msg_attachment" style="margin-top: 0.5rem; padding: 0.5rem; background: rgba(15,23,42,0.25); border: 1px solid var(--o-border); border-radius: 6px; display: inline-flex; flex-direction: column; gap: 6px; max-width: 240px;">
+                    <img src="${msgAttachment}" alt="${esc(msgAttName)}" style="max-width: 220px; max-height: 150px; object-fit: contain; border-radius: 4px; cursor: pointer;" onclick="openImageLightbox(this.src, '${esc(msgAttName)}')" title="Clic para ampliar foto registrada en el chatter" />
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.75rem;">
+                      <span style="color: var(--o-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">📎 ${esc(msgAttName)}</span>
+                      <a href="${msgAttachment}" download="${esc(msgAttName)}" style="color: #38bdf8; font-weight: 600; text-decoration: none;">Descargar</a>
+                    </div>
+                  </div>
+                ` : ''}
               </div>
-            `
+            `;
+              }
             )
             .join('')}
         </div>

@@ -411,7 +411,7 @@ function serializeExpense(e) {
   let notesVal = cleanNotes || null;
 
   const hasItems = Array.isArray(e.items) && e.items.length > 0;
-  const hasExtra = Boolean(e.supplier_vat || e.journal_code || e.bill_id || e.bill_name);
+  const hasExtra = Boolean(e.supplier_vat || e.journal_code || e.bill_id || e.bill_name || e.receipt_image || (Array.isArray(e.chatter) && e.chatter.length > 0));
   if (hasItems || hasExtra) {
     const metaObj = {};
     if (hasItems) {
@@ -431,6 +431,9 @@ function serializeExpense(e) {
     if (e.journal_code) metaObj.journal_code = String(e.journal_code).trim();
     if (e.bill_id) metaObj.bill_id = Number(e.bill_id);
     if (e.bill_name) metaObj.bill_name = String(e.bill_name).trim();
+    if (e.receipt_image) metaObj.receipt_image = String(e.receipt_image);
+    if (Array.isArray(e.attachments) && e.attachments.length > 0) metaObj.attachments = e.attachments;
+    if (Array.isArray(e.chatter) && e.chatter.length > 0) metaObj.chatter = e.chatter;
 
     const metaBlock = `${EXP_META_START}${JSON.stringify(metaObj)}${EXP_META_END}`;
     notesVal = cleanNotes ? `${cleanNotes}\n${metaBlock}` : metaBlock;
@@ -494,6 +497,9 @@ function deserializeExpense(r) {
     if (meta.journal_code) out.journal_code = meta.journal_code;
     if (meta.bill_id) out.bill_id = Number(meta.bill_id);
     if (meta.bill_name) out.bill_name = meta.bill_name;
+    if (meta.receipt_image) out.receipt_image = meta.receipt_image;
+    if (Array.isArray(meta.attachments)) out.attachments = meta.attachments;
+    if (Array.isArray(meta.chatter) && meta.chatter.length > 0) out.chatter = meta.chatter;
   }
   return out;
 }
