@@ -16,7 +16,12 @@
       const json = await res.json();
       state.data = json.data;
       updateSystray();
-      openHomeMenu();
+      const authenticated = typeof isUserAuthenticated === 'function' ? isUserAuthenticated() : true;
+      if (authenticated) {
+        openHomeMenu();
+      } else {
+        openLogin();
+      }
     } catch (err) {
       showToast('Error cargando estado del ERP: ' + err.message, true);
     }
@@ -41,6 +46,12 @@
     });
 
     document.getElementById('btnUserSettings').addEventListener('click', () => openApp('settings'));
+    const navLogout = document.getElementById('btnNavLogout');
+    if (navLogout) {
+      navLogout.addEventListener('click', () => {
+        if (typeof handleLogout === 'function') handleLogout();
+      });
+    }
     document.getElementById('btnPendingActivities')?.addEventListener('click', () => openApp('expenses', { submenu: 'to_approve' }));
     document.getElementById('btnCommandPalette').addEventListener('click', openCommandPalette);
 

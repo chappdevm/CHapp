@@ -13,7 +13,7 @@
   <meta property="og:image" content="/assets/icons/logo.png" />
   <meta name="twitter:card" content="summary" />
   <meta name="twitter:image" content="/assets/icons/logo.png" />
-  <link rel="stylesheet" href="/assets/css/odoo20.css?v=2.22" />
+  <link rel="stylesheet" href="/assets/css/odoo20.css?v=2.23" />
 </head>
 <body>
   <div id="webclient" class="o_web_client o_home_menu_background">
@@ -82,8 +82,20 @@
           <span class="o_user_avatar" id="systrayUserAvatar">AD</span>
           <span id="systrayUserName">Administrador</span>
         </button>
+
+        <button type="button" id="btnNavLogout" class="o_systray_item" title="Cerrar Sesión" aria-label="Cerrar Sesión">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+          <span class="o_logout_label">Salir</span>
+        </button>
       </div>
     </header>
+
+    <!-- 0. LOGIN VIEW (Acceso Creativo 3D Glassmorphism) -->
+    <section id="loginView" class="o_login_view" style="display: none;" aria-label="Pantalla de inicio de sesión"></section>
 
     <!-- 1. HOME MENU (Panel Principal) -->
     <main id="homeMenuView" class="o_home_menu" role="main" aria-label="Panel principal de módulos">
@@ -295,21 +307,22 @@
   <div id="toastContainer" class="o_toast_container" aria-live="polite"></div>
 
   <script src="/assets/js/html2pdf.bundle.min.js"></script>
-  <script src="/assets/js/modules/01-state-utils.js?v=2.22"></script>
-  <script src="/assets/js/modules/02-theme-camera.js?v=2.22"></script>
-  <script src="/assets/js/modules/03-router-control-panel.js?v=2.22"></script>
-  <script src="/assets/js/modules/04-contacts.js?v=2.22"></script>
-  <script src="/assets/js/modules/05-expenses.js?v=2.22"></script>
-  <script src="/assets/js/modules/06-sales-views.js?v=2.22"></script>
-  <script src="/assets/js/modules/07-pdf-invoice.js?v=2.22"></script>
-  <script src="/assets/js/modules/08-pdf-sale.js?v=2.22"></script>
-  <script src="/assets/js/modules/09-whatsapp.js?v=2.22"></script>
-  <script src="/assets/js/modules/10-sales-form.js?v=2.22"></script>
-  <script src="/assets/js/modules/11-products.js?v=2.22"></script>
-  <script src="/assets/js/modules/12-accounting-dashboard.js?v=2.22"></script>
-  <script src="/assets/js/modules/13-accounting-form.js?v=2.22"></script>
-  <script src="/assets/js/modules/14-settings-chatter.js?v=2.22"></script>
-  <script src="/assets/js/modules/15-inventory.js?v=2.22"></script>
-  <script src="/assets/js/app.js?v=2.22"></script>
+  <script src="/assets/js/modules/01-state-utils.js?v=2.23"></script>
+  <script src="/assets/js/modules/02-theme-camera.js?v=2.23"></script>
+  <script src="/assets/js/modules/03-router-control-panel.js?v=2.23"></script>
+  <script src="/assets/js/modules/04-contacts.js?v=2.23"></script>
+  <script src="/assets/js/modules/05-expenses.js?v=2.23"></script>
+  <script src="/assets/js/modules/06-sales-views.js?v=2.23"></script>
+  <script src="/assets/js/modules/07-pdf-invoice.js?v=2.23"></script>
+  <script src="/assets/js/modules/08-pdf-sale.js?v=2.23"></script>
+  <script src="/assets/js/modules/09-whatsapp.js?v=2.23"></script>
+  <script src="/assets/js/modules/10-sales-form.js?v=2.23"></script>
+  <script src="/assets/js/modules/11-products.js?v=2.23"></script>
+  <script src="/assets/js/modules/12-accounting-dashboard.js?v=2.23"></script>
+  <script src="/assets/js/modules/13-accounting-form.js?v=2.23"></script>
+  <script src="/assets/js/modules/14-settings-chatter.js?v=2.23"></script>
+  <script src="/assets/js/modules/15-inventory.js?v=2.23"></script>
+  <script src="/assets/js/modules/16-auth.js?v=2.23"></script>
+  <script src="/assets/js/app.js?v=2.23"></script>
 </body>
 </html>

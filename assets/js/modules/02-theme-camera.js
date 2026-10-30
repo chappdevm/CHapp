@@ -59,7 +59,11 @@
     const workspace = document.getElementById('moduleWorkspace');
     const brand = document.getElementById('navbarBrand');
     const submenus = document.getElementById('navbarSubmenus');
+    const loginView = document.getElementById('loginView');
+    const mainNavbar = document.getElementById('mainNavbar');
 
+    if (loginView) loginView.style.display = 'none';
+    if (mainNavbar) mainNavbar.style.display = 'flex';
     webclient.classList.add('o_home_menu_background');
     homeView.style.display = 'flex';
     workspace.style.display = 'none';
@@ -152,7 +156,11 @@
     const brand = document.getElementById('navbarBrand');
     const brandIcon = document.getElementById('navbarBrandIcon');
     const brandText = document.getElementById('navbarBrandText');
+    const loginView = document.getElementById('loginView');
+    const mainNavbar = document.getElementById('mainNavbar');
 
+    if (loginView) loginView.style.display = 'none';
+    if (mainNavbar) mainNavbar.style.display = 'flex';
     webclient.classList.remove('o_home_menu_background');
     homeView.style.display = 'none';
     workspace.style.display = 'flex';

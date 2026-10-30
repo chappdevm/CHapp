@@ -243,6 +243,11 @@
     display: none;
   }
 
+  #btnNavLogout .o_logout_label {
+    display: none;
+  }
+
+
   .o_menu_sections {
     order: 4;
     width: 100%;

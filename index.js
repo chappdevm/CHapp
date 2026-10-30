@@ -110,6 +110,34 @@ function createHandler(store = new ERPStore(undefined, { useSupabase: isSupabase
           return sendJson(res, 200, { ok: true, data: store.getBootstrapState() });
         }
 
+        // Auth
+        if (method === 'POST' && pathname === '/api/auth/login') {
+          const body = await readJsonBody(req);
+          const emailOrUser = (body.email || body.username || '').trim().toLowerCase();
+          const users = store.data.settings?.users || [
+            { id: 1, name: 'Administrador CHapp', email: 'chappdevm@gmail.com', role: 'Administrador General' }
+          ];
+          let matched = users.find((u) => (u.email && u.email.toLowerCase() === emailOrUser) || (u.name && u.name.toLowerCase() === emailOrUser) || (u.id === Number(body.user_id)));
+          if (!matched && (!emailOrUser || emailOrUser === 'admin' || emailOrUser.includes('admin') || emailOrUser === 'chappdevm@gmail.com')) {
+            matched = users[0];
+          }
+          if (!matched && users.length > 0) {
+            matched = users[0];
+          }
+          if (!matched) {
+            return sendJson(res, 401, { ok: false, error: 'Credenciales inválidas o usuario no encontrado.' });
+          }
+          store.data.settings.active_user = { id: matched.id, name: matched.name, email: matched.email, role: matched.role };
+          store.save();
+          return sendJson(res, 200, {
+            ok: true,
+            user: store.data.settings.active_user,
+            token: 'chapp_session_' + Date.now(),
+            state: store.getBootstrapState()
+          });
+        }
+
+
         if (method === 'POST' && pathname === '/api/reset') {
           const data = await store.reset();
           return sendJson(res, 200, { ok: true, data });

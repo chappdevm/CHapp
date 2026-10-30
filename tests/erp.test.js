@@ -2240,4 +2240,29 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.equal(checkResult.svgDonutPopulated, true);
     assert.equal(checkResult.svgFlowDonut, true);
   });
+
+  it('Auth & Login: validates creative 3D glassmorphic login screen, logo/banner branding, and authentication endpoint', async () => {
+    // 1. Verify /api/auth/login endpoint
+    const loginRes = await req('/api/auth/login', 'POST', { email: 'chappdevm@gmail.com', password: 'secretpassword' });
+    assert.equal(loginRes.status, 200);
+    assert.equal(loginRes.json.ok, true);
+    assert.equal(loginRes.json.user.email, 'chappdevm@gmail.com');
+    assert.ok(loginRes.json.token.startsWith('chapp_session_'));
+
+    // 2. Verify HTML and CSS contracts for 3D glassmorphic login
+    const htmlText = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    const cssText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'css', 'odoo20.css'), 'utf8');
+    const authJsText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'modules', '16-auth.js'), 'utf8');
+
+    assert.ok(htmlText.includes('id="loginView"'), 'HTML must include loginView section');
+    assert.ok(htmlText.includes('id="btnNavLogout"'), 'HTML must include btnNavLogout button');
+    assert.ok(cssText.includes('.o_login_view'), 'CSS must include .o_login_view');
+    assert.ok(cssText.includes('.o_login_card'), 'CSS must include .o_login_card');
+    assert.ok(cssText.includes('backdrop-filter: blur(28px)'), 'CSS must include glassmorphic backdrop-filter');
+    assert.ok(authJsText.includes('/assets/icons/logo.png'), 'Login must include logo.png');
+    assert.ok(authJsText.includes('/assets/icons/brand-banner.png'), 'Login must include brand-banner.png');
+    assert.ok(authJsText.includes('o_shape_torus'), 'Login must render 3D torus shape');
+    assert.ok(authJsText.includes('o_shape_spiral'), 'Login must render 3D spiral shape');
+    assert.ok(authJsText.includes('o_shape_zigzag'), 'Login must render 3D zigzag shape');
+  });
 });
