@@ -226,13 +226,14 @@ function createHandler(store = new ERPStore(undefined, { useSupabase: isSupabase
           return sendJson(res, 200, { ok: true, removed, state: store.getBootstrapState() });
         }
 
-        // Inventory
+        // Inventory (Insumos)
         if (method === 'GET' && pathname === '/api/inventory') {
           const summary = store.getInventorySummary ? store.getInventorySummary() : {};
+          const insumos = store.getInventoryInsumos ? store.getInventoryInsumos() : (store.data.products || []);
           return sendJson(res, 200, {
             ok: true,
             summary,
-            products: store.data.products || [],
+            products: insumos,
             moves: store.data.inventory_moves || []
           });
         }

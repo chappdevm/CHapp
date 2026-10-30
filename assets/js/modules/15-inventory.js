@@ -36,7 +36,8 @@
   }
 
   function renderInventoryStockSubmodule(container) {
-    let products = state.data.products || [];
+    const allInsumos = typeof getInventoryInsumosList === 'function' ? getInventoryInsumosList() : (state.data.products || []);
+    let products = [...allInsumos];
     const moves = state.data.inventory_moves || [];
 
     // Filter by pills
@@ -62,10 +63,10 @@
       );
     }
 
-    updatePager(products.length, (state.data.products || []).length);
+    updatePager(products.length, allInsumos.length);
 
-    // Calculate inventory metrics
-    const allProducts = state.data.products || [];
+    // Calculate inventory metrics (only Insumos)
+    const allProducts = allInsumos;
     const totalUnits = allProducts.reduce((sum, p) => sum + (Number(p.qty_available) || 0), 0);
     const totalValuation = allProducts.reduce((sum, p) => sum + ((Number(p.qty_available) || 0) * (Number(p.standard_price) || 0)), 0);
     const inStockCount = allProducts.filter((p) => (Number(p.qty_available) || 0) > 0).length;
@@ -76,10 +77,10 @@
         <div>
           <div style="font-size: 1.15rem; font-weight: 700; color: var(--o-heading); display: flex; align-items: center; gap: 8px;">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--o-accent, #14B5D9);"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-            Control de Inventario y Almacén — CH Aluminios
+            Control de Inventario de Insumos — CH Aluminios
           </div>
           <p style="margin: 4px 0 0; color: var(--o-muted); font-size: 0.88rem;">
-            Las existencias aumentan automáticamente con cada compra o gasto registrado a proveedores. Trazabilidad completa sin duplicados.
+            Almacén exclusivo de insumos y materiales comprados mediante facturas de gastos. Los productos terminados para la venta se gestionan en Ventas.
           </p>
         </div>
         <div style="display: flex; gap: 0.5rem; align-items: center;">
@@ -105,9 +106,9 @@
           <span class="o_stat_sub">Valoración a costo de compra</span>
         </div>
         <div class="o_stat_card">
-          <span class="o_stat_label">Catálogo de Productos</span>
+          <span class="o_stat_label">Catálogo de Insumos</span>
           <span class="o_stat_value">${allProducts.length}</span>
-          <span class="o_stat_sub">Referencias configuradas</span>
+          <span class="o_stat_sub">Insumos y materiales registrados</span>
         </div>
         <div class="o_stat_card">
           <span class="o_stat_label">Última Entrada</span>
@@ -176,7 +177,7 @@
             <thead>
               <tr>
                 <th>Referencia / SKU</th>
-                <th>Producto / Material</th>
+                <th>Insumo / Material</th>
                 <th>Categoría</th>
                 <th class="text-center" style="width: 140px;">Stock en Almacén</th>
                 <th>Unidad</th>

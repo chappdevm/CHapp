@@ -6,7 +6,8 @@
 
   function renderSaleOrderForm(container) {
     const isNew = state.activeRecordId === 'new';
-    const defaultProd = (state.data.products || [])[0] || { id: 1, name: 'Servicio', list_price: 1000000, tax_rate: 19 };
+    const saleProducts = typeof getSaleProductsList === 'function' ? getSaleProductsList() : (state.data.products || []);
+    const defaultProd = saleProducts[0] || { id: 1, name: 'Servicio', list_price: 1000000, tax_rate: 19 };
     const existing = isNew
       ? {
           name: 'Nueva Cotización',
@@ -250,7 +251,8 @@
                             <th>
                               <select class="o_select line-product" data-idx="${idx}" ${!isEditable ? 'disabled' : ''}>
                                 <option value="" ${!l.product_id ? 'selected disabled' : ''}>— Seleccione producto —</option>
-                                ${(state.data.products || [])
+                                ${saleProducts
+                                  .concat(prod && !saleProducts.some((sp) => Number(sp.id) === Number(prod.id)) ? [prod] : [])
                                   .map(
                                     (p) => `<option value="${p.id}" ${Number(l.product_id) === Number(p.id) ? 'selected' : ''}>${esc(p.name)}</option>`
                                   )

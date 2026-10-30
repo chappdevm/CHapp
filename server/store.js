@@ -378,6 +378,14 @@ function areExpenseItemsSemanticEqual(itemsA = [], itemsB = []) {
   return true;
 }
 
+function isInsumoProduct(p) {
+  if (!p) return false;
+  if (p.is_insumo === true || p.type === 'insumo') return true;
+  if (p.is_insumo === false) return false;
+  if (p.can_be_expensed === true && p.can_be_sold === false) return true;
+  return false;
+}
+
 class ERPStore {
   constructor(dbPath = DEFAULT_DB_PATH, options = {}) {
     this.dbPath = dbPath;
@@ -414,11 +422,18 @@ class ERPStore {
         if (!Array.isArray(this.data.inventory_moves)) {
           this.data.inventory_moves = [];
         }
-        if (this.data.inventory_moves.length === 0 && Array.isArray(this.data.expenses) && this.data.expenses.length > 0) {
-          this.data.expenses.forEach((e) => this.syncExpenseToInventory(e));
-        } else {
-          this.recomputeInventoryStock();
+        if (Array.isArray(this.data.expenses) && this.data.expenses.length > 0) {
+          this.data.inventory_moves = [];
+          const sortedExp = [...this.data.expenses].sort((a, b) => Number(a.id) - Number(b.id));
+          sortedExp.forEach((e) => this.syncExpenseToInventory(e));
+          const sortedBills = [...((this.data.accounting && this.data.accounting.moves) || [])].sort((a, b) => Number(a.id) - Number(b.id));
+          sortedBills.forEach((m) => {
+            if (m.move_type === 'in_invoice' && m.state === 'posted') {
+              this.syncBillToInventory(m);
+            }
+          });
         }
+        this.recomputeInventoryStock();
         this.updateSequencesFromData();
       } else {
         this.data = createInitialData();
@@ -516,8 +531,42 @@ class ERPStore {
           this.data.settings = remote.settings;
         }
 
+        const existingProdIdsBefore = new Set((this.data.products || []).map((p) => Number(p.id)));
+        const newlyCreatedInsumos = [];
+        this.data.inventory_moves = [];
+        const sortedExpenses = [...(this.data.expenses || [])].sort((a, b) => Number(a.id) - Number(b.id));
+        for (const exp of sortedExpenses) {
+          const touched = this.syncExpenseToInventory(exp) || [];
+          for (const tp of touched) {
+            if (!existingProdIdsBefore.has(Number(tp.id)) && !newlyCreatedInsumos.some((x) => Number(x.id) === Number(tp.id))) {
+              newlyCreatedInsumos.push(tp);
+            }
+          }
+        }
+        const sortedMoves = [...((this.data.accounting && this.data.accounting.moves) || [])].sort((a, b) => Number(a.id) - Number(b.id));
+        for (const mv of sortedMoves) {
+          if (mv.move_type === 'in_invoice' && mv.state === 'posted') {
+            const touched = this.syncBillToInventory(mv) || [];
+            for (const tp of touched) {
+              if (!existingProdIdsBefore.has(Number(tp.id)) && !newlyCreatedInsumos.some((x) => Number(x.id) === Number(tp.id))) {
+                newlyCreatedInsumos.push(tp);
+              }
+            }
+          }
+        }
+        this.recomputeInventoryStock();
         this.updateSequencesFromData();
         this.save();
+
+        if (newlyCreatedInsumos.length > 0 && this.supabase) {
+          for (const insumoProd of newlyCreatedInsumos) {
+            try {
+              await this.supabase.saveProduct(insumoProd);
+            } catch (_) {
+              // ignore individual sync error
+            }
+          }
+        }
       }
       this._hasSyncedOnce = true;
       this._lastSyncTime = Date.now();
@@ -910,8 +959,109 @@ class ERPStore {
     });
   }
 
+  getInventoryInsumos() {
+    this.recomputeInventoryStock();
+    const moves = this.data.inventory_moves || [];
+    const moveProdIds = new Set(moves.filter((m) => m.state !== 'cancel').map((m) => Number(m.product_id)));
+    return (this.data.products || []).filter((p) => {
+      if (isInsumoProduct(p)) return true;
+      if (p.can_be_sold === true && p.can_be_expensed === false) return false;
+      return moveProdIds.has(Number(p.id));
+    });
+  }
+
+  getSaleProducts() {
+    return (this.data.products || []).filter((p) => !isInsumoProduct(p) && p.can_be_sold !== false);
+  }
+
+  _inferInsumoCategoryAndUom(desc) {
+    const lowerDesc = String(desc || '').toLowerCase();
+    let category = 'Materiales y Perfilería';
+    let uom = 'Unidad';
+
+    if (lowerDesc.includes('metro') || lowerDesc.includes('perfil') || lowerDesc.includes('tubo') || lowerDesc.includes('varilla') || lowerDesc.includes('aluminio')) {
+      category = 'Materiales y Perfilería';
+      uom = lowerDesc.includes('cuadrado') || lowerDesc.includes('m2') ? 'Metro Cuadrado' : (lowerDesc.includes('lineal') || lowerDesc.includes('ml') || lowerDesc.includes('metro') ? 'Metro Lineal' : 'Unidad');
+    } else if (lowerDesc.includes('vidrio') || lowerDesc.includes('cristal') || lowerDesc.includes('espejo') || lowerDesc.includes('templado')) {
+      category = 'Vidrios y Paneles';
+      uom = 'Metro Cuadrado';
+    } else if (lowerDesc.includes('tornillo') || lowerDesc.includes('remache') || lowerDesc.includes('chapa') || lowerDesc.includes('bisagra') || lowerDesc.includes('felpa') || lowerDesc.includes('empaque') || lowerDesc.includes('escuadra') || lowerDesc.includes('silicona')) {
+      category = 'Herrajes y Accesorios';
+      uom = lowerDesc.includes('caja') ? 'Caja' : (lowerDesc.includes('rollo') ? 'Rollo' : 'Unidad');
+    } else if (lowerDesc.includes('transporte') || lowerDesc.includes('viatico') || lowerDesc.includes('almuerzo') || lowerDesc.includes('hotel') || lowerDesc.includes('asesoria') || lowerDesc.includes('servicio')) {
+      category = 'Gastos Operativos';
+      uom = 'Unidad';
+    }
+    return { category, uom };
+  }
+
+  _findOrCreateInsumoProduct(desc, priceUnit, taxRate, explicitProductId = null) {
+    const normDesc = String(desc || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    let product = null;
+
+    if (explicitProductId) {
+      const candidate = this.data.products.find((p) => Number(p.id) === Number(explicitProductId));
+      if (candidate && (isInsumoProduct(candidate) || (candidate.name || '').trim().toLowerCase() === String(desc || '').trim().toLowerCase())) {
+        product = candidate;
+      }
+    }
+
+    // 1. Prefer matching existing insumo by normalized name or code
+    if (!product) {
+      product = this.data.products.find((p) => {
+        if (!isInsumoProduct(p)) return false;
+        const normP = (p.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+        const normCode = (p.default_code || '').toLowerCase().trim();
+        return normP === normDesc || (normCode && normCode === normDesc);
+      });
+    }
+
+    // 2. Fallback: match any product that is not strictly a sales-only product
+    if (!product) {
+      product = this.data.products.find((p) => {
+        if (p.can_be_sold === true && p.can_be_expensed === false) return false;
+        const normP = (p.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+        const normCode = (p.default_code || '').toLowerCase().trim();
+        return normP === normDesc || (normCode && normCode === normDesc);
+      });
+    }
+
+    if (!product) {
+      const seqNum = this.nextSeq('product');
+      const defaultCode = `INS-${this.padSeq(seqNum, 3)}`;
+      const { category, uom } = this._inferInsumoCategoryAndUom(desc);
+
+      product = {
+        id: seqNum,
+        name: desc,
+        default_code: defaultCode,
+        type: 'insumo',
+        is_insumo: true,
+        list_price: 0,
+        standard_price: priceUnit,
+        tax_rate: Number(taxRate ?? 19),
+        category,
+        can_be_sold: false,
+        can_be_expensed: true,
+        uom,
+        qty_available: 0
+      };
+      this.data.products.push(product);
+    } else {
+      product.type = 'insumo';
+      product.is_insumo = true;
+      product.can_be_sold = false;
+      product.can_be_expensed = true;
+      if (priceUnit > 0) {
+        product.standard_price = priceUnit;
+      }
+    }
+
+    return product;
+  }
+
   syncExpenseToInventory(expense) {
-    if (!expense || !this.data) return;
+    if (!expense || !this.data) return [];
     this.data.inventory_moves = Array.isArray(this.data.inventory_moves) ? this.data.inventory_moves : [];
 
     // DEDUPLICACIÓN ESTRICTA: Eliminar movimientos previos de este mismo gasto antes de aplicar los nuevos
@@ -922,7 +1072,7 @@ class ERPStore {
     // Si el gasto fue rechazado o cancelado, el inventario se revierte
     if (expense.state === 'refused' || expense.state === 'cancel') {
       this.recomputeInventoryStock();
-      return;
+      return [];
     }
 
     const rawItems = Array.isArray(expense.items) && expense.items.length > 0
@@ -935,78 +1085,24 @@ class ERPStore {
           subtotal: Number(expense.total_amount || 0)
         }];
 
-    for (const item of rawItems) {
-      const desc = String(item.description || expense.name || '').trim();
+    const touchedProducts = [];
+
+    for (let i = 0; i < rawItems.length; i++) {
+      const item = rawItems[i];
+      const desc = String(item.description || item.name || expense.name || '').trim();
       if (!desc) continue;
       const qty = Math.max(0.001, Number(item.quantity || 1));
       const priceUnit = Math.max(0, Number(item.price_unit || 0));
+      const itemTaxRate = item.tax_rate !== undefined ? item.tax_rate : expense.tax_rate;
 
-      // DEDUPLICACIÓN DE PRODUCTOS:
-      // Buscar si el producto ya existe por ID o nombre/código
-      let product = null;
-      if (item.product_id) {
-        product = this.data.products.find((p) => Number(p.id) === Number(item.product_id));
-      }
-      if (!product && expense.product_id) {
-        const candidate = this.data.products.find((p) => Number(p.id) === Number(expense.product_id));
-        if (candidate && candidate.name.trim().toLowerCase() === desc.toLowerCase()) {
-          product = candidate;
-        }
-      }
-      if (!product) {
-        const normDesc = desc.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-        product = this.data.products.find((p) => {
-          const normP = (p.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-          const normCode = (p.default_code || '').toLowerCase().trim();
-          return normP === normDesc || normCode === normDesc;
-        });
+      const product = this._findOrCreateInsumoProduct(desc, priceUnit, itemTaxRate, item.product_id || null);
+      item.product_id = product.id;
+
+      if (!touchedProducts.some((tp) => Number(tp.id) === Number(product.id))) {
+        touchedProducts.push(product);
       }
 
-      if (!product) {
-        // Auto-crear producto sólo si no existe, asignando categoría y unidad técnica de GH Aluminios
-        const seqNum = this.nextSeq('product');
-        const defaultCode = `PRD-${this.padSeq(seqNum, 3)}`;
-
-        const lowerDesc = desc.toLowerCase();
-        let category = 'Materiales y Perfilería';
-        let uom = 'Unidad';
-
-        if (lowerDesc.includes('metro') || lowerDesc.includes('perfil') || lowerDesc.includes('tubo') || lowerDesc.includes('varilla') || lowerDesc.includes('aluminio')) {
-          category = 'Materiales y Perfilería';
-          uom = lowerDesc.includes('cuadrado') || lowerDesc.includes('m2') ? 'Metro Cuadrado' : (lowerDesc.includes('lineal') || lowerDesc.includes('ml') || lowerDesc.includes('metro') ? 'Metro Lineal' : 'Unidad');
-        } else if (lowerDesc.includes('vidrio') || lowerDesc.includes('cristal') || lowerDesc.includes('espejo') || lowerDesc.includes('templado')) {
-          category = 'Vidrios y Paneles';
-          uom = 'Metro Cuadrado';
-        } else if (lowerDesc.includes('tornillo') || lowerDesc.includes('remache') || lowerDesc.includes('chapa') || lowerDesc.includes('bisagra') || lowerDesc.includes('felpa') || lowerDesc.includes('empaque') || lowerDesc.includes('escuadra') || lowerDesc.includes('silicona')) {
-          category = 'Herrajes y Accesorios';
-          uom = lowerDesc.includes('caja') ? 'Caja' : (lowerDesc.includes('rollo') ? 'Rollo' : 'Unidad');
-        } else if (lowerDesc.includes('transporte') || lowerDesc.includes('viatico') || lowerDesc.includes('almuerzo') || lowerDesc.includes('hotel') || lowerDesc.includes('asesoria') || lowerDesc.includes('servicio')) {
-          category = 'Gastos Operativos';
-          uom = 'Unidad';
-        }
-
-        product = {
-          id: seqNum,
-          name: desc,
-          default_code: defaultCode,
-          type: category === 'Gastos Operativos' ? 'consu' : 'product',
-          list_price: round2(priceUnit > 0 ? priceUnit * 1.35 : 0),
-          standard_price: priceUnit,
-          tax_rate: Number(expense.tax_rate ?? 19),
-          category,
-          can_be_sold: true,
-          can_be_expensed: true,
-          uom,
-          qty_available: 0
-        };
-        this.data.products.push(product);
-      } else {
-        if (priceUnit > 0) {
-          product.standard_price = priceUnit;
-        }
-      }
-
-      // Registrar movimiento de almacén trazable
+      // Registrar movimiento de almacén trazable por cada insumo de la factura de gasto
       const moveId = this.nextSeq('inventory_move');
       const invMove = {
         id: moveId,
@@ -1021,23 +1117,87 @@ class ERPStore {
         origin_type: 'expense',
         origin_id: expense.id,
         origin_ref: expense.reference,
-        item_id: item.id || 1,
+        item_id: item.id || (i + 1),
         partner_id: expense.partner_id || null,
         partner_name: expense.partner_name || 'Proveedor General',
         supplier_vat: expense.supplier_vat || '',
         employee_name: expense.employee_name || 'Administrador',
-        notes: `Entrada a almacén por compra/gasto ${expense.reference}`,
+        notes: `Entrada de insumo a almacén por factura de gasto ${expense.reference}`,
         state: 'done'
       };
       this.data.inventory_moves.unshift(invMove);
     }
 
     this.recomputeInventoryStock();
+    return touchedProducts;
+  }
+
+  syncBillToInventory(move) {
+    if (!move || !this.data || move.move_type !== 'in_invoice') return [];
+    // Si esta factura de proveedor proviene de un Gasto (EXP/...), syncExpenseToInventory ya gestiona sus insumos
+    const originStr = String(move.origin || '');
+    const isLinkedToExpense =
+      originStr.startsWith('Gasto EXP/') ||
+      (this.data.expenses || []).some((e) => Number(e.move_id) === Number(move.id) || Number(e.bill_id) === Number(move.id));
+    if (isLinkedToExpense) return [];
+
+    this.data.inventory_moves = Array.isArray(this.data.inventory_moves) ? this.data.inventory_moves : [];
+    this.data.inventory_moves = this.data.inventory_moves.filter(
+      (m) => !(m.origin_type === 'bill' && Number(m.origin_id) === Number(move.id))
+    );
+
+    if (move.state !== 'posted') {
+      this.recomputeInventoryStock();
+      return [];
+    }
+
+    const lines = Array.isArray(move.lines) && move.lines.length > 0 ? move.lines : [];
+    const touchedProducts = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const desc = String(line.name || line.description || move.ref || move.name || '').trim();
+      if (!desc) continue;
+      const qty = Math.max(0.001, Number(line.quantity || 1));
+      const priceUnit = Math.max(0, Number(line.price_unit || 0));
+
+      const product = this._findOrCreateInsumoProduct(desc, priceUnit, line.tax_rate ?? 19, line.product_id || null);
+      line.product_id = product.id;
+
+      if (!touchedProducts.some((tp) => Number(tp.id) === Number(product.id))) {
+        touchedProducts.push(product);
+      }
+
+      const moveId = this.nextSeq('inventory_move');
+      this.data.inventory_moves.unshift({
+        id: moveId,
+        date: move.invoice_date || todayStr(),
+        product_id: product.id,
+        product_name: product.name,
+        product_code: product.default_code || '',
+        quantity: qty,
+        uom: product.uom || 'Unidad',
+        price_unit: priceUnit,
+        total_value: round2(qty * priceUnit),
+        origin_type: 'bill',
+        origin_id: move.id,
+        origin_ref: move.name,
+        item_id: line.id || (i + 1),
+        partner_id: move.partner_id || null,
+        partner_name: move.partner_name || 'Proveedor General',
+        supplier_vat: '',
+        employee_name: this.getActiveAuthor(),
+        notes: `Entrada de insumo a almacén por factura de proveedor ${move.name}`,
+        state: 'done'
+      });
+    }
+
+    this.recomputeInventoryStock();
+    return touchedProducts;
   }
 
   getInventorySummary() {
-    this.recomputeInventoryStock();
-    const products = this.data.products || [];
+    const products = this.getInventoryInsumos();
     const moves = this.data.inventory_moves || [];
     const totalUnits = products.reduce((acc, p) => acc + (Number(p.qty_available) || 0), 0);
     const totalValue = products.reduce((acc, p) => acc + (Number(p.stock_value) || 0), 0);
@@ -1228,17 +1388,23 @@ class ERPStore {
       const idx = this.data.products.findIndex((p) => Number(p.id) === Number(payload.id));
       if (idx === -1) throw new Error('Producto no encontrado.');
       const oldProd = { ...this.data.products[idx] };
+      const nextCanBeSold = payload.can_be_sold !== undefined ? Boolean(payload.can_be_sold) : this.data.products[idx].can_be_sold;
+      const nextCanBeExpensed = payload.can_be_expensed !== undefined ? Boolean(payload.can_be_expensed) : this.data.products[idx].can_be_expensed;
+      const nextIsInsumo = payload.is_insumo !== undefined
+        ? Boolean(payload.is_insumo)
+        : (payload.type === 'insumo' || (nextCanBeExpensed === true && nextCanBeSold === false));
       this.data.products[idx] = {
         ...this.data.products[idx],
         name,
         default_code: String(payload.default_code ?? this.data.products[idx].default_code).trim(),
-        type: payload.type || this.data.products[idx].type,
+        type: nextIsInsumo ? 'insumo' : (payload.type || this.data.products[idx].type),
+        is_insumo: nextIsInsumo,
         list_price: listPrice,
         standard_price: standardPrice,
         tax_rate: Number(payload.tax_rate ?? this.data.products[idx].tax_rate),
         category: String(payload.category ?? this.data.products[idx].category).trim(),
-        can_be_sold: payload.can_be_sold !== undefined ? Boolean(payload.can_be_sold) : this.data.products[idx].can_be_sold,
-        can_be_expensed: payload.can_be_expensed !== undefined ? Boolean(payload.can_be_expensed) : this.data.products[idx].can_be_expensed,
+        can_be_sold: nextIsInsumo ? false : nextCanBeSold,
+        can_be_expensed: nextIsInsumo ? true : nextCanBeExpensed,
         uom: String(payload.uom || this.data.products[idx].uom || 'Metro Cuadrado').trim()
       };
       this.save();
@@ -1255,17 +1421,23 @@ class ERPStore {
     }
 
     const id = this.nextSeq('product');
+    const isExplicitInsumo = Boolean(
+      payload.is_insumo === true ||
+      payload.type === 'insumo' ||
+      (payload.can_be_expensed === true && payload.can_be_sold === false)
+    );
     const prod = {
       id,
       name,
-      default_code: String(payload.default_code || `PRD-${this.padSeq(id, 3)}`).trim(),
-      type: payload.type || 'service',
+      default_code: String(payload.default_code || `${isExplicitInsumo ? 'INS' : 'PRD'}-${this.padSeq(id, 3)}`).trim(),
+      type: isExplicitInsumo ? 'insumo' : (payload.type || 'service'),
+      is_insumo: isExplicitInsumo,
       list_price: listPrice,
       standard_price: standardPrice,
       tax_rate: Number(payload.tax_rate ?? this.data.settings.default_sale_tax ?? 19),
       category: String(payload.category || 'General').trim(),
-      can_be_sold: payload.can_be_sold !== undefined ? Boolean(payload.can_be_sold) : true,
-      can_be_expensed: payload.can_be_expensed !== undefined ? Boolean(payload.can_be_expensed) : true,
+      can_be_sold: isExplicitInsumo ? false : (payload.can_be_sold !== undefined ? Boolean(payload.can_be_sold) : true),
+      can_be_expensed: isExplicitInsumo ? true : (payload.can_be_expensed !== undefined ? Boolean(payload.can_be_expensed) : false),
       uom: String(payload.uom || 'Metro Cuadrado').trim()
     };
     this.data.products.push(prod);
@@ -1396,6 +1568,7 @@ class ERPStore {
         const itTotal = it.total !== undefined && it.total !== null && it.total !== '' && Number(it.total) > 0 ? round2(Number(it.total)) : round2(sub + itTax);
         return {
           id: it.id || idx + 1,
+          product_id: it.product_id ? Number(it.product_id) : null,
           description: String(it.description || it.name || name).trim(),
           quantity: q,
           price_unit: p,
@@ -1505,10 +1678,46 @@ class ERPStore {
       });
       const oldExpense = { ...existing };
       this.data.expenses[idx] = updated;
-      this.syncExpenseToInventory(updated);
+      const touchedProducts = this.syncExpenseToInventory(updated) || [];
+
+      // Mantener sincronizada la factura de proveedor asociada con cada insumo individual (sin resumir)
+      let linkedVendorBill = null;
+      const linkedBillId = updated.bill_id || updated.move_id;
+      if (linkedBillId && this.data.accounting && Array.isArray(this.data.accounting.moves)) {
+        linkedVendorBill = this.data.accounting.moves.find((m) => Number(m.id) === Number(linkedBillId));
+        if (linkedVendorBill) {
+          linkedVendorBill.partner_id = updated.partner_id;
+          linkedVendorBill.partner_name = updated.partner_name;
+          linkedVendorBill.invoice_date = updated.date;
+          linkedVendorBill.ref = updated.receipt_ref || updated.reference;
+          linkedVendorBill.amount_untaxed = updated.untaxed_amount;
+          linkedVendorBill.amount_tax = updated.tax_amount;
+          linkedVendorBill.amount_total = updated.total_amount;
+          linkedVendorBill.lines = updated.items.map((it, lIdx) => ({
+            id: it.id || lIdx + 1,
+            product_id: it.product_id || null,
+            name: it.description,
+            account_code: '519530',
+            account_name: 'Gastos de Tecnología, Licencias y Suministros',
+            quantity: it.quantity,
+            price_unit: it.price_unit,
+            tax_rate: it.tax_rate !== undefined ? it.tax_rate : taxRate,
+            subtotal: it.subtotal,
+            tax_amount: it.tax_amount,
+            total: it.total
+          }));
+        }
+      }
+
       this.save();
       if (this.supabase) {
         try {
+          for (const prod of touchedProducts) {
+            await this.supabase.saveProduct(prod);
+          }
+          if (linkedVendorBill) {
+            await this.supabase.saveAccountMove(linkedVendorBill);
+          }
           await this.supabase.saveExpense(updated);
         } catch (err) {
           this.data.expenses[idx] = oldExpense;
@@ -1557,10 +1766,14 @@ class ERPStore {
       ]
     };
 
-    // Generar automáticamente la factura de proveedor asociada (BILL) con los datos del gasto y sus artículos
+    // Registrar primero los insumos en el inventario para vincular cada product_id de insumo
+    const touchedProducts = this.syncExpenseToInventory(newExpense) || [];
+
+    // Generar automáticamente la factura de proveedor asociada (BILL) con los datos del gasto y sus artículos detallados
     try {
-      const billLines = items.map((it, idx) => ({
+      const billLines = newExpense.items.map((it, idx) => ({
         id: idx + 1,
+        product_id: it.product_id || null,
         name: it.description,
         quantity: it.quantity,
         price_unit: it.price_unit,
@@ -1611,10 +1824,12 @@ class ERPStore {
     }
 
     this.data.expenses.unshift(newExpense);
-    this.syncExpenseToInventory(newExpense);
     this.save();
     if (this.supabase) {
       try {
+        for (const prod of touchedProducts) {
+          await this.supabase.saveProduct(prod);
+        }
         await this.supabase.saveExpense(newExpense);
       } catch (err) {
         this.data.expenses.shift();
@@ -1719,21 +1934,35 @@ class ERPStore {
         origin: exp.reference,
         state: 'posted',
         payment_state: exp.payment_mode === 'company_account' ? 'paid' : 'not_paid',
-        lines: [
-          {
-            id: 1,
-            product_id: exp.product_id,
-            name: exp.name,
-            account_code: '510506',
-            account_name: 'Gastos de Viaje, Viáticos y Representación',
-            quantity: exp.quantity,
-            price_unit: exp.price_unit,
-            tax_rate: exp.tax_rate,
-            subtotal: exp.untaxed_amount,
-            tax_amount: exp.tax_amount,
-            total: exp.total_amount
-          }
-        ],
+        lines: (Array.isArray(exp.items) && exp.items.length > 0)
+          ? exp.items.map((it, idx) => ({
+              id: it.id || idx + 1,
+              product_id: it.product_id || exp.product_id || null,
+              name: it.description || exp.name,
+              account_code: '510506',
+              account_name: 'Gastos de Viaje, Viáticos y Representación',
+              quantity: it.quantity,
+              price_unit: it.price_unit,
+              tax_rate: it.tax_rate !== undefined ? it.tax_rate : exp.tax_rate,
+              subtotal: it.subtotal,
+              tax_amount: it.tax_amount,
+              total: it.total
+            }))
+          : [
+              {
+                id: 1,
+                product_id: exp.product_id,
+                name: exp.name,
+                account_code: '510506',
+                account_name: 'Gastos de Viaje, Viáticos y Representación',
+                quantity: exp.quantity,
+                price_unit: exp.price_unit,
+                tax_rate: exp.tax_rate,
+                subtotal: exp.untaxed_amount,
+                tax_amount: exp.tax_amount,
+                total: exp.total_amount
+              }
+            ],
         journal_items: journalItems,
         amount_untaxed: exp.untaxed_amount,
         amount_tax: exp.tax_amount,
@@ -1800,6 +2029,7 @@ class ERPStore {
     } else if (action === 'refuse') {
       exp.state = 'refused';
       exp.refuse_reason = String(extra.reason || 'Rechazado por políticas de gasto').trim();
+      this.syncExpenseToInventory(exp);
       exp.chatter.push({
         id: this.nextChatterId(),
         author: this.getActiveAuthor(),
@@ -1809,6 +2039,7 @@ class ERPStore {
     } else if (action === 'reset') {
       exp.state = 'draft';
       exp.refuse_reason = '';
+      this.syncExpenseToInventory(exp);
       exp.chatter.push({
         id: this.nextChatterId(),
         author: this.getActiveAuthor(),
@@ -2720,8 +2951,18 @@ class ERPStore {
       this.recomputeSaleOrderInvoiceStatus(linkedSale);
     }
 
+    let touchedBillProducts = [];
+    if (move.move_type === 'in_invoice' && (action === 'post' || action === 'cancel' || action === 'draft')) {
+      touchedBillProducts = this.syncBillToInventory(move) || [];
+    }
+
     this.save();
     if (this.supabase) {
+      for (const prod of touchedBillProducts) {
+        try {
+          await this.supabase.saveProduct(prod);
+        } catch (_) {}
+      }
       await this.supabase.saveAccountMove(move);
       if (nextInvoice) {
         await this.supabase.saveAccountMove(nextInvoice);

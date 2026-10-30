@@ -324,23 +324,72 @@ function deserializePartner(r) {
   };
 }
 
+const EXP_META_START = '<!--CHAPP_EXP_META:';
+const EXP_META_END = '-->';
+const MOVE_META_START = '<!--CHAPP_MOVE_META:';
+const MOVE_META_END = '-->';
+
+function extractExpenseMeta(rawNotes) {
+  if (!rawNotes || typeof rawNotes !== 'string') {
+    return { cleanNotes: '', meta: null };
+  }
+  const idx = rawNotes.indexOf(EXP_META_START);
+  if (idx === -1) {
+    return { cleanNotes: rawNotes, meta: null };
+  }
+  const cleanNotes = rawNotes.slice(0, idx).trim();
+  const endIdx = rawNotes.lastIndexOf(EXP_META_END);
+  const jsonStr = endIdx > idx
+    ? rawNotes.slice(idx + EXP_META_START.length, endIdx)
+    : rawNotes.slice(idx + EXP_META_START.length);
+  try {
+    const meta = JSON.parse(jsonStr);
+    return { cleanNotes, meta };
+  } catch (_) {
+    return { cleanNotes, meta: null };
+  }
+}
+
+function extractMoveMeta(rawOrigin) {
+  if (!rawOrigin || typeof rawOrigin !== 'string') {
+    return { cleanOrigin: '', meta: null };
+  }
+  const idx = rawOrigin.indexOf(MOVE_META_START);
+  if (idx === -1) {
+    return { cleanOrigin: rawOrigin, meta: null };
+  }
+  const cleanOrigin = rawOrigin.slice(0, idx).trim();
+  const endIdx = rawOrigin.lastIndexOf(MOVE_META_END);
+  const jsonStr = endIdx > idx
+    ? rawOrigin.slice(idx + MOVE_META_START.length, endIdx)
+    : rawOrigin.slice(idx + MOVE_META_START.length);
+  try {
+    const meta = JSON.parse(jsonStr);
+    return { cleanOrigin, meta };
+  } catch (_) {
+    return { cleanOrigin, meta: null };
+  }
+}
+
 function serializeProduct(p) {
+  const isInsumo = Boolean(p.is_insumo === true || p.type === 'insumo' || (p.can_be_expensed === true && p.can_be_sold === false));
   return {
     id: Number(p.id),
     name: String(p.name || '').trim(),
     default_code: p.default_code ? String(p.default_code).trim() : null,
-    type: p.type || 'service',
+    type: isInsumo ? 'insumo' : (p.type || 'service'),
     list_price: Number(p.list_price || 0),
     standard_price: Number(p.standard_price || 0),
     tax_rate: Number(p.tax_rate ?? 19),
     category: p.category ? String(p.category).trim() : 'General',
-    can_be_sold: p.can_be_sold !== false,
-    can_be_expensed: p.can_be_expensed !== false,
+    can_be_sold: isInsumo ? false : (p.can_be_sold !== false),
+    can_be_expensed: isInsumo ? true : (p.can_be_expensed !== false),
     uom: p.uom ? String(p.uom).trim() : 'Unidad'
   };
 }
 
 function deserializeProduct(r) {
+  const isInsumo = Boolean(r.type === 'insumo' || (r.can_be_expensed === true && r.can_be_sold === false));
   return {
     id: Number(r.id),
     name: r.name,
@@ -350,13 +399,43 @@ function deserializeProduct(r) {
     standard_price: Number(r.standard_price || 0),
     tax_rate: Number(r.tax_rate ?? 19),
     category: r.category || 'General',
-    can_be_sold: Boolean(r.can_be_sold),
+    can_be_sold: isInsumo ? false : Boolean(r.can_be_sold),
     can_be_expensed: Boolean(r.can_be_expensed),
+    is_insumo: isInsumo,
     uom: r.uom || 'Unidad'
   };
 }
 
 function serializeExpense(e) {
+  const { cleanNotes } = extractExpenseMeta(e.notes ? String(e.notes).trim() : '');
+  let notesVal = cleanNotes || null;
+
+  const hasItems = Array.isArray(e.items) && e.items.length > 0;
+  const hasExtra = Boolean(e.supplier_vat || e.journal_code || e.bill_id || e.bill_name);
+  if (hasItems || hasExtra) {
+    const metaObj = {};
+    if (hasItems) {
+      metaObj.items = e.items.map((it, idx) => ({
+        id: Number(it.id || idx + 1),
+        product_id: it.product_id ? Number(it.product_id) : null,
+        description: String(it.description || it.name || e.name || '').trim(),
+        quantity: Number(it.quantity ?? 1),
+        price_unit: Number(it.price_unit ?? 0),
+        tax_rate: Number(it.tax_rate ?? 0),
+        tax_amount: Number(it.tax_amount ?? 0),
+        subtotal: Number(it.subtotal ?? 0),
+        total: Number(it.total ?? 0)
+      }));
+    }
+    if (e.supplier_vat) metaObj.supplier_vat = String(e.supplier_vat).trim();
+    if (e.journal_code) metaObj.journal_code = String(e.journal_code).trim();
+    if (e.bill_id) metaObj.bill_id = Number(e.bill_id);
+    if (e.bill_name) metaObj.bill_name = String(e.bill_name).trim();
+
+    const metaBlock = `${EXP_META_START}${JSON.stringify(metaObj)}${EXP_META_END}`;
+    notesVal = cleanNotes ? `${cleanNotes}\n${metaBlock}` : metaBlock;
+  }
+
   return {
     id: Number(e.id),
     reference: String(e.reference || '').trim(),
@@ -374,14 +453,15 @@ function serializeExpense(e) {
     total_amount: Number(e.total_amount || 0),
     partner_id: e.partner_id ? Number(e.partner_id) : null,
     receipt_ref: e.receipt_ref ? String(e.receipt_ref).trim() : null,
-    notes: e.notes ? String(e.notes).trim() : null,
+    notes: notesVal,
     state: e.state || 'draft',
     move_id: e.move_id ? Number(e.move_id) : null
   };
 }
 
 function deserializeExpense(r) {
-  return {
+  const { cleanNotes, meta } = extractExpenseMeta(r.notes || '');
+  const out = {
     id: Number(r.id),
     reference: r.reference,
     name: r.name,
@@ -400,12 +480,22 @@ function deserializeExpense(r) {
     partner_id: r.partner_id ? Number(r.partner_id) : null,
     partner_name: '',
     receipt_ref: r.receipt_ref || '',
-    notes: r.notes || '',
+    notes: cleanNotes,
     state: r.state || 'draft',
     move_id: r.move_id ? Number(r.move_id) : null,
     payment_id: null,
     chatter: []
   };
+  if (meta) {
+    if (Array.isArray(meta.items) && meta.items.length > 0) {
+      out.items = meta.items;
+    }
+    if (meta.supplier_vat) out.supplier_vat = meta.supplier_vat;
+    if (meta.journal_code) out.journal_code = meta.journal_code;
+    if (meta.bill_id) out.bill_id = Number(meta.bill_id);
+    if (meta.bill_name) out.bill_name = meta.bill_name;
+  }
+  return out;
 }
 
 function serializeSaleOrder(s) {
@@ -483,6 +573,42 @@ function deserializeSaleOrder(r) {
 }
 
 function serializeAccountMove(m) {
+  const { cleanOrigin } = extractMoveMeta(m.origin ? String(m.origin).trim() : '');
+  let originVal = cleanOrigin || null;
+
+  if (Array.isArray(m.lines) && m.lines.length > 0) {
+    const metaObj = {
+      lines: m.lines.map((l, idx) => ({
+        id: Number(l.id || idx + 1),
+        product_id: l.product_id ? Number(l.product_id) : null,
+        name: String(l.name || l.description || 'Concepto contable').trim(),
+        account_code: l.account_code || (m.move_type === 'out_invoice' ? '413501' : '519530'),
+        account_name: l.account_name || (m.move_type === 'out_invoice' ? 'Ingresos por Servicios de Software y Consultoría' : 'Gastos de Tecnología, Licencias y Suministros'),
+        quantity: Number(l.quantity ?? 1),
+        price_unit: Number(l.price_unit ?? 0),
+        tax_rate: Number(l.tax_rate ?? 0),
+        subtotal: Number(l.subtotal ?? 0),
+        tax_amount: Number(l.tax_amount ?? 0),
+        total: Number(l.total ?? 0)
+      }))
+    };
+    if (m.retention_source_rate) metaObj.retention_source_rate = Number(m.retention_source_rate);
+    if (m.retention_source_amount) metaObj.retention_source_amount = Number(m.retention_source_amount);
+    if (m.retention_ica_rate) metaObj.retention_ica_rate = Number(m.retention_ica_rate);
+    if (m.retention_ica_amount) metaObj.retention_ica_amount = Number(m.retention_ica_amount);
+    if (m.amount_net !== undefined) metaObj.amount_net = Number(m.amount_net);
+    if (m.order_total) metaObj.order_total = Number(m.order_total);
+    if (m.invoiced_prior) metaObj.invoiced_prior = Number(m.invoiced_prior);
+    if (m.advance_amount) metaObj.advance_amount = Number(m.advance_amount);
+    if (m.order_residual !== undefined) metaObj.order_residual = Number(m.order_residual);
+    if (m.installment_number) metaObj.installment_number = Number(m.installment_number);
+    if (m.is_installment) metaObj.is_installment = Boolean(m.is_installment);
+    if (Array.isArray(m.payments_history) && m.payments_history.length > 0) metaObj.payments_history = m.payments_history;
+
+    const metaBlock = `${MOVE_META_START}${JSON.stringify(metaObj)}${MOVE_META_END}`;
+    originVal = cleanOrigin ? `${cleanOrigin}\n${metaBlock}` : metaBlock;
+  }
+
   return {
     id: Number(m.id),
     name: String(m.name || 'Borrador').trim(),
@@ -493,7 +619,7 @@ function serializeAccountMove(m) {
     invoice_date: m.invoice_date ? String(m.invoice_date).slice(0, 10) : new Date().toISOString().slice(0, 10),
     invoice_date_due: m.invoice_date_due ? String(m.invoice_date_due).slice(0, 10) : null,
     ref: m.ref ? String(m.ref).trim() : null,
-    origin: m.origin ? String(m.origin).trim() : null,
+    origin: originVal,
     state: m.state || 'draft',
     payment_state: m.payment_state || 'not_paid',
     amount_untaxed: Number(m.amount_untaxed || 0),
@@ -504,6 +630,7 @@ function serializeAccountMove(m) {
 }
 
 function deserializeAccountMove(r) {
+  const { cleanOrigin, meta } = extractMoveMeta(r.origin || '');
   const moveType = r.move_type || 'out_invoice';
   const isOutInvoice = moveType === 'out_invoice';
   const isExpenseMove = r.journal_code === 'EXJ' || moveType === 'entry';
@@ -539,7 +666,25 @@ function deserializeAccountMove(r) {
     ];
   }
 
-  return {
+  const restoredLines = (meta && Array.isArray(meta.lines) && meta.lines.length > 0)
+    ? meta.lines
+    : [
+        {
+          id: 1,
+          product_id: null,
+          name: r.ref || r.name || 'Concepto contable',
+          account_code: defaultAccountCode,
+          account_name: defaultAccountName,
+          quantity: 1,
+          price_unit: amountUntaxed,
+          tax_rate: amountUntaxed > 0 ? Math.round((amountTax / amountUntaxed) * 100) : 0,
+          subtotal: amountUntaxed,
+          tax_amount: amountTax,
+          total: amountTotal
+        }
+      ];
+
+  const out = {
     id: Number(r.id),
     name: r.name,
     move_type: moveType,
@@ -556,31 +701,34 @@ function deserializeAccountMove(r) {
     invoice_date: String(r.invoice_date || '').slice(0, 10),
     invoice_date_due: r.invoice_date_due ? String(r.invoice_date_due).slice(0, 10) : '',
     ref: r.ref || '',
-    origin: r.origin || '',
+    origin: cleanOrigin,
     state: r.state || 'draft',
     payment_state: r.payment_state || 'not_paid',
     amount_untaxed: amountUntaxed,
     amount_tax: amountTax,
     amount_total: amountTotal,
     amount_residual: Number(r.amount_residual || 0),
-    lines: [
-      {
-        id: 1,
-        product_id: null,
-        name: r.ref || r.name || 'Concepto contable',
-        account_code: defaultAccountCode,
-        account_name: defaultAccountName,
-        quantity: 1,
-        price_unit: amountUntaxed,
-        tax_rate: amountUntaxed > 0 ? Math.round((amountTax / amountUntaxed) * 100) : 0,
-        subtotal: amountUntaxed,
-        tax_amount: amountTax,
-        total: amountTotal
-      }
-    ],
+    lines: restoredLines,
     journal_items: journalItems,
     chatter: []
   };
+
+  if (meta) {
+    if (meta.retention_source_rate !== undefined) out.retention_source_rate = meta.retention_source_rate;
+    if (meta.retention_source_amount !== undefined) out.retention_source_amount = meta.retention_source_amount;
+    if (meta.retention_ica_rate !== undefined) out.retention_ica_rate = meta.retention_ica_rate;
+    if (meta.retention_ica_amount !== undefined) out.retention_ica_amount = meta.retention_ica_amount;
+    if (meta.amount_net !== undefined) out.amount_net = meta.amount_net;
+    if (meta.order_total !== undefined) out.order_total = meta.order_total;
+    if (meta.invoiced_prior !== undefined) out.invoiced_prior = meta.invoiced_prior;
+    if (meta.advance_amount !== undefined) out.advance_amount = meta.advance_amount;
+    if (meta.order_residual !== undefined) out.order_residual = meta.order_residual;
+    if (meta.installment_number !== undefined) out.installment_number = meta.installment_number;
+    if (meta.is_installment !== undefined) out.is_installment = meta.is_installment;
+    if (Array.isArray(meta.payments_history)) out.payments_history = meta.payments_history;
+  }
+
+  return out;
 }
 
 function serializePayment(p) {
@@ -785,14 +933,58 @@ class SupabasePersistence {
         settings = deserializeSettings(settingsRes.data[0], settings || {});
       }
 
-      // Re-link relationships (expenses product_name, partner_name; sales invoice_ids, bank balance)
+      // Re-link relationships (expenses product_name, partner_name, items<->bill lines; sales invoice_ids)
       for (const e of expenses) {
         const prod = products.find((p) => Number(p.id) === Number(e.product_id));
         if (prod) e.product_name = prod.name;
         const part = contacts.find((c) => Number(c.id) === Number(e.partner_id));
-        if (part) e.partner_name = part.name;
-        const pay = payments.find((p) => p.ref === e.reference);
+        if (part) {
+          e.partner_name = part.name;
+          if (!e.supplier_vat && part.vat) e.supplier_vat = part.vat;
+        }
+        const pay = payments.find((p) => p.ref === e.reference || (p.ref && p.ref.includes(e.reference)));
         if (pay) e.payment_id = pay.id;
+
+        const linkedBill = moves.find(
+          (m) =>
+            (e.move_id && Number(m.id) === Number(e.move_id)) ||
+            (e.bill_id && Number(m.id) === Number(e.bill_id)) ||
+            m.origin === `Gasto ${e.reference}`
+        );
+        if (linkedBill) {
+          if (!e.move_id) e.move_id = linkedBill.id;
+          if (!e.bill_id) e.bill_id = linkedBill.id;
+          if (!e.bill_name) e.bill_name = linkedBill.name;
+          if (Array.isArray(e.items) && e.items.length > 0) {
+            if (!Array.isArray(linkedBill.lines) || (linkedBill.lines.length === 1 && e.items.length > 1) || linkedBill.lines[0]?.name === linkedBill.ref) {
+              linkedBill.lines = e.items.map((it, idx) => ({
+                id: Number(it.id || idx + 1),
+                product_id: it.product_id || null,
+                name: it.description || it.name || e.name,
+                account_code: '519530',
+                account_name: 'Gastos de Tecnología, Licencias y Suministros',
+                quantity: Number(it.quantity ?? 1),
+                price_unit: Number(it.price_unit ?? 0),
+                tax_rate: Number(it.tax_rate ?? 0),
+                subtotal: Number(it.subtotal ?? 0),
+                tax_amount: Number(it.tax_amount ?? 0),
+                total: Number(it.total ?? 0)
+              }));
+            }
+          } else if (Array.isArray(linkedBill.lines) && linkedBill.lines.length > 0 && !(linkedBill.lines.length === 1 && linkedBill.lines[0].name === (linkedBill.ref || linkedBill.name))) {
+            e.items = linkedBill.lines.map((l, idx) => ({
+              id: Number(l.id || idx + 1),
+              product_id: l.product_id || null,
+              description: l.name || e.name,
+              quantity: Number(l.quantity ?? 1),
+              price_unit: Number(l.price_unit ?? 0),
+              tax_rate: Number(l.tax_rate ?? 0),
+              tax_amount: Number(l.tax_amount ?? 0),
+              subtotal: Number(l.subtotal ?? 0),
+              total: Number(l.total ?? 0)
+            }));
+          }
+        }
       }
 
       for (const s of sales) {

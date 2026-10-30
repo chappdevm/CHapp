@@ -599,4 +599,116 @@ describe('Supabase Persistence Layer & PostgREST Architecture', () => {
     assert.equal(res.ok, true);
     assert.equal(res.data.length, 0, 'Deleted product must not exist in Supabase');
   });
+
+  it('preserves multi-insumo expense items, multi-line supplier bills, and insumo vs producto flags across cold-start Supabase deserialization', () => {
+    // 1. Multi-insumo Expense serialization -> cold-start deserialization (no RAM fallback)
+    const multiInsumoExpense = {
+      id: 77,
+      reference: 'EXP/2026/0077',
+      name: 'Factura Compra Perfilería y Herrajes',
+      employee_name: 'Administrador CHapp',
+      partner_id: 12,
+      partner_name: 'Aluminios Nacionales SAS',
+      supplier_vat: '900111222-3',
+      date: '2026-10-30',
+      journal_code: 'BNK1',
+      payment_mode: 'company_account',
+      quantity: 1,
+      price_unit: 320000,
+      tax_rate: 19,
+      untaxed_amount: 300000,
+      tax_amount: 20000,
+      total_amount: 320000,
+      receipt_ref: 'FE-9012',
+      notes: 'Compra urgente obra norte',
+      state: 'paid',
+      move_id: 88,
+      bill_id: 88,
+      bill_name: 'BILL/2026/0088',
+      items: [
+        { id: 1, product_id: 501, description: 'Perfil Riel Superior 3m', quantity: 5, price_unit: 40000, tax_rate: 10, tax_amount: 20000, subtotal: 200000, total: 220000 },
+        { id: 2, product_id: 502, description: 'Rodamiento Doble Acero', quantity: 10, price_unit: 10000, tax_rate: 0, tax_amount: 0, subtotal: 100000, total: 100000 }
+      ]
+    };
+
+    const dbExpRow = serializeExpense(multiInsumoExpense);
+    const coldDeserializedExp = deserializeExpense(dbExpRow);
+    assert.equal(coldDeserializedExp.notes, 'Compra urgente obra norte', 'Clean notes must not leak metadata comment');
+    assert.equal(coldDeserializedExp.supplier_vat, '900111222-3');
+    assert.equal(coldDeserializedExp.journal_code, 'BNK1');
+    assert.equal(coldDeserializedExp.bill_name, 'BILL/2026/0088');
+    assert.ok(Array.isArray(coldDeserializedExp.items), 'Deserialized expense must include items array');
+    assert.equal(coldDeserializedExp.items.length, 2, 'Must preserve both individual insumos after cold restart');
+    assert.equal(coldDeserializedExp.items[0].description, 'Perfil Riel Superior 3m');
+    assert.equal(coldDeserializedExp.items[0].quantity, 5);
+    assert.equal(coldDeserializedExp.items[1].description, 'Rodamiento Doble Acero');
+    assert.equal(coldDeserializedExp.items[1].quantity, 10);
+
+    // 2. Multi-line Account Move serialization -> cold-start deserialization
+    const multiLineBill = {
+      id: 88,
+      name: 'BILL/2026/0088',
+      move_type: 'in_invoice',
+      journal_id: 2,
+      journal_code: 'BILL',
+      partner_id: 12,
+      partner_name: 'Aluminios Nacionales SAS',
+      invoice_date: '2026-10-30',
+      invoice_date_due: '2026-10-30',
+      ref: 'FE-9012',
+      origin: 'Gasto EXP/2026/0077',
+      state: 'posted',
+      payment_state: 'paid',
+      amount_untaxed: 300000,
+      amount_tax: 20000,
+      amount_total: 320000,
+      amount_residual: 0,
+      lines: [
+        { id: 1, product_id: 501, name: 'Perfil Riel Superior 3m', account_code: '519530', quantity: 5, price_unit: 40000, tax_rate: 10, subtotal: 200000, tax_amount: 20000, total: 220000 },
+        { id: 2, product_id: 502, name: 'Rodamiento Doble Acero', account_code: '519530', quantity: 10, price_unit: 10000, tax_rate: 0, subtotal: 100000, tax_amount: 0, total: 100000 }
+      ]
+    };
+
+    const dbMoveRow = serializeAccountMove(multiLineBill);
+    const coldDeserializedMove = deserializeAccountMove(dbMoveRow);
+    assert.equal(coldDeserializedMove.origin, 'Gasto EXP/2026/0077', 'Clean origin must not leak metadata comment');
+    assert.equal(coldDeserializedMove.lines.length, 2, 'Must preserve both invoice lines after cold restart');
+    assert.equal(coldDeserializedMove.lines[0].name, 'Perfil Riel Superior 3m');
+    assert.equal(coldDeserializedMove.lines[1].name, 'Rodamiento Doble Acero');
+
+    // 3. Insumo vs Producto serialization -> deserialization
+    const insumoRow = serializeProduct({
+      id: 501,
+      name: 'Perfil Riel Superior 3m',
+      default_code: 'INS-501',
+      type: 'insumo',
+      is_insumo: true,
+      list_price: 0,
+      standard_price: 40000,
+      can_be_sold: false,
+      can_be_expensed: true,
+      uom: 'Metro Lineal'
+    });
+    const deserializedInsumo = deserializeProduct(insumoRow);
+    assert.equal(deserializedInsumo.is_insumo, true);
+    assert.equal(deserializedInsumo.can_be_sold, false);
+    assert.equal(deserializedInsumo.can_be_expensed, true);
+
+    const saleProdRow = serializeProduct({
+      id: 601,
+      name: 'Puerta Ventana Europea',
+      default_code: 'PRD-601',
+      type: 'service',
+      is_insumo: false,
+      list_price: 950000,
+      standard_price: 0,
+      can_be_sold: true,
+      can_be_expensed: false,
+      uom: 'Metro Cuadrado'
+    });
+    const deserializedSaleProd = deserializeProduct(saleProdRow);
+    assert.equal(deserializedSaleProd.is_insumo, false);
+    assert.equal(deserializedSaleProd.can_be_sold, true);
+    assert.equal(deserializedSaleProd.can_be_expensed, false);
+  });
 });

@@ -117,6 +117,30 @@
     return `${sym} ${Math.round(num).toLocaleString('es-CO')}`;
   }
 
+  function isInsumoItem(p) {
+    if (!p) return false;
+    if (p.is_insumo === true || p.type === 'insumo') return true;
+    if (p.is_insumo === false) return false;
+    if (p.can_be_expensed === true && p.can_be_sold === false) return true;
+    return false;
+  }
+
+  function getInventoryInsumosList() {
+    const all = (state.data && state.data.products) || [];
+    const moves = (state.data && state.data.inventory_moves) || [];
+    const moveProdIds = new Set(moves.filter((m) => m.state !== 'cancel').map((m) => Number(m.product_id)));
+    return all.filter((p) => {
+      if (isInsumoItem(p)) return true;
+      if (p.can_be_sold === true && p.can_be_expensed === false) return false;
+      return moveProdIds.has(Number(p.id));
+    });
+  }
+
+  function getSaleProductsList() {
+    const all = (state.data && state.data.products) || [];
+    return all.filter((p) => !isInsumoItem(p) && p.can_be_sold !== false);
+  }
+
   function formatUomShort(uom) {
     if (!uom) return 'm²';
     const s = String(uom).toLowerCase().trim();

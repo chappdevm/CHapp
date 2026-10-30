@@ -2283,4 +2283,101 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.ok(authJsText.includes('o_shape_spiral'), 'Login must render 3D spiral shape');
     assert.ok(authJsText.includes('o_shape_zigzag'), 'Login must render 3D zigzag shape');
   });
+
+  it('Insumos vs Productos & No Summarization: saves expense invoice insumos in Inventory separately and keeps finished sales products in Sales', async () => {
+    // 1. Create a finished Sales Product in Ventas -> Productos
+    const saleProdRes = await req('/api/products', 'POST', {
+      name: 'Ventana Corrediza Monumental Acústica',
+      default_code: 'PRD-VENT-900',
+      uom: 'Metro Cuadrado',
+      list_price: 680000,
+      tax_rate: 19,
+      can_be_sold: true,
+      can_be_expensed: false,
+      is_insumo: false
+    });
+    assert.equal(saleProdRes.status, 200);
+    assert.equal(saleProdRes.json.product.is_insumo, false);
+    assert.equal(saleProdRes.json.product.can_be_sold, true);
+    assert.equal(saleProdRes.json.product.can_be_expensed, false);
+
+    // 2. Register an Expense Invoice with 3 distinct Insumos
+    const expRes = await req('/api/expenses', 'POST', {
+      name: 'Compra Factura FE-8841 Aluminios del Valle',
+      partner_name: 'Aluminios del Valle S.A.S.',
+      supplier_vat: '900555111-2',
+      receipt_ref: 'FE-8841',
+      date: '2026-10-30',
+      total_amount: 950000,
+      items: [
+        {
+          id: 1,
+          description: 'Perfil Aluminio Jamba 5020',
+          quantity: 10,
+          price_unit: 45000,
+          tax_rate: 0,
+          tax_amount: 0,
+          subtotal: 450000,
+          total: 450000
+        },
+        {
+          id: 2,
+          description: 'Vidrio Templado Incoloro 6mm',
+          quantity: 4,
+          price_unit: 100000,
+          tax_rate: 0,
+          tax_amount: 0,
+          subtotal: 400000,
+          total: 400000
+        },
+        {
+          id: 3,
+          description: 'Empaque EPDM Burbuja Rollo',
+          quantity: 2,
+          price_unit: 50000,
+          tax_rate: 0,
+          tax_amount: 0,
+          subtotal: 100000,
+          total: 100000
+        }
+      ]
+    });
+    assert.equal(expRes.status, 200);
+    const savedExp = expRes.json.expense;
+    assert.equal(savedExp.items.length, 3, 'Expense invoice must preserve all 3 individual insumos without summarizing');
+    assert.equal(savedExp.items[0].description, 'Perfil Aluminio Jamba 5020');
+    assert.equal(savedExp.items[1].description, 'Vidrio Templado Incoloro 6mm');
+    assert.equal(savedExp.items[2].description, 'Empaque EPDM Burbuja Rollo');
+    assert.ok(savedExp.items[0].product_id, 'Insumo 1 must have a linked product_id');
+    assert.ok(savedExp.items[1].product_id, 'Insumo 2 must have a linked product_id');
+    assert.ok(savedExp.items[2].product_id, 'Insumo 3 must have a linked product_id');
+
+    // Verify the linked supplier bill in Contabilidad also keeps all 3 individual lines
+    const linkedBill = expRes.json.state.accounting.moves.find((m) => Number(m.id) === Number(savedExp.move_id));
+    assert.ok(linkedBill, 'Supplier bill must be created');
+    assert.equal(linkedBill.lines.length, 3, 'Supplier bill must preserve all 3 insumo lines');
+
+    // 3. Verify GET /api/inventory returns Insumos (including the 3 purchased insumos) and excludes the finished Sales Product
+    const invRes = await req('/api/inventory');
+    assert.equal(invRes.status, 200);
+    const invInsumos = invRes.json.products;
+    assert.ok(invInsumos.some((p) => p.name === 'Perfil Aluminio Jamba 5020' && p.qty_available === 10 && p.is_insumo === true && p.can_be_sold === false));
+    assert.ok(invInsumos.some((p) => p.name === 'Vidrio Templado Incoloro 6mm' && p.qty_available === 4 && p.is_insumo === true && p.can_be_sold === false));
+    assert.ok(invInsumos.some((p) => p.name === 'Empaque EPDM Burbuja Rollo' && p.qty_available === 2 && p.is_insumo === true && p.can_be_sold === false));
+    assert.ok(
+      !invInsumos.some((p) => p.name === 'Ventana Corrediza Monumental Acústica'),
+      'Finished sales product must NOT appear in Inventory of Insumos'
+    );
+
+    // 4. Verify store.getSaleProducts() contains the finished sales product and excludes the insumos
+    const { ERPStore } = require('../server/store');
+    const reloadedStore = new ERPStore(tempDbPath, { useSupabase: false });
+    const saleProducts = reloadedStore.getSaleProducts();
+    const reloadedExp = reloadedStore.data.expenses.find((e) => Number(e.id) === Number(savedExp.id));
+    assert.equal(reloadedExp.items.length, 3, 'Reloaded expense must still have all 3 separate insumos');
+    assert.ok(saleProducts.some((p) => p.name === 'Ventana Corrediza Monumental Acústica'));
+    assert.ok(!saleProducts.some((p) => p.name === 'Perfil Aluminio Jamba 5020'), 'Insumo must NOT appear in Sales Products');
+    assert.ok(!saleProducts.some((p) => p.name === 'Vidrio Templado Incoloro 6mm'), 'Insumo must NOT appear in Sales Products');
+    assert.ok(!saleProducts.some((p) => p.name === 'Empaque EPDM Burbuja Rollo'), 'Insumo must NOT appear in Sales Products');
+  });
 });

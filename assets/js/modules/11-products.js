@@ -5,7 +5,8 @@
 'use strict';
 
   function renderProductsSubmodule(container) {
-    let products = state.data.products || [];
+    const allSaleProducts = typeof getSaleProductsList === 'function' ? getSaleProductsList() : (state.data.products || []);
+    let products = [...allSaleProducts];
     const q = state.searchQuery.trim().toLowerCase();
     if (q) {
       products = products.filter(
@@ -15,14 +16,14 @@
           (p.category || '').toLowerCase().includes(q)
       );
     }
-    updatePager(products.length, (state.data.products || []).length);
+    updatePager(products.length, allSaleProducts.length);
 
     const bannerHtml = `
       <div class="o_dashboard_banner" style="margin-bottom: 1rem;">
         <div class="o_stat_card">
-          <span class="o_stat_label">Catálogo de Productos</span>
-          <span class="o_stat_value">${(state.data.products || []).length}</span>
-          <span class="o_stat_sub">Productos registrados</span>
+          <span class="o_stat_label">Catálogo de Productos de Venta</span>
+          <span class="o_stat_value">${allSaleProducts.length}</span>
+          <span class="o_stat_sub">Productos terminados para venta al cliente (los insumos están en Inventario)</span>
         </div>
       </div>
     `;
@@ -271,8 +272,9 @@
             list_price,
             standard_price: existing.standard_price || 0,
             tax_rate,
+            is_insumo: false,
             can_be_sold: true,
-            can_be_expensed: existing.can_be_expensed !== undefined ? existing.can_be_expensed : false
+            can_be_expensed: false
           };
           if (!isNew) {
             payload.id = existing.id;

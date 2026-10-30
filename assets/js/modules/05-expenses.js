@@ -125,7 +125,12 @@
                     <strong>${esc(e.partner_name || 'Proveedor General')}</strong>
                     ${(e.supplier_vat) ? `<div style="font-size: 0.78rem; color: var(--o-muted); margin-top: 2px;">NIT: ${esc(e.supplier_vat)}</div>` : ''}
                   </td>
-                  <td>${esc(e.name)}</td>
+                  <td>
+                    <div>${esc(e.name)}</div>
+                    ${Array.isArray(e.items) && e.items.length > 0
+                      ? `<div style="font-size: 0.78rem; color: var(--o-muted); margin-top: 2px;">${e.items.length} insumo(s): ${esc(e.items.map((it) => it.description || it.name).filter(Boolean).join(', '))}</div>`
+                      : ''}
+                  </td>
                   <td>${esc(e.date)}</td>
                   <td>${esc(e.receipt_ref || '—')}</td>
                   <td class="text-end"><strong>${formatMoney(e.total_amount)}</strong></td>
@@ -333,24 +338,24 @@
               </select>
             </div>
 
-            <!-- Tabla estructurada de Artículos / Productos -->
+            <!-- Tabla estructurada de Insumos / Materiales -->
             <div style="margin-top: 1.25rem; border-top: 1px solid var(--o-border); padding-top: 1rem;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
                 <div>
-                  <h4 style="margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--o-text);">Productos / Artículos Adquiridos</h4>
-                  <span style="font-size: 0.8rem; color: var(--o-muted);">Detalle de ítems con cantidad, valor unitario y subtotal</span>
+                  <h4 style="margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--o-text);">Insumos / Materiales de la Factura de Gasto</h4>
+                  <span style="font-size: 0.8rem; color: var(--o-muted);">Cada insumo se guarda por separado y entra automáticamente al Inventario</span>
                 </div>
                 <button type="button" class="btn btn-sm btn-secondary" id="btnAddExpenseItem" style="display: inline-flex; align-items: center; gap: 4px;">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                  Agregar Producto / Artículo
+                  Agregar Insumo / Material
                 </button>
               </div>
 
-              <div tabindex="0" role="region" aria-label="Tabla de productos del gasto" class="table-wrapper" style="margin-bottom: 0.75rem;">
+              <div tabindex="0" role="region" aria-label="Tabla de insumos del gasto" class="table-wrapper" style="margin-bottom: 0.75rem;">
                 <table class="o_list_table" id="expenseItemsTable" style="--label-2: 'Cantidad'; --label-3: 'Valor Unit.'; --label-4: 'IVA %'; --label-5: 'Total'; --label-6: 'Acción';">
                   <thead>
                     <tr>
-                      <th>Descripción del Producto / Artículo</th>
+                      <th>Descripción del Insumo / Material</th>
                       <th style="width: 90px;">Cantidad</th>
                       <th style="width: 130px;">Valor Unitario ($)</th>
                       <th style="width: 90px;">IVA %</th>
@@ -424,11 +429,47 @@
         total: total
       };
     };
+    let recoveredItems = null;
+    if (!isNew && (!Array.isArray(existing.items) || existing.items.length === 0)) {
+      const invMoves = ((state.data && state.data.inventory_moves) || []).filter(
+        (m) => m.origin_type === 'expense' && Number(m.origin_id) === Number(existing.id) && m.state !== 'cancel'
+      );
+      if (invMoves.length > 0) {
+        recoveredItems = invMoves.map((m, idx) => ({
+          id: m.item_id || idx + 1,
+          product_id: m.product_id || null,
+          description: m.product_name || existing.name || '',
+          quantity: Number(m.quantity || 1),
+          price_unit: Number(m.price_unit || 0),
+          subtotal: Number(m.total_value || 0),
+          total: Number(m.total_value || 0)
+        }));
+      } else if (existing.move_id || existing.bill_id) {
+        const linkedMove = ((state.data && state.data.accounting && state.data.accounting.moves) || []).find(
+          (mv) => Number(mv.id) === Number(existing.move_id || existing.bill_id)
+        );
+        if (linkedMove && Array.isArray(linkedMove.lines) && linkedMove.lines.length > 0) {
+          recoveredItems = linkedMove.lines.map((l, idx) => ({
+            id: l.id || idx + 1,
+            product_id: l.product_id || null,
+            description: l.name || l.description || existing.name || '',
+            quantity: Number(l.quantity || 1),
+            price_unit: Number(l.price_unit || 0),
+            tax_rate: Number(l.tax_rate || 0),
+            tax_amount: Number(l.tax_amount || 0),
+            subtotal: Number(l.subtotal || 0),
+            total: Number(l.total || 0)
+          }));
+        }
+      }
+    }
     let expenseItems = (Array.isArray(existing.items) && existing.items.length > 0
       ? [...existing.items]
-      : (draft && Array.isArray(draft.items) && draft.items.length > 0
-          ? [...draft.items]
-          : [{ description: existing.name || '', quantity: existing.quantity || 1, price_unit: existing.price_unit || existing.total_amount || 0, total: existing.total_amount || 0 }])
+      : (recoveredItems && recoveredItems.length > 0
+          ? recoveredItems
+          : (draft && Array.isArray(draft.items) && draft.items.length > 0
+              ? [...draft.items]
+              : [{ description: existing.name || '', quantity: existing.quantity || 1, price_unit: existing.price_unit || existing.total_amount || 0, total: existing.total_amount || 0 }]))
     ).map(normalizeExpenseItem);
 
     // Totales literales impresos en la factura escaneada (se conservan hasta que el usuario edite los productos)
@@ -719,31 +760,55 @@
             : (partnerNameInput ? (state.data.contacts || []).find((c) => c.name.toLowerCase() === partnerNameInput.toLowerCase()) : null);
 
           const prodEl = document.getElementById('fExpProduct');
-          const prodVal = prodEl ? prodEl.value : (existing.product_id || null);
-          const defaultProd = (state.data.products || [])[0];
+          const prodVal = prodEl && prodEl.value ? prodEl.value : (existing.product_id || null);
           const suppVatInput = document.getElementById('fExpPartnerVat') ? document.getElementById('fExpPartnerVat').value.trim() : '';
 
-          // Collect items from table
-          const cleanItems = expenseItems.filter(it => it.description || it.price_unit > 0 || it.total > 0 || it.subtotal > 0).map((it, idx) => {
-            const rate = Number(it.tax_rate || 0);
-            const tot = Number(it.total || 0);
-            const sub = it.subtotal !== undefined && it.subtotal !== null && it.subtotal > 0
-              ? Number(it.subtotal)
-              : (rate > 0 ? round2c(tot / (1 + rate / 100)) : tot);
-            const tax = it.tax_amount !== undefined && it.tax_amount !== null && it.tax_amount > 0
-              ? Number(it.tax_amount)
-              : round2c(tot - sub);
-            return {
-              id: idx + 1,
-              description: it.description || name,
-              quantity: Number(it.quantity || 1),
-              price_unit: Number(it.price_unit || 0) || (Number(it.quantity || 1) > 0 ? round2c(sub / Number(it.quantity || 1)) : 0),
-              tax_rate: rate,
-              tax_amount: tax,
-              subtotal: sub,
-              total: tot
-            };
-          });
+          // Sincronizar directamente desde el DOM cada fila de insumo para no perder ningún ítem
+          const domRows = document.querySelectorAll('#expenseItemsTbody tr[data-item-idx]');
+          if (domRows && domRows.length > 0) {
+            domRows.forEach((tr) => {
+              const rIdx = Number(tr.getAttribute('data-item-idx'));
+              if (!expenseItems[rIdx]) return;
+              const descInp = tr.querySelector('.exp-item-desc');
+              const qtyInp = tr.querySelector('[data-field="quantity"]');
+              const priceInp = tr.querySelector('[data-field="price_unit"]');
+              const taxInp = tr.querySelector('[data-field="tax_rate"]');
+              const totInp = tr.querySelector('[data-field="total"]');
+              if (descInp) expenseItems[rIdx].description = descInp.value.trim();
+              if (qtyInp) expenseItems[rIdx].quantity = Number(qtyInp.value || 1);
+              if (priceInp) expenseItems[rIdx].price_unit = Number(priceInp.value || 0);
+              if (taxInp) expenseItems[rIdx].tax_rate = Number(taxInp.value || 0);
+              if (totInp) expenseItems[rIdx].total = Number(totInp.value || 0);
+            });
+          }
+
+          // Collect items from table (each insumo preserved individually)
+          const cleanItems = expenseItems
+            .filter((it) => (it.description && String(it.description).trim()) || Number(it.price_unit) > 0 || Number(it.total) > 0 || Number(it.subtotal) > 0)
+            .map((it, idx) => {
+              const qty = Math.max(0.001, Number(it.quantity || 1));
+              const rate = Number(it.tax_rate || 0);
+              const rawPrice = Number(it.price_unit || 0);
+              const rawTot = Number(it.total || 0);
+              const tot = rawTot > 0 ? rawTot : round2c(qty * rawPrice * (1 + rate / 100));
+              const sub = it.subtotal !== undefined && it.subtotal !== null && Number(it.subtotal) > 0
+                ? Number(it.subtotal)
+                : (rate > 0 ? round2c(tot / (1 + rate / 100)) : tot);
+              const tax = it.tax_amount !== undefined && it.tax_amount !== null && Number(it.tax_amount) > 0
+                ? Number(it.tax_amount)
+                : round2c(tot - sub);
+              return {
+                id: it.id || idx + 1,
+                product_id: it.product_id || null,
+                description: String(it.description || name).trim(),
+                quantity: qty,
+                price_unit: rawPrice > 0 ? rawPrice : (qty > 0 ? round2c(sub / qty) : 0),
+                tax_rate: rate,
+                tax_amount: tax,
+                subtotal: sub,
+                total: tot
+              };
+            });
           const useLiteral = Boolean(literalTotals && Math.abs(literalTotals.total - totalAmount) < 0.01);
 
           const payload = {
@@ -751,10 +816,10 @@
             name,
             employee_name: document.getElementById('fExpEmployee').value.trim() || 'Andrés Salazar',
             department: existing.department || 'Operaciones & Proyectos',
-            product_id: prodVal ? Number(prodVal) : (defaultProd ? defaultProd.id : 1),
+            product_id: prodVal ? Number(prodVal) : null,
             product_name: prodVal
-              ? ((state.data.products.find((p) => Number(p.id) === Number(prodVal)) || {}).name || 'Gasto General')
-              : (defaultProd ? defaultProd.name : 'Gasto General'),
+              ? ((state.data.products.find((p) => Number(p.id) === Number(prodVal)) || {}).name || name)
+              : (cleanItems[0] ? cleanItems[0].description : name),
             partner_id: matchedPartner ? matchedPartner.id : (existing.partner_id || null),
             partner_name: partnerNameInput || (matchedPartner ? matchedPartner.name : ''),
             supplier_vat: suppVatInput || existing.supplier_vat || '',
