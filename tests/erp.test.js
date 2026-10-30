@@ -2495,5 +2495,7 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.ok(expJs.includes('fExpSupplierDropdown'), '05-expenses.js must render live supplier dropdown');
     assert.ok(expJs.includes('o_supplier_create_option'), '05-expenses.js must offer option to create new supplier when no match exists');
     assert.ok(expJs.includes('getSupplierContactsList'), '05-expenses.js must filter only suppliers via getSupplierContactsList');
+    assert.ok(!expJs.includes('#1e293b'), 'Supplier dropdown must not hardcode dark #1e293b background that breaks Light theme readability');
+    assert.ok(expJs.includes('var(--o-view-bg') && expJs.includes('var(--o-text-main'), 'Supplier dropdown must use theme-adaptive --o-view-bg and --o-text-main variables');
   });
 });

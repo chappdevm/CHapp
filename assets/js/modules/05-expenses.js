@@ -294,7 +294,7 @@
                       id="btnToggleSupplierDropdown"
                       tabindex="-1"
                       title="Mostrar lista de proveedores"
-                      style="position: absolute; right: 6px; background: transparent; border: none; color: var(--o-muted); cursor: pointer; padding: 4px; display: inline-flex; align-items: center;"
+                      style="position: absolute; right: 6px; background: transparent; border: none; color: var(--o-text-muted); cursor: pointer; padding: 4px; display: inline-flex; align-items: center;"
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
                     </button>
@@ -302,7 +302,7 @@
                   <div
                     id="fExpSupplierDropdown"
                     class="o_supplier_dropdown_menu"
-                    style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; max-height: 230px; overflow-y: auto; background: var(--o-surface, #1e293b); border: 1px solid var(--o-border, #334155); border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.28); z-index: 60;"
+                    style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; max-height: 230px; overflow-y: auto; background: var(--o-view-bg, #ffffff); color: var(--o-text-main, #031626); border: 1px solid var(--o-border-color, #c9dbe7); border-radius: 8px; box-shadow: 0 10px 25px rgba(3, 22, 38, 0.18); z-index: 60;"
                   ></div>
                 </div>
               </div>
@@ -582,12 +582,12 @@
       const exactMatch = q && suppliers.some((c) => (c.name || '').trim().toLowerCase() === q);
 
       let html = matches.length === 0 && !q
-        ? `<div style="padding: 10px 12px; font-size: 0.83rem; color: var(--o-muted);">No hay proveedores registrados. Escribe el nombre para crearlo.</div>`
-        : matches.map((c) => `<div class="o_supplier_option" data-supp-id="${c.id}" style="padding: 8px 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(148,163,184,0.12); font-size: 0.88rem;"><div><strong>${esc(c.name)}</strong>${c.vat ? `<span style="font-size: 0.78rem; color: var(--o-muted); margin-left: 6px;">NIT: ${esc(c.vat)}</span>` : ''}</div><span class="o_badge o_badge_info" style="font-size: 0.7rem;">Proveedor</span></div>`).join('');
+        ? `<div style="padding: 10px 12px; font-size: 0.83rem; color: var(--o-text-muted);">No hay proveedores registrados. Escribe el nombre para crearlo.</div>`
+        : matches.map((c) => `<div class="o_supplier_option" data-supp-id="${c.id}"><div style="color: var(--o-text-main);"><strong style="color: var(--o-text-main);">${esc(c.name)}</strong>${c.vat ? `<span style="font-size: 0.78rem; color: var(--o-text-muted); margin-left: 6px;">NIT: ${esc(c.vat)}</span>` : ''}</div><span class="o_badge o_badge_info" style="font-size: 0.7rem;">Proveedor</span></div>`).join('');
 
       if (q && !exactMatch) {
         const rawTyped = String(filterText || '').trim();
-        html += `<div class="o_supplier_create_option" data-create-name="${esc(rawTyped)}" style="padding: 9px 12px; cursor: pointer; background: rgba(37, 99, 235, 0.12); color: #38bdf8; font-weight: 600; font-size: 0.88rem; display: flex; align-items: center; gap: 6px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Crear proveedor "<strong>${esc(rawTyped)}</strong>"</span></div>`;
+        html += `<div class="o_supplier_create_option" data-create-name="${esc(rawTyped)}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Crear proveedor "<strong>${esc(rawTyped)}</strong>"</span></div>`;
       }
 
       supplierDropdown.innerHTML = html;

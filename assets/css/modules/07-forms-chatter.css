@@ -495,3 +495,53 @@
   }
 }
 
+/* Supplier Combobox Dropdown (Light & Dark Theme Adaptive) */
+.o_supplier_dropdown_menu {
+  background-color: var(--o-view-bg);
+  color: var(--o-text-main);
+  border: 1px solid var(--o-border-color);
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(3, 22, 38, 0.18);
+}
+
+.o_supplier_option {
+  padding: 9px 12px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--o-border-color);
+  font-size: 0.88rem;
+  color: var(--o-text-main);
+  background-color: var(--o-view-bg);
+  transition: background-color 0.12s ease;
+}
+
+.o_supplier_option strong {
+  color: var(--o-text-main);
+}
+
+.o_supplier_option:hover {
+  background-color: var(--o-action-subtle);
+}
+
+.o_supplier_create_option {
+  padding: 10px 12px;
+  cursor: pointer;
+  background-color: var(--o-action-subtle);
+  color: var(--o-action);
+  font-weight: 600;
+  font-size: 0.88rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background-color 0.12s ease;
+}
+
+.o_supplier_create_option strong {
+  color: var(--o-text-main);
+}
+
+.o_supplier_create_option:hover {
+  background-color: var(--o-gray-200);
+}

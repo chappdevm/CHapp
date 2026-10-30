@@ -445,12 +445,12 @@
           </div>
         </div>
         ${hasReceiptAttachment ? `
-          <div class="o_chatter_attachments_box" style="margin-bottom: 0.75rem; padding: 0.65rem 0.85rem; background: var(--o-bg-subtle, rgba(37,99,235,0.06)); border: 1px solid var(--o-border); border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap;">
+          <div class="o_chatter_attachments_box" style="margin-bottom: 0.75rem; padding: 0.65rem 0.85rem; background: var(--o-gray-100); border: 1px solid var(--o-border-color); border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap;">
             <div style="display: flex; align-items: center; gap: 0.65rem;">
-              <img src="${record.receipt_image}" alt="Adjunto factura" style="width: 44px; height: 44px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 1px solid var(--o-border);" onclick="openImageLightbox(this.src, '${esc(defaultAttName)}')" />
+              <img src="${record.receipt_image}" alt="Adjunto factura" style="width: 44px; height: 44px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 1px solid var(--o-border-color);" onclick="openImageLightbox(this.src, '${esc(defaultAttName)}')" />
               <div>
                 <div style="font-size: 0.84rem; font-weight: 700;">${esc(defaultAttName)}</div>
-                <div style="font-size: 0.75rem; color: var(--o-muted);">Archivo adjunto de factura registrada</div>
+                <div style="font-size: 0.75rem; color: var(--o-text-muted);">Archivo adjunto de factura registrada</div>
               </div>
             </div>
             <div style="display: flex; gap: 6px;">
@@ -477,11 +477,11 @@
                 </div>
                 <div>${esc(m.text)}</div>
                 ${msgAttachment ? `
-                  <div class="o_chatter_msg_attachment" style="margin-top: 0.5rem; padding: 0.5rem; background: rgba(15,23,42,0.25); border: 1px solid var(--o-border); border-radius: 6px; display: inline-flex; flex-direction: column; gap: 6px; max-width: 240px;">
+                  <div class="o_chatter_msg_attachment" style="margin-top: 0.5rem; padding: 0.5rem; background: var(--o-view-bg); border: 1px solid var(--o-border-color); border-radius: 6px; display: inline-flex; flex-direction: column; gap: 6px; max-width: 240px;">
                     <img src="${msgAttachment}" alt="${esc(msgAttName)}" style="max-width: 220px; max-height: 150px; object-fit: contain; border-radius: 4px; cursor: pointer;" onclick="openImageLightbox(this.src, '${esc(msgAttName)}')" title="Clic para ampliar foto registrada en el chatter" />
                     <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.75rem;">
-                      <span style="color: var(--o-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">📎 ${esc(msgAttName)}</span>
-                      <a href="${msgAttachment}" download="${esc(msgAttName)}" style="color: #38bdf8; font-weight: 600; text-decoration: none;">Descargar</a>
+                      <span style="color: var(--o-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">📎 ${esc(msgAttName)}</span>
+                      <a href="${msgAttachment}" download="${esc(msgAttName)}" style="color: var(--o-action); font-weight: 600; text-decoration: none;">Descargar</a>
                     </div>
                   </div>
                 ` : ''}
