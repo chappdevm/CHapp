@@ -2260,7 +2260,7 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.ok(cssText.includes('.o_login_card'), 'CSS must include .o_login_card');
     assert.ok(cssText.includes('backdrop-filter: blur(28px)'), 'CSS must include glassmorphic backdrop-filter');
     assert.ok(authJsText.includes('/assets/icons/logo.png'), 'Login must include logo.png');
-    assert.ok(authJsText.includes('/assets/icons/brand-banner.png'), 'Login must include brand-banner.png');
+    assert.ok(authJsText.includes('/assets/icons/nombreyslogan.png') || authJsText.includes('/assets/icons/brand-banner.png'), 'Login must include brand image');
     assert.ok(authJsText.includes('o_shape_torus'), 'Login must render 3D torus shape');
     assert.ok(authJsText.includes('o_shape_spiral'), 'Login must render 3D spiral shape');
     assert.ok(authJsText.includes('o_shape_zigzag'), 'Login must render 3D zigzag shape');

@@ -162,7 +162,7 @@
             <div class="o_login_logo_badge">
               <img src="/assets/icons/logo.png" alt="CH Aluminios Logo" />
             </div>
-            <img src="/assets/icons/brand-banner.png" alt="CH Aluminios - Innovación y Calidad" class="o_login_brand_banner" />
+            <img src="/assets/icons/nombreyslogan.png?v=2.24" alt="CH Aluminios - Innovación y Calidad" class="o_login_brand_banner" />
           </div>
 
           <div class="o_login_header">
@@ -375,12 +375,17 @@
       } catch (_) {}
 
       // Synchronize in-memory settings
+      if (data.state) {
+        state.data = data.state;
+      }
       if (state.data) {
         if (!state.data.settings) state.data.settings = {};
         state.data.settings.active_user = user;
       }
 
-      applyBrandingAndSystray();
+      if (typeof updateSystray === 'function') {
+        updateSystray();
+      }
 
       // Smooth transition to Home Menu
       const loginView = document.getElementById('loginView');
@@ -388,7 +393,9 @@
       if (loginView) loginView.style.display = 'none';
       if (mainNavbar) mainNavbar.style.display = 'flex';
 
-      openHomeMenu();
+      if (typeof openHomeMenu === 'function') {
+        openHomeMenu();
+      }
       showToast(`¡Bienvenido, ${user.name.split(' ')[0]}!`);
     } catch (err) {
       showToast(err.message || 'Error al iniciar sesión', true);
