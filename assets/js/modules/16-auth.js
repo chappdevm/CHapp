@@ -170,6 +170,9 @@
             <p class="o_login_subtitle">Acceso seguro a la plataforma empresarial ERP</p>
           </div>
 
+          <!-- In-card Alert Box for Feedback -->
+          <div id="loginErrorBox" class="o_login_error_box" role="alert" style="display: none;"></div>
+
           <!-- Login Form -->
           <form id="loginForm" class="o_login_form" autocomplete="on">
             <div class="o_login_field">
@@ -209,8 +212,8 @@
                   id="loginPassword"
                   name="password"
                   class="o_login_input"
-                  placeholder="••••••••••••"
-                  value="123456"
+                  placeholder="Ingrese su contraseña"
+                  value=""
                   required
                   autocomplete="current-password"
                   aria-label="Contraseña"
@@ -319,8 +322,10 @@
         const userId = Number(btn.getAttribute('data-user-id'));
         const userEmail = btn.getAttribute('data-user-email');
         const emailInput = document.getElementById('loginEmail');
+        const passInputEl = document.getElementById('loginPassword');
         if (emailInput && userEmail) emailInput.value = userEmail;
-        performLogin({ user_id: userId, email: userEmail });
+        if (passInputEl) passInputEl.value = '123456';
+        performLogin({ user_id: userId, email: userEmail, password: '123456' });
       });
     });
 
@@ -342,6 +347,14 @@
 
   async function performLogin(credentials) {
     const submitBtn = document.getElementById('btnLoginSubmit');
+    const errorBox = document.getElementById('loginErrorBox');
+    const cardEl = document.querySelector('.o_login_card');
+
+    if (errorBox) {
+      errorBox.style.display = 'none';
+      errorBox.innerHTML = '';
+    }
+
     if (submitBtn) {
       submitBtn.disabled = true;
       submitBtn.innerHTML = `<span>Verificando...</span>`;
@@ -398,7 +411,24 @@
       }
       showToast(`¡Bienvenido, ${user.name.split(' ')[0]}!`);
     } catch (err) {
-      showToast(err.message || 'Error al iniciar sesión', true);
+      const errorMsg = err.message || 'Error al iniciar sesión';
+      if (errorBox) {
+        errorBox.innerHTML = `
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <span>${esc(errorMsg)}</span>
+        `;
+        errorBox.style.display = 'flex';
+      }
+      if (cardEl) {
+        cardEl.classList.remove('o_login_shake');
+        void cardEl.offsetWidth; // Reflow trigger
+        cardEl.classList.add('o_login_shake');
+      }
+      showToast(errorMsg, true);
     } finally {
       if (submitBtn) {
         submitBtn.disabled = false;

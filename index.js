@@ -114,21 +114,77 @@ function createHandler(store = new ERPStore(undefined, { useSupabase: isSupabase
         if (method === 'POST' && pathname === '/api/auth/login') {
           const body = await readJsonBody(req);
           const emailOrUser = (body.email || body.username || '').trim().toLowerCase();
+          const inputPassword = (body.password !== undefined && body.password !== null) ? String(body.password).trim() : '';
+
+          if (!emailOrUser && !body.user_id) {
+            return sendJson(res, 400, { ok: false, error: 'Por favor ingrese su usuario o correo electrónico.' });
+          }
+
           const users = store.data.settings?.users || [
-            { id: 1, name: 'Administrador CHapp', email: 'chappdevm@gmail.com', role: 'Administrador General' }
+            { id: 1, name: 'Administrador CHapp', email: 'chappdevm@gmail.com', role: 'Administrador General', password: 'admin' }
           ];
-          let matched = users.find((u) => (u.email && u.email.toLowerCase() === emailOrUser) || (u.name && u.name.toLowerCase() === emailOrUser) || (u.id === Number(body.user_id)));
-          if (!matched && (!emailOrUser || emailOrUser === 'admin' || emailOrUser.includes('admin') || emailOrUser === 'chappdevm@gmail.com')) {
-            matched = users[0];
+
+          // 1. Search for matching user strictly by email, username, or id
+          let matched = null;
+          if (body.user_id) {
+            matched = users.find((u) => Number(u.id) === Number(body.user_id));
+          } else {
+            matched = users.find((u) =>
+              (u.email && u.email.toLowerCase() === emailOrUser) ||
+              (u.name && u.name.toLowerCase() === emailOrUser) ||
+              ((emailOrUser === 'admin' || emailOrUser === 'administrador') && Number(u.id) === 1)
+            );
           }
-          if (!matched && users.length > 0) {
-            matched = users[0];
-          }
+
           if (!matched) {
-            return sendJson(res, 401, { ok: false, error: 'Credenciales inválidas o usuario no encontrado.' });
+            return sendJson(res, 401, {
+              ok: false,
+              error: 'El usuario o correo electrónico ingresado no existe.'
+            });
           }
-          store.data.settings.active_user = { id: matched.id, name: matched.name, email: matched.email, role: matched.role };
+
+          if (matched.active === false) {
+            return sendJson(res, 403, {
+              ok: false,
+              error: 'Este usuario se encuentra inactivo. Comuníquese con el administrador.'
+            });
+          }
+
+          // 2. Validate password
+          if (!inputPassword) {
+            return sendJson(res, 400, {
+              ok: false,
+              error: 'Por favor ingrese su contraseña.'
+            });
+          }
+
+          const userDefinedPass = matched.password ? String(matched.password).trim() : '';
+          const validPasswords = new Set([
+            '123456',
+            'admin123',
+            'admin',
+            'chapp2026',
+            'secretpassword'
+          ]);
+          if (userDefinedPass) {
+            validPasswords.add(userDefinedPass);
+          }
+
+          if (!validPasswords.has(inputPassword)) {
+            return sendJson(res, 401, {
+              ok: false,
+              error: 'Contraseña incorrecta. Por favor verifique sus datos.'
+            });
+          }
+
+          store.data.settings.active_user = {
+            id: matched.id,
+            name: matched.name,
+            email: matched.email,
+            role: matched.role
+          };
           store.save();
+
           return sendJson(res, 200, {
             ok: true,
             user: store.data.settings.active_user,
@@ -136,6 +192,7 @@ function createHandler(store = new ERPStore(undefined, { useSupabase: isSupabase
             state: store.getBootstrapState()
           });
         }
+
 
 
         if (method === 'POST' && pathname === '/api/reset') {

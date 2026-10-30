@@ -2242,12 +2242,30 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
   });
 
   it('Auth & Login: validates creative 3D glassmorphic login screen, logo/banner branding, and authentication endpoint', async () => {
-    // 1. Verify /api/auth/login endpoint
+    // 1. Verify /api/auth/login endpoint (success & strict validation)
     const loginRes = await req('/api/auth/login', 'POST', { email: 'chappdevm@gmail.com', password: 'secretpassword' });
     assert.equal(loginRes.status, 200);
     assert.equal(loginRes.json.ok, true);
     assert.equal(loginRes.json.user.email, 'chappdevm@gmail.com');
     assert.ok(loginRes.json.token.startsWith('chapp_session_'));
+
+    // Reject unknown user
+    const unknownRes = await req('/api/auth/login', 'POST', { email: 'inexistente@example.com', password: '123' });
+    assert.equal(unknownRes.status, 401);
+    assert.equal(unknownRes.json.ok, false);
+    assert.ok(unknownRes.json.error.includes('no existe'));
+
+    // Reject wrong password
+    const wrongPassRes = await req('/api/auth/login', 'POST', { email: 'chappdevm@gmail.com', password: 'wrongpassword' });
+    assert.equal(wrongPassRes.status, 401);
+    assert.equal(wrongPassRes.json.ok, false);
+    assert.ok(wrongPassRes.json.error.includes('Contraseña incorrecta'));
+
+    // Reject missing password
+    const emptyPassRes = await req('/api/auth/login', 'POST', { email: 'chappdevm@gmail.com', password: '' });
+    assert.equal(emptyPassRes.status, 400);
+    assert.equal(emptyPassRes.json.ok, false);
+    assert.ok(emptyPassRes.json.error.includes('ingrese su contraseña'));
 
     // 2. Verify HTML and CSS contracts for 3D glassmorphic login
     const htmlText = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
