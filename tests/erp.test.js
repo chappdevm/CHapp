@@ -2767,4 +2767,178 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
       }
     });
   });
+
+  it('Module 3 (Ventas & Contratos): Flujo de 4 Estados (Cotización -> Cotización Enviada -> Pedido de Venta -> Entregado), Contrato Físico y Facturación Automática', async () => {
+    // 1. Crear cliente y cotización borrador
+    const custRes = await req('/api/contacts', 'POST', {
+      name: 'Carlos Mendoza Contrato Test',
+      vat: '1088234567',
+      street: 'Calle 14 # 25-10',
+      city: 'Pereira',
+      phone: '3119988776',
+      payment_term: '30 Días'
+    });
+    assert.equal(custRes.status, 200);
+    const partnerId = custRes.json.contact.id;
+
+    const prodRes = await req('/api/products', 'POST', {
+      name: 'Ventana Corrediza 1.20 x 1.00 CH',
+      list_price: 380000,
+      uom: 'Metro Cuadrado',
+      tax_rate: 19
+    });
+    assert.equal(prodRes.status, 200);
+    const prodId = prodRes.json.product.id;
+
+    // Estado 1: draft (Cotización)
+    const saleRes = await req('/api/sales', 'POST', {
+      partner_id: partnerId,
+      payment_term: '30 Días',
+      lines: [
+        { product_id: prodId, measure: 1.2, quantity: 1, price_unit: 380000, discount: 0, tax_rate: 19 }
+      ]
+    });
+    assert.equal(saleRes.status, 200);
+    const saleId = saleRes.json.order.id;
+    assert.equal(saleRes.json.order.state, 'draft');
+    assert.equal(saleRes.json.order.invoice_ids.length, 0);
+
+    // Estado 2: sent (Cotización Enviada)
+    const sendRes = await req(`/api/sales/${saleId}/action`, 'POST', { action: 'send' });
+    assert.equal(sendRes.status, 200);
+    assert.equal(sendRes.json.order.state, 'sent');
+    assert.equal(sendRes.json.order.invoice_ids.length, 0);
+
+    // Estado 3: sale (Pedido de Venta) - Al confirmar NO debe generar factura aún
+    const confirmRes = await req(`/api/sales/${saleId}/action`, 'POST', { action: 'confirm' });
+    assert.equal(confirmRes.status, 200);
+    assert.equal(confirmRes.json.order.state, 'sale');
+    assert.equal(confirmRes.json.order.invoice_ids.length, 0, 'No debe generar factura al confirmar el pedido');
+
+    // Guardar datos del contrato
+    const contractPayload = {
+      id: saleId,
+      partner_id: partnerId,
+      contract_data: {
+        residence_neighborhood: 'Las Mercedes Cuba',
+        work_address: 'Av 30 de Agosto # 45-12',
+        work_neighborhood: 'Centro',
+        work_phone: '3157778899',
+        codebtor_name: 'Martha Gomez',
+        codebtor_vat: '42111222',
+        codebtor_phone: '3206665544',
+        codebtor_address: 'Mz 10 Casa 20',
+        collection_place: 'work',
+        install_date: '2026-11-20',
+        down_payment_date: '2026-11-10',
+        ref_commercial_1: 'Ferretería El Cóndor',
+        ref_commercial_phone_1: '3334445566',
+        ref_family_1: 'Pedro Mendoza',
+        ref_family_phone_1: '3112223344',
+        observations: 'Instalar con sellador de alta resistencia'
+      }
+    };
+    const updateRes = await req('/api/sales', 'POST', contractPayload);
+    assert.equal(updateRes.status, 200);
+    assert.equal(updateRes.json.order.contract_data.work_address, 'Av 30 de Agosto # 45-12');
+    assert.equal(updateRes.json.order.contract_data.collection_place, 'work');
+    assert.equal(updateRes.json.order.contract_data.codebtor_name, 'Martha Gomez');
+    assert.equal(updateRes.json.order.invoice_ids.length, 0, 'Sigue sin facturar en estado sale');
+
+    // Estado 4: deliver (Aprobar Contrato y Entregar) -> Genera y contabiliza factura automáticamente
+    const deliverRes = await req(`/api/sales/${saleId}/action`, 'POST', { action: 'deliver' });
+    assert.equal(deliverRes.status, 200);
+    assert.equal(deliverRes.json.order.state, 'delivered');
+    assert.equal(deliverRes.json.order.contract_approved, true);
+    assert.equal(deliverRes.json.order.invoice_ids.length, 1, 'Debe haber generado exactamente 1 factura');
+    assert.ok(deliverRes.json.invoice, 'Respuesta debe retornar la factura generada');
+    assert.equal(deliverRes.json.invoice.state, 'posted', 'La factura generada debe estar publicada automáticamente');
+    assert.equal(deliverRes.json.invoice.origin, deliverRes.json.order.name);
+    assert.equal(deliverRes.json.invoice.amount_total, deliverRes.json.order.amount_total);
+
+    // 2. Verificación de lógica y helpers frontend
+    const contractJs = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'modules', '08b-pdf-contract.js'), 'utf8');
+    const salesFormJs = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'modules', '10-sales-form.js'), 'utf8');
+    const salesViewsJs = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'modules', '06-sales-views.js'), 'utf8');
+    const contractCss = fs.readFileSync(path.join(__dirname, '..', 'assets', 'css', 'modules', '13-contract-sheet.css'), 'utf8');
+    const odooCss = fs.readFileSync(path.join(__dirname, '..', 'assets', 'css', 'odoo20.css'), 'utf8');
+    const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+
+    // Script & CSS imports
+    assert.ok(indexHtml.includes('assets/js/modules/08b-pdf-contract.js'), 'index.html debe cargar 08b-pdf-contract.js');
+    assert.ok(odooCss.includes('modules/13-contract-sheet.css'), 'odoo20.css debe importar 13-contract-sheet.css');
+
+    // Funciones exportadas
+    assert.ok(contractJs.includes('renderContractPdfSheetHtml'), '08b-pdf-contract.js debe exportar renderContractPdfSheetHtml');
+    assert.ok(contractJs.includes('downloadContractPdf'), '08b-pdf-contract.js debe exportar downloadContractPdf');
+    assert.ok(contractJs.includes('renderSaleContractTabHtml'), '08b-pdf-contract.js debe exportar renderSaleContractTabHtml');
+    assert.ok(contractJs.includes('getSaleContractData'), '08b-pdf-contract.js debe exportar getSaleContractData');
+
+    // Contenido del Contrato Físico idéntico
+    assert.ok(contractJs.includes('ALUMINIOS C.H.') && contractJs.includes('CALIDAD PARA TU HOGAR'), 'Contrato debe incluir encabezado ALUMINIOS C.H. y CALIDAD PARA TU HOGAR');
+    assert.ok(contractJs.includes('MZ 32 CASA 584 LAS MERCEDES CUBA - PEREIRA'), 'Contrato debe incluir dirección Pereira');
+    assert.ok(contractJs.includes('3138483191'), 'Contrato debe incluir teléfono 3138483191');
+    assert.ok(contractJs.includes('LETRA DE CAMBIO POR $'), 'Contrato debe incluir Letra de Cambio');
+    assert.ok(contractJs.includes('ACEPTADA'), 'Contrato debe incluir casilla ACEPTADA');
+    assert.ok(contractJs.includes('CEDULA O NIT'), 'Contrato debe incluir casilla CEDULA O NIT');
+    assert.ok(contractJs.includes('Firma Cliente'), 'Contrato debe incluir firma de cliente');
+    assert.ok(contractJs.includes('Firma Codeudor'), 'Contrato debe incluir firma de codeudor');
+    assert.ok(contractJs.includes('Firma Vendedor'), 'Contrato debe incluir firma de vendedor');
+    assert.ok(contractJs.includes('Cobrar en el trabajo'), 'Contrato debe incluir opción Cobrar en el trabajo');
+    assert.ok(contractJs.includes('En la casa'), 'Contrato debe incluir opción En la casa');
+    assert.ok(contractJs.includes('Paga en la oficina'), 'Contrato debe incluir opción Paga en la oficina');
+
+    // Botones dinámicos de WhatsApp y transición en sales-form
+    assert.ok(salesFormJs.includes("'Enviar Contrato'"), 'sales-form debe incluir etiqueta Enviar Contrato');
+    assert.ok(salesFormJs.includes("'Enviar Factura'"), 'sales-form debe incluir etiqueta Enviar Factura');
+    assert.ok(salesFormJs.includes("'Enviar Cotización'"), 'sales-form debe incluir etiqueta Enviar Cotización');
+    assert.ok(salesFormJs.includes('btnApproveContractDeliver'), 'sales-form debe incluir botón Aprobar Contrato y Entregar');
+    assert.ok(salesFormJs.includes('data-sale-action="send"'), 'sales-form debe incluir acción Enviar Cotización');
+    assert.ok(salesFormJs.includes('btnSaveContractData'), 'sales-form debe incluir botón Guardar Contrato en estado sale');
+    assert.ok(salesFormJs.includes('Datos del Contrato'), 'sales-form debe incluir pestaña Datos del Contrato');
+
+    // Referencias completas en el tab de contrato
+    assert.ok(contractJs.includes('ref_commercial_2'), 'Contrato debe soportar Referencia Comercial 2');
+    assert.ok(contractJs.includes('ref_family_2'), 'Contrato debe soportar Referencia Familiar 2');
+
+    // Alias mapping y normalización en getSaleContractData
+    const testContractHelper = new Function(contractJs + '; return getSaleContractData;')();
+    const parsedData = testContractHelper({
+      amount_total: 500000,
+      contract_data: {
+        codebtor_name: 'Martha Codebtor',
+        install_date: '2026-12-01',
+        collection_place: 'work'
+      }
+    });
+    assert.equal(parsedData.codeudor_name, 'Martha Codebtor', 'codebtor_name debe mapearse a codeudor_name');
+    assert.equal(parsedData.installation_date, '2026-12-01', 'install_date debe mapearse a installation_date');
+    assert.equal(parsedData.collection_place, 'trabajo', 'work debe normalizarse a trabajo');
+    assert.equal(parsedData.residence_address, '', 'Dirección de residencia no debe contaminarse con dirección de la empresa si el cliente no la tiene');
+
+    // Kanban columns en sales-views
+    assert.ok(salesViewsJs.includes("id: 'delivered'"), 'Kanban debe incluir columna Entregado');
+
+    // 3. Verificación de CERO emojis en botones
+    const btnEmojiRegex = /<button[\s\S]*?<\/button>/gi;
+    const emojiCheck = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u;
+    [contractJs, salesFormJs, salesViewsJs].forEach((content) => {
+      const btns = content.match(btnEmojiRegex) || [];
+      for (const b of btns) {
+        assert.ok(!emojiCheck.test(b), `Found forbidden emoji in button: ${b}`);
+      }
+    });
+
+    // 4. Verificación de límite de líneas < 900
+    [
+      path.join(__dirname, '..', 'assets', 'js', 'modules', '08b-pdf-contract.js'),
+      path.join(__dirname, '..', 'assets', 'js', 'modules', '10-sales-form.js'),
+      path.join(__dirname, '..', 'assets', 'js', 'modules', '06-sales-views.js'),
+      path.join(__dirname, '..', 'assets', 'css', 'modules', '13-contract-sheet.css')
+    ].forEach((filePath) => {
+      const lc = fs.readFileSync(filePath, 'utf8').split('\n').length;
+      assert.ok(lc < 900, `File ${path.basename(filePath)} has ${lc} lines, exceeds 900 limit`);
+    });
+  });
 });
+

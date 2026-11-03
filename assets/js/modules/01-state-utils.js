@@ -241,6 +241,7 @@
     if (String(existing.validity_date || '').slice(0, 10) !== String(draft.validity_date || '').slice(0, 10)) return true;
     if (String(existing.salesperson || '').trim() !== String(draft.salesperson || '').trim()) return true;
     if (String(existing.notes || '').trim() !== String(draft.notes || '').trim()) return true;
+    if (draft.contract_data && JSON.stringify(draft.contract_data) !== JSON.stringify(existing.contract_data || {})) return true;
 
     const existLines = Array.isArray(existing.lines) ? existing.lines : [];
     const draftLines = Array.isArray(draft.lines) ? draft.lines : [];

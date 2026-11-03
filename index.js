@@ -390,15 +390,31 @@ function createHandler(store = new ERPStore(undefined, { useSupabase: isSupabase
             throw new Error('No se recibió el documento PDF para enviar.');
           }
 
-          const defaultCaption = caption || (model === 'sales'
-            ? `Hola ${partnerName || ''}, adjuntamos su cotización ${docName} de CH Aluminios. Quedamos a su entera disposición.`
-            : `Hola ${partnerName || ''}, adjuntamos su factura electrónica ${docName} de CH Aluminios. Agradecemos su preferencia.`
+          const isSaleContract = model === 'sales' && record.state === 'sale';
+          const isSaleDelivered = model === 'sales' && record.state === 'delivered';
+
+          const defaultCaption = caption || (
+            model === 'sales'
+              ? (isSaleContract
+                  ? `Hola ${partnerName || ''}, adjuntamos su contrato de venta y pedido ${docName} de ALUMINIOS C.H. CALIDAD PARA TU HOGAR. Quedamos atentos a su firma.`
+                  : (isSaleDelivered
+                      ? `Hola ${partnerName || ''}, adjuntamos su factura electrónica de venta del pedido ${docName} de CH Aluminios. ¡Muchas gracias por su preferencia!`
+                      : `Hola ${partnerName || ''}, adjuntamos su cotización ${docName} de CH Aluminios. Quedamos a su entera disposición.`
+                    )
+                )
+              : `Hola ${partnerName || ''}, adjuntamos su factura electrónica ${docName} de CH Aluminios. Agradecemos su preferencia.`
           );
 
           const sendResult = await baileysManager.sendPdf(targetPhone, pdfBase64, filename || `${docName}.pdf`, defaultCaption);
 
           const chatterMsg = model === 'sales'
-            ? `Cotización ${docName} enviada por WhatsApp al cliente (+${sendResult.to}).`
+            ? (isSaleContract
+                ? `Contrato de venta ${docName} enviado por WhatsApp al cliente (+${sendResult.to}).`
+                : (isSaleDelivered
+                    ? `Factura de venta del pedido ${docName} enviada por WhatsApp al cliente (+${sendResult.to}).`
+                    : `Cotización ${docName} enviada por WhatsApp al cliente (+${sendResult.to}).`
+                  )
+              )
             : `Factura ${docName} enviada por WhatsApp al cliente (+${sendResult.to}).`;
 
           await store.addChatterNote(model === 'sales' ? 'sales' : 'accounting', id, chatterMsg);

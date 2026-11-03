@@ -760,7 +760,7 @@ class ERPStore {
   }
 
   getSummaryKPIs() {
-    const salesConfirmed = this.data.sales.filter((s) => s.state === 'sale');
+    const salesConfirmed = this.data.sales.filter((s) => s.state === 'sale' || s.state === 'delivered');
     const quotations = this.data.sales.filter((s) => s.state === 'draft' || s.state === 'sent');
     const expensesToSubmit = this.data.expenses.filter((e) => e.state === 'draft');
     const expensesSubmitted = this.data.expenses.filter((e) => e.state === 'submitted');
@@ -1609,7 +1609,7 @@ class ERPStore {
   recomputeSaleOrderInvoiceStatus(order) {
     if (!order) return;
     order.installment_plan = this.buildSaleInstallmentPlan(order);
-    if (order.state !== 'sale') return;
+    if (order.state !== 'sale' && order.state !== 'delivered') return;
     const validMoves = (order.invoice_ids || [])
       .map((mid) => this.data.accounting.moves.find((m) => Number(m.id) === Number(mid)))
       .filter((m) => m && m.state !== 'cancel');
@@ -2400,47 +2400,54 @@ class ERPStore {
       idx = this.data.sales.findIndex((s) => Number(s.id) === Number(payload.id));
       if (idx === -1) throw new Error('Pedido de venta no encontrado.');
       existing = this.data.sales[idx];
-      if (existing.state === 'sale' || existing.state === 'cancel') {
+      if (existing.state === 'sale' || existing.state === 'delivered' || existing.state === 'cancel') {
         const isPartnerChanged = payload.partner_id !== undefined && Number(payload.partner_id) !== Number(existing.partner_id);
-        const lines = this.normalizeOrderLines(payload.lines);
-        const existingLinesNorm = (existing.lines || []).map((l) => ({
-          product_id: l.product_id ? Number(l.product_id) : '',
-          name: String(l.name || l.description || '').trim(),
-          description: String(l.description || l.name || '').trim(),
-          measure: Number(l.measure || 1),
-          quantity: Number(l.quantity || 0),
-          price_unit: Number(l.price_unit || 0),
-          discount: Number(l.discount || 0),
-          tax_rate: l.tax_rate !== '' && l.tax_rate !== undefined && l.tax_rate !== null ? Number(l.tax_rate) : 0
-        }));
-        const newLinesNorm = lines.map((l) => ({
-          product_id: l.product_id ? Number(l.product_id) : '',
-          name: String(l.name || l.description || '').trim(),
-          description: String(l.description || l.name || '').trim(),
-          measure: Number(l.measure || 1),
-          quantity: Number(l.quantity || 0),
-          price_unit: Number(l.price_unit || 0),
-          discount: Number(l.discount || 0),
-          tax_rate: l.tax_rate !== '' && l.tax_rate !== undefined && l.tax_rate !== null ? Number(l.tax_rate) : 0
-        }));
-        const isLinesChanged = payload.lines !== undefined && JSON.stringify(existingLinesNorm) !== JSON.stringify(newLinesNorm);
-        if (isPartnerChanged || isLinesChanged) {
+        if (payload.lines !== undefined) {
+          const lines = this.normalizeOrderLines(payload.lines);
+          const existingLinesNorm = (existing.lines || []).map((l) => ({
+            product_id: l.product_id ? Number(l.product_id) : '',
+            name: String(l.name || l.description || '').trim(),
+            description: String(l.description || l.name || '').trim(),
+            measure: Number(l.measure || 1),
+            quantity: Number(l.quantity || 0),
+            price_unit: Number(l.price_unit || 0),
+            discount: Number(l.discount || 0),
+            tax_rate: l.tax_rate !== '' && l.tax_rate !== undefined && l.tax_rate !== null ? Number(l.tax_rate) : 0
+          }));
+          const newLinesNorm = lines.map((l) => ({
+            product_id: l.product_id ? Number(l.product_id) : '',
+            name: String(l.name || l.description || '').trim(),
+            description: String(l.description || l.name || '').trim(),
+            measure: Number(l.measure || 1),
+            quantity: Number(l.quantity || 0),
+            price_unit: Number(l.price_unit || 0),
+            discount: Number(l.discount || 0),
+            tax_rate: l.tax_rate !== '' && l.tax_rate !== undefined && l.tax_rate !== null ? Number(l.tax_rate) : 0
+          }));
+          const isLinesChanged = JSON.stringify(existingLinesNorm) !== JSON.stringify(newLinesNorm);
+          if (isPartnerChanged || isLinesChanged) {
+            throw new Error('No se puede modificar el cliente ni los productos de un pedido de venta confirmado o cancelado.');
+          }
+        } else if (isPartnerChanged) {
           throw new Error('No se puede modificar el cliente ni los productos de un pedido de venta confirmado o cancelado.');
         }
       }
     }
 
-    const partner = this.data.contacts.find((c) => Number(c.id) === Number(payload.partner_id));
-    if (!partner && !payload.partner_name) {
+    const targetPartnerId = payload.partner_id !== undefined ? payload.partner_id : (existing ? existing.partner_id : null);
+    const partner = this.data.contacts.find((c) => Number(c.id) === Number(targetPartnerId));
+    if (!partner && !payload.partner_name && (!existing || !existing.partner_name)) {
       throw new Error('Debe seleccionar un cliente para la cotización/pedido.');
     }
 
-    const lines = this.normalizeOrderLines(payload.lines);
+    const linesInput = payload.lines !== undefined ? payload.lines : (existing ? existing.lines : []);
+    const lines = this.normalizeOrderLines(linesInput);
     const amountUntaxed = round2(lines.reduce((s, l) => s + l.subtotal, 0));
     const amountTax = round2(lines.reduce((s, l) => s + l.tax_amount, 0));
     const amountTotal = round2(amountUntaxed + amountTax);
 
     if (existing) {
+      const contractData = payload.contract_data !== undefined ? payload.contract_data : (existing.contract_data || {});
       const updated = {
         ...existing,
         partner_id: partner ? partner.id : existing.partner_id,
@@ -2449,6 +2456,7 @@ class ERPStore {
         validity_date: payload.validity_date || existing.validity_date,
         salesperson: String(payload.salesperson || existing.salesperson).trim(),
         payment_term: String(payload.payment_term || existing.payment_term).trim(),
+        contract_data: contractData,
         lines,
         amount_untaxed: amountUntaxed,
         amount_tax: amountTax,
@@ -2457,6 +2465,7 @@ class ERPStore {
       };
       this.recomputeSaleOrderInvoiceStatus(updated);
       const isLinesChanged = !areSaleLinesSemanticEqual(lines, existing.lines);
+      const isContractChanged = payload.contract_data !== undefined && JSON.stringify(payload.contract_data) !== JSON.stringify(existing.contract_data || {});
       const isSaleChanged =
         (partner && Number(partner.id) !== Number(existing.partner_id)) ||
         (payload.date_order && String(payload.date_order) !== String(existing.date_order)) ||
@@ -2464,6 +2473,7 @@ class ERPStore {
         (payload.payment_term !== undefined && String(payload.payment_term).trim() !== String(existing.payment_term || '').trim()) ||
         (payload.salesperson !== undefined && String(payload.salesperson).trim() !== String(existing.salesperson || '').trim()) ||
         (payload.notes !== undefined && String(payload.notes).trim() !== String(existing.notes || '').trim()) ||
+        isContractChanged ||
         Math.abs(amountTotal - Number(existing.amount_total || 0)) > 0.01;
 
       if (!isLinesChanged && !isSaleChanged) {
@@ -2508,6 +2518,7 @@ class ERPStore {
       state: 'draft',
       invoice_status: 'no',
       lines,
+      contract_data: payload.contract_data || {},
       amount_untaxed: amountUntaxed,
       amount_tax: amountTax,
       amount_total: amountTotal,
@@ -2530,6 +2541,178 @@ class ERPStore {
       }
     }
     return newOrder;
+  }
+
+  _createSaleInvoiceInternal(order, reqAmount = null, params = {}) {
+    const existingInvoices = (order.invoice_ids || [])
+      .map((mid) => this.data.accounting.moves.find((m) => Number(m.id) === Number(mid)))
+      .filter((m) => m && m.state !== 'cancel');
+    const invoicedUntaxed = round2(existingInvoices.reduce((s, m) => s + Number(m.amount_untaxed || 0), 0));
+    const invoicedTax = round2(existingInvoices.reduce((s, m) => s + Number(m.amount_tax || 0), 0));
+    const invoicedTotal = round2(existingInvoices.reduce((s, m) => s + Number(m.amount_total || 0), 0));
+
+    const deltaUntaxed = round2(order.amount_untaxed - invoicedUntaxed);
+    const deltaTax = round2(order.amount_tax - invoicedTax);
+    const deltaTotal = round2(order.amount_total - invoicedTotal);
+
+    if (deltaTotal <= 0) {
+      throw new Error('Este pedido de venta ya fue facturado en su totalidad.');
+    }
+
+    let billTotal = deltaTotal;
+    let isPartialInstallment = false;
+
+    if (reqAmount !== null && Number.isFinite(reqAmount) && reqAmount > 0) {
+      if (reqAmount > deltaTotal) {
+        throw new Error(`El valor del abono (${reqAmount}) no puede superar el saldo pendiente de facturar (${deltaTotal}).`);
+      }
+      billTotal = reqAmount;
+      if (billTotal < deltaTotal) {
+        isPartialInstallment = true;
+      }
+    }
+
+    let billUntaxed = 0;
+    let billTax = 0;
+    if (Math.abs(billTotal - deltaTotal) < 0.001) {
+      billUntaxed = deltaUntaxed;
+      billTax = deltaTax;
+    } else {
+      const orderTotal = round2(order.amount_total);
+      const taxRatio = orderTotal > 0 ? (order.amount_tax / orderTotal) : 0;
+      billTax = round2(billTotal * taxRatio);
+      billUntaxed = round2(billTotal - billTax);
+    }
+
+    const pendingResidualAfterThis = round2(deltaTotal - billTotal);
+    const installmentNum = existingInvoices.length + 1;
+    const isAbono = isPartialInstallment || existingInvoices.length > 0;
+    const isDeltaInvoice = existingInvoices.length > 0 && invoicedTotal > 0;
+
+    const invSeq = this.nextSeq('move_inv');
+    const moveId = this.data.accounting.moves.reduce((m, x) => Math.max(m, Number(x.id)), 0) + 1;
+    const invName = `INV/2026/${this.padSeq(invSeq, 4)}`;
+    const planItems = this.buildSaleInstallmentPlan(order);
+    const matchedPlanItem = planItems.find((p) => Number(p.installment_number) === Number(installmentNum));
+    const invDate = (params && params.invoice_date) ? String(params.invoice_date).trim() : todayStr();
+    const dueDate = (params && params.due_date)
+      ? String(params.due_date).trim()
+      : (matchedPlanItem && matchedPlanItem.due_date ? matchedPlanItem.due_date : addDays(invDate, 30));
+
+    const conceptNote = isAbono
+      ? `Abono / Cuota #${installmentNum} a la orden ${order.name} (Saldo restante: $ ${pendingResidualAfterThis.toLocaleString('es-CO')})`
+      : `Facturación orden ${order.name}`;
+
+    const moveLines = (!isAbono && !isDeltaInvoice)
+      ? order.lines.map((l, i) => ({
+          id: i + 1,
+          product_id: l.product_id,
+          name: `${l.product_name}${l.description && l.description !== l.product_name ? ' - ' + l.description : ''}`,
+          account_code: '413501',
+          account_name: 'Ingresos por Servicios de Software y Consultoría',
+          quantity: l.quantity,
+          price_unit: round2(l.subtotal / l.quantity),
+          tax_rate: l.tax_rate,
+          subtotal: l.subtotal,
+          tax_amount: l.tax_amount,
+          total: l.total
+        }))
+      : [
+          {
+            id: 1,
+            product_id: order.lines[0] ? order.lines[0].product_id : 1,
+            name: conceptNote,
+            account_code: '413501',
+            account_name: 'Ingresos por Servicios de Software y Consultoría',
+            quantity: 1,
+            price_unit: billUntaxed,
+            tax_rate: billUntaxed > 0 ? round2((billTax / billUntaxed) * 100) : 0,
+            subtotal: billUntaxed,
+            tax_amount: billTax,
+            total: billTotal
+          }
+        ];
+
+    const journalItems = [
+      {
+        account_code: '130505',
+        account_name: 'Clientes Nacionales (Cuentas por Cobrar)',
+        label: `${invName} - ${order.partner_name}`,
+        debit: billTotal,
+        credit: 0
+      },
+      {
+        account_code: '413501',
+        account_name: 'Ingresos por Servicios de Software y Consultoría',
+        label: `${conceptNote}`,
+        debit: 0,
+        credit: billUntaxed
+      }
+    ];
+    if (billTax > 0) {
+      journalItems.push({
+        account_code: '240801',
+        account_name: 'IVA Generado en Ventas (19%)',
+        label: `IVA Generado ${invName}`,
+        debit: 0,
+        credit: billTax
+      });
+    }
+
+    const invoice = {
+      id: moveId,
+      name: invName,
+      move_type: 'out_invoice',
+      journal_id: 1,
+      journal_code: 'INV',
+      journal_name: 'Facturas de Clientes',
+      partner_id: order.partner_id,
+      partner_name: order.partner_name,
+      invoice_date: invDate,
+      invoice_date_due: dueDate,
+      ref: order.name,
+      origin: order.name,
+      state: 'posted',
+      payment_state: 'not_paid',
+      lines: moveLines,
+      journal_items: journalItems,
+      amount_untaxed: billUntaxed,
+      amount_tax: billTax,
+      amount_total: billTotal,
+      amount_residual: billTotal,
+      order_total: round2(order.amount_total),
+      invoiced_prior: invoicedTotal,
+      advance_amount: billTotal,
+      order_residual: pendingResidualAfterThis,
+      installment_number: installmentNum,
+      is_installment: isAbono,
+      chatter: [
+        {
+          id: this.nextChatterId(),
+          author: this.getActiveAuthor(),
+          date: this.formatNowShort(),
+          text: isAbono
+            ? `Factura ${invName} creada y publicada por concepto de Abono Cuota #${installmentNum} ($ ${billTotal.toLocaleString('es-CO')}). Saldo pendiente de la orden: $ ${pendingResidualAfterThis.toLocaleString('es-CO')}.`
+            : `Factura ${invName} creada y publicada desde el pedido ${order.name}.`
+        }
+      ]
+    };
+
+    this.data.accounting.moves.unshift(invoice);
+    order.invoice_ids = [...(order.invoice_ids || []), invoice.id];
+    const newInvoicedTotal = round2(invoicedTotal + billTotal);
+    order.invoice_status = newInvoicedTotal >= round2(order.amount_total) ? 'invoiced' : 'to invoice';
+    order.installment_plan = this.buildSaleInstallmentPlan(order);
+    order.chatter.push({
+      id: this.nextChatterId(),
+      author: this.getActiveAuthor(),
+      date: this.formatNowShort(),
+      text: isAbono
+        ? `Factura de cliente ${invName} emitida por Abono Cuota #${installmentNum} de $ ${billTotal.toLocaleString('es-CO')}. Total facturado: $ ${newInvoicedTotal.toLocaleString('es-CO')}. Saldo restante: $ ${pendingResidualAfterThis.toLocaleString('es-CO')}.`
+        : `Factura de cliente ${invName} creada en Contabilidad.`
+    });
+
+    return invoice;
   }
 
   async transitionSaleOrder(id, action, params = {}) {
@@ -2562,180 +2745,39 @@ class ERPStore {
         text: `Cotización confirmada -> Pedido de Venta ${order.name}.`
       });
     } else if (action === 'create_invoice') {
-      if (order.state !== 'sale') {
+      if (order.state !== 'sale' && order.state !== 'delivered') {
         throw new Error('Debe confirmar el pedido de venta antes de crear la factura.');
       }
-      const existingInvoices = (order.invoice_ids || [])
-        .map((mid) => this.data.accounting.moves.find((m) => Number(m.id) === Number(mid)))
-        .filter((m) => m && m.state !== 'cancel');
-      const invoicedUntaxed = round2(existingInvoices.reduce((s, m) => s + Number(m.amount_untaxed || 0), 0));
-      const invoicedTax = round2(existingInvoices.reduce((s, m) => s + Number(m.amount_tax || 0), 0));
-      const invoicedTotal = round2(existingInvoices.reduce((s, m) => s + Number(m.amount_total || 0), 0));
-
-      const deltaUntaxed = round2(order.amount_untaxed - invoicedUntaxed);
-      const deltaTax = round2(order.amount_tax - invoicedTax);
-      const deltaTotal = round2(order.amount_total - invoicedTotal);
-
-      if (deltaTotal <= 0) {
-        throw new Error('Este pedido de venta ya fue facturado en su totalidad.');
-      }
-
       const rawReq = params && (params.amount !== undefined ? params.amount : params.advance_amount);
       const reqAmount = rawReq !== undefined && rawReq !== null && String(rawReq).trim() !== ''
         ? round2(Number(rawReq))
         : null;
+      invoice = this._createSaleInvoiceInternal(order, reqAmount, params);
+    } else if (action === 'deliver' || action === 'action_deliver' || action === 'approve_contract') {
+      if (order.state !== 'sale') {
+        throw new Error('Solo los pedidos de venta confirmados pueden aprobarse y entregarse.');
+      }
+      order.state = 'delivered';
+      order.contract_approved = true;
+      order.delivered_date = todayStr();
+      this.recomputeSaleOrderInvoiceStatus(order);
 
-      let billTotal = deltaTotal;
-      let isPartialInstallment = false;
+      // Automatically create and post customer invoice for the pending residual
+      const existingInvoices = (order.invoice_ids || [])
+        .map((mid) => this.data.accounting.moves.find((m) => Number(m.id) === Number(mid)))
+        .filter((m) => m && m.state !== 'cancel');
+      const invoicedTotal = round2(existingInvoices.reduce((s, m) => s + Number(m.amount_total || 0), 0));
+      const deltaTotal = round2(order.amount_total - invoicedTotal);
 
-      if (reqAmount !== null && Number.isFinite(reqAmount) && reqAmount > 0) {
-        if (reqAmount > deltaTotal) {
-          throw new Error(`El valor del abono (${reqAmount}) no puede superar el saldo pendiente de facturar (${deltaTotal}).`);
-        }
-        billTotal = reqAmount;
-        if (billTotal < deltaTotal) {
-          isPartialInstallment = true;
-        }
+      if (deltaTotal > 0) {
+        invoice = this._createSaleInvoiceInternal(order, deltaTotal, params);
       }
 
-      let billUntaxed = 0;
-      let billTax = 0;
-      if (Math.abs(billTotal - deltaTotal) < 0.001) {
-        billUntaxed = deltaUntaxed;
-        billTax = deltaTax;
-      } else {
-        const orderTotal = round2(order.amount_total);
-        const taxRatio = orderTotal > 0 ? (order.amount_tax / orderTotal) : 0;
-        billTax = round2(billTotal * taxRatio);
-        billUntaxed = round2(billTotal - billTax);
-      }
-
-      const pendingResidualAfterThis = round2(deltaTotal - billTotal);
-      const installmentNum = existingInvoices.length + 1;
-      const isAbono = isPartialInstallment || existingInvoices.length > 0;
-      const isDeltaInvoice = existingInvoices.length > 0 && invoicedTotal > 0;
-
-      const invSeq = this.nextSeq('move_inv');
-      const moveId = this.data.accounting.moves.reduce((m, x) => Math.max(m, Number(x.id)), 0) + 1;
-      const invName = `INV/2026/${this.padSeq(invSeq, 4)}`;
-      const planItems = this.buildSaleInstallmentPlan(order);
-      const matchedPlanItem = planItems.find((p) => Number(p.installment_number) === Number(installmentNum));
-      const invDate = (params && params.invoice_date) ? String(params.invoice_date).trim() : todayStr();
-      const dueDate = (params && params.due_date)
-        ? String(params.due_date).trim()
-        : (matchedPlanItem && matchedPlanItem.due_date ? matchedPlanItem.due_date : addDays(invDate, 30));
-
-      const conceptNote = isAbono
-        ? `Abono / Cuota #${installmentNum} a la orden ${order.name} (Saldo restante: $ ${pendingResidualAfterThis.toLocaleString('es-CO')})`
-        : `Facturación orden ${order.name}`;
-
-      const moveLines = (!isAbono && !isDeltaInvoice)
-        ? order.lines.map((l, i) => ({
-            id: i + 1,
-            product_id: l.product_id,
-            name: `${l.product_name}${l.description && l.description !== l.product_name ? ' - ' + l.description : ''}`,
-            account_code: '413501',
-            account_name: 'Ingresos por Servicios de Software y Consultoría',
-            quantity: l.quantity,
-            price_unit: round2(l.subtotal / l.quantity),
-            tax_rate: l.tax_rate,
-            subtotal: l.subtotal,
-            tax_amount: l.tax_amount,
-            total: l.total
-          }))
-        : [
-            {
-              id: 1,
-              product_id: order.lines[0] ? order.lines[0].product_id : 1,
-              name: conceptNote,
-              account_code: '413501',
-              account_name: 'Ingresos por Servicios de Software y Consultoría',
-              quantity: 1,
-              price_unit: billUntaxed,
-              tax_rate: billUntaxed > 0 ? round2((billTax / billUntaxed) * 100) : 0,
-              subtotal: billUntaxed,
-              tax_amount: billTax,
-              total: billTotal
-            }
-          ];
-
-      const journalItems = [
-        {
-          account_code: '130505',
-          account_name: 'Clientes Nacionales (Cuentas por Cobrar)',
-          label: `${invName} - ${order.partner_name}`,
-          debit: billTotal,
-          credit: 0
-        },
-        {
-          account_code: '413501',
-          account_name: 'Ingresos por Servicios de Software y Consultoría',
-          label: `${conceptNote}`,
-          debit: 0,
-          credit: billUntaxed
-        }
-      ];
-      if (billTax > 0) {
-        journalItems.push({
-          account_code: '240801',
-          account_name: 'IVA Generado en Ventas (19%)',
-          label: `IVA Generado ${invName}`,
-          debit: 0,
-          credit: billTax
-        });
-      }
-
-      invoice = {
-        id: moveId,
-        name: invName,
-        move_type: 'out_invoice',
-        journal_id: 1,
-        journal_code: 'INV',
-        journal_name: 'Facturas de Clientes',
-        partner_id: order.partner_id,
-        partner_name: order.partner_name,
-        invoice_date: invDate,
-        invoice_date_due: dueDate,
-        ref: order.name,
-        origin: order.name,
-        state: 'posted',
-        payment_state: 'not_paid',
-        lines: moveLines,
-        journal_items: journalItems,
-        amount_untaxed: billUntaxed,
-        amount_tax: billTax,
-        amount_total: billTotal,
-        amount_residual: billTotal,
-        order_total: round2(order.amount_total),
-        invoiced_prior: invoicedTotal,
-        advance_amount: billTotal,
-        order_residual: pendingResidualAfterThis,
-        installment_number: installmentNum,
-        is_installment: isAbono,
-        chatter: [
-          {
-            id: this.nextChatterId(),
-            author: this.getActiveAuthor(),
-            date: this.formatNowShort(),
-            text: isAbono
-              ? `Factura ${invName} creada y publicada por concepto de Abono Cuota #${installmentNum} ($ ${billTotal.toLocaleString('es-CO')}). Saldo pendiente de la orden: $ ${pendingResidualAfterThis.toLocaleString('es-CO')}.`
-              : `Factura ${invName} creada y publicada desde el pedido ${order.name}.`
-          }
-        ]
-      };
-
-      this.data.accounting.moves.unshift(invoice);
-      order.invoice_ids = [...(order.invoice_ids || []), invoice.id];
-      const newInvoicedTotal = round2(invoicedTotal + billTotal);
-      order.invoice_status = newInvoicedTotal >= round2(order.amount_total) ? 'invoiced' : 'to invoice';
-      order.installment_plan = this.buildSaleInstallmentPlan(order);
       order.chatter.push({
         id: this.nextChatterId(),
         author: this.getActiveAuthor(),
         date: this.formatNowShort(),
-        text: isAbono
-          ? `Factura de cliente ${invName} emitida por Abono Cuota #${installmentNum} de $ ${billTotal.toLocaleString('es-CO')}. Total facturado: $ ${newInvoicedTotal.toLocaleString('es-CO')}. Saldo restante: $ ${pendingResidualAfterThis.toLocaleString('es-CO')}.`
-          : `Factura de cliente ${invName} creada en Contabilidad.`
+        text: `Contrato aprobado y pedido entregado.${invoice ? ' Factura ' + invoice.name + ' generada automáticamente.' : ''}`
       });
     } else if (action === 'cancel') {
       const hasPostedInvoices = (order.invoice_ids || []).some((mid) => {
@@ -2770,7 +2812,7 @@ class ERPStore {
     if (this.supabase) {
       try {
         await this.supabase.saveSaleOrder(order);
-        if (action === 'create_invoice' && invoice) {
+        if (invoice) {
           await this.supabase.saveAccountMove(invoice);
         }
       } catch (err) {

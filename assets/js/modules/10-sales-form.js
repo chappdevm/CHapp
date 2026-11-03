@@ -47,7 +47,7 @@
     }
 
     if (!state.formDraft || state.formDraft.recordId !== state.activeRecordId) {
-      state.activeSaleTab = 'lines';
+      state.activeSaleTab = existing.state === 'sale' ? 'contract' : 'lines';
       state.formDraft = {
         recordId: state.activeRecordId,
         partner_id: (state.formDraft && state.formDraft.partner_id) || existing.partner_id || '',
@@ -56,6 +56,7 @@
         validity_date: existing.validity_date,
         salesperson: existing.salesperson,
         notes: existing.notes || '',
+        contract_data: existing.contract_data ? JSON.parse(JSON.stringify(existing.contract_data)) : {},
         lines: JSON.parse(JSON.stringify(existing.lines || [])).map((l) => ({
           ...l,
           measure: l.measure !== undefined && l.measure !== null ? Number(l.measure) : 1
@@ -65,12 +66,22 @@
 
     const draft = state.formDraft;
     const isEditable = isNew || existing.state === 'draft' || existing.state === 'sent';
+    const canSave = isEditable || existing.state === 'sale';
     const selectedPartner = (state.data.contacts || []).find((c) => Number(c.id) === Number(draft.partner_id));
     const stages = [
       { id: 'draft', label: 'Cotización' },
       { id: 'sent', label: 'Cotización Enviada' },
-      { id: 'sale', label: 'Pedido de Venta' }
+      { id: 'sale', label: 'Pedido de Venta' },
+      { id: 'delivered', label: 'Entregado' }
     ];
+
+    if (!state.currentSaleDocType || state.currentSaleDocRecordId !== state.activeRecordId) {
+      state.currentSaleDocRecordId = state.activeRecordId;
+      if (existing.state === 'sale') state.currentSaleDocType = 'contract';
+      else if (existing.state === 'delivered') state.currentSaleDocType = 'invoice';
+      else state.currentSaleDocType = 'quote';
+    }
+    const currentDocType = state.currentSaleDocType || 'quote';
 
     const draftLines = draft.lines;
     const calcGross = draftLines.reduce((acc, l) => {
@@ -88,7 +99,7 @@
     const calcTotal = calcUntaxed + calcTax;
     const currentPaymentTerm = String(draft.payment_term || '').trim();
     const isInstallment = typeof isInstallmentPaymentTerm === 'function' ? isInstallmentPaymentTerm(currentPaymentTerm) : (Boolean(currentPaymentTerm) && currentPaymentTerm.toLowerCase() !== 'contado' && currentPaymentTerm.toLowerCase() !== 'immediate');
-    const activeSaleTab = isInstallment && state.activeSaleTab === 'invoice_plan' ? 'invoice_plan' : 'lines';
+    const activeSaleTab = state.activeSaleTab === 'contract' ? 'contract' : (isInstallment && state.activeSaleTab === 'invoice_plan' ? 'invoice_plan' : 'lines');
     const allAccountingMoves = (state.data.accounting && state.data.accounting.moves) || [];
     const linkedOrderMoves = !isNew
       ? allAccountingMoves.filter((m) => (existing.invoice_ids || []).includes(m.id) || m.origin === existing.name || m.ref === existing.name)
@@ -106,6 +117,7 @@
       salesperson: draft.salesperson || existing.salesperson,
       payment_term: draft.payment_term || existing.payment_term,
       notes: draft.notes !== undefined ? draft.notes : existing.notes,
+      contract_data: draft.contract_data || existing.contract_data || {},
       lines: draftLines.map((l) => ({
         ...l,
         name: l.product_name || l.description || 'Producto / Servicio',
@@ -115,12 +127,17 @@
         price_unit: Number(l.price_unit || 0),
         discount: Number(l.discount || 0),
         tax_rate: l.tax_rate !== '' && l.tax_rate !== undefined && l.tax_rate !== null ? Number(l.tax_rate) : 19,
-        subtotal: Number(l.quantity || 0) * Number(l.price_unit || 0) * (1 - Number(l.discount || 0) / 100)
+        subtotal: Number(l.quantity || 0) * Number(l.price_unit || 0) * (1 - Number(l.discount || 0) / 100),
+        total: (Number(l.quantity || 0) * Number(l.price_unit || 0) * (1 - Number(l.discount || 0) / 100)) * (1 + (l.tax_rate !== '' && l.tax_rate !== undefined && l.tax_rate !== null ? Number(l.tax_rate) : 19) / 100)
       })),
       amount_untaxed: calcUntaxed,
       amount_tax: calcTax,
       amount_total: calcTotal
     };
+
+    const waButtonLabel = existing.state === 'sale'
+      ? 'Enviar Contrato'
+      : (existing.state === 'delivered' ? 'Enviar Factura' : 'Enviar Cotización');
 
     container.innerHTML = `
       <div class="o_invoice_split_container">
@@ -129,12 +146,18 @@
               <div class="o_form_statusbar">
                 <div class="o_statusbar_buttons">
                   ${isEditable ? `<button type="button" class="btn btn-primary" id="btnSaveSaleOrder">Guardar</button>` : ''}
+                  ${!isNew && existing.state === 'sale' ? `<button type="button" class="btn btn-primary" id="btnSaveContractData">Guardar Contrato</button>` : ''}
                   ${
-                    !isNew && (existing.state === 'draft' || existing.state === 'sent')
+                    !isNew && existing.state !== 'cancel'
                       ? `<button type="button" class="btn btn-action" id="btnSendSaleWhatsApp" style="background: #25D366; border-color: #25D366; color: #fff; display: inline-flex; align-items: center; gap: 0.35rem;">
                           <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2z"></path></svg>
-                          <span>Enviar por WhatsApp</span>
+                          <span>${waButtonLabel}</span>
                         </button>`
+                      : ''
+                  }
+                  ${
+                    !isNew && existing.state === 'draft'
+                      ? `<button type="button" class="btn btn-action" data-sale-action="send">Enviar Cotización</button>`
                       : ''
                   }
                   ${
@@ -143,12 +166,12 @@
                       : ''
                   }
                   ${
-                    !isNew && existing.state === 'sale' && existing.invoice_status !== 'invoiced'
-                      ? `<button type="button" class="btn btn-action" data-sale-action="create_invoice">Crear Factura</button>`
+                    !isNew && existing.state === 'sale'
+                      ? `<button type="button" class="btn btn-action btn-success" data-sale-action="deliver" id="btnApproveContractDeliver" style="background: #10b981; border-color: #10b981; color: #fff;">Aprobar Contrato y Entregar</button>`
                       : ''
                   }
                   ${
-                    !isNew && existing.state !== 'cancel'
+                    !isNew && existing.state !== 'cancel' && existing.state !== 'delivered'
                       ? `<button type="button" class="btn btn-danger btn-sm" data-sale-action="cancel">Cancelar</button>`
                       : ''
                   }
@@ -243,6 +266,7 @@
 
                 <div class="o_notebook_headers">
                   <button type="button" class="o_notebook_tab ${activeSaleTab === 'lines' ? 'is-active' : ''}" id="tabBtnSaleLines" data-sale-tab="lines">Líneas del Pedido</button>
+                  <button type="button" class="o_notebook_tab ${activeSaleTab === 'contract' ? 'is-active' : ''}" id="tabBtnSaleContract" data-sale-tab="contract">Datos del Contrato</button>
                   ${
                     isInstallment
                       ? `<button type="button" class="o_notebook_tab ${activeSaleTab === 'invoice_plan' ? 'is-active' : ''}" id="tabBtnSaleInvoicePlan" data-sale-tab="invoice_plan">Plan de Facturas</button>`
@@ -250,7 +274,7 @@
                   }
                 </div>
 
-                <div id="saleTabLinesPanel" style="${activeSaleTab === 'invoice_plan' ? 'display: none;' : ''}">
+                <div id="saleTabLinesPanel" style="${activeSaleTab === 'lines' ? '' : 'display: none;'}">
                 <div tabindex="0" role="region" aria-label="Líneas del pedido de venta" class="table-wrapper" style="margin-bottom: 0.75rem;">
                   <table class="o_list_table" style="--label-2: 'Medida'; --label-3: 'U. Medida'; --label-4: 'Precio Unit.'; --label-5: 'Cant.'; --label-6: 'Desc %'; --label-7: 'IVA %'; --label-8: 'Subtotal'; --label-9: 'Acción';">
                     <thead>
@@ -312,6 +336,10 @@
                 ${isEditable ? `<button type="button" class="btn btn-secondary btn-sm" id="btnAddSaleLine">Agregar producto / línea</button>` : ''}
                 </div>
 
+                <div id="saleTabContractPanel" style="${activeSaleTab === 'contract' ? '' : 'display: none;'}">
+                  ${typeof renderSaleContractTabHtml === 'function' ? renderSaleContractTabHtml(draft, existing, canSave) : ''}
+                </div>
+
                 ${
                   isInstallment && typeof renderSaleInstallmentPlanHtml === 'function'
                     ? `<div id="saleTabInvoicePlanPanel" style="${activeSaleTab === 'invoice_plan' ? '' : 'display: none;'}">${renderSaleInstallmentPlanHtml(installmentPlan, currentPaymentTerm, draft.date_order || existing.date_order, calcTotal, existing, isEditable)}</div>`
@@ -355,11 +383,16 @@
             ${renderChatterHtml('sales', existing)}
         </div>
 
-        <aside class="o_invoice_pdf_panel" aria-label="Previsualización PDF de la Cotización">
+        <aside class="o_invoice_pdf_panel" aria-label="Previsualización PDF del Documento">
           <div class="o_pdf_panel_header">
             <div class="o_pdf_panel_title">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-              ${existing.state === 'sale' ? 'Pedido de Venta (PDF)' : 'Cotización Comercial (PDF)'}
+              <span>${currentDocType === 'contract' ? 'Contrato de Venta (PDF)' : (currentDocType === 'invoice' ? 'Factura de Venta (PDF)' : 'Cotización Comercial (PDF)')}</span>
+            </div>
+            <div class="o_pdf_doc_switcher">
+              <button type="button" class="o_pdf_doc_tab ${currentDocType === 'quote' ? 'is-active' : ''}" data-doc-type="quote">Cotización</button>
+              <button type="button" class="o_pdf_doc_tab ${currentDocType === 'contract' ? 'is-active' : ''}" data-doc-type="contract">Contrato</button>
+              ${linkedOrderMoves.length > 0 ? `<button type="button" class="o_pdf_doc_tab ${currentDocType === 'invoice' ? 'is-active' : ''}" data-doc-type="invoice">Factura</button>` : ''}
             </div>
             <div class="o_pdf_panel_actions">
               <button type="button" class="btn btn-sm btn-secondary" id="btnPrintSalePdf" title="Imprimir documento">
@@ -373,7 +406,13 @@
             </div>
           </div>
           <div class="o_pdf_paper_viewport">
-            ${renderSalePdfSheetHtml(previewData)}
+            ${
+              currentDocType === 'contract'
+                ? (typeof renderContractPdfSheetHtml === 'function' ? renderContractPdfSheetHtml(previewData) : renderSalePdfSheetHtml(previewData))
+                : (currentDocType === 'invoice' && linkedOrderMoves.length > 0
+                    ? (typeof renderInvoicePdfSheetHtml === 'function' ? renderInvoicePdfSheetHtml(linkedOrderMoves[0]) : renderSalePdfSheetHtml(previewData))
+                    : renderSalePdfSheetHtml(previewData))
+            }
           </div>
         </aside>
       </div>
@@ -413,6 +452,20 @@
           line.tax_rate = lineTaxVal === '' ? '' : Number(lineTaxVal);
         }
       });
+
+      if (!state.formDraft.contract_data) {
+        state.formDraft.contract_data = {};
+      }
+      container.querySelectorAll('.contract-input').forEach((inp) => {
+        const fld = inp.getAttribute('data-contract-field');
+        if (fld) {
+          state.formDraft.contract_data[fld] = inp.value;
+        }
+      });
+      const checkedRadio = container.querySelector('.contract-radio:checked');
+      if (checkedRadio) {
+        state.formDraft.contract_data.collection_place = checkedRadio.value;
+      }
     };
 
     const partnerSelectEl = document.getElementById('fSalePartner');
@@ -431,6 +484,21 @@
       tabBtn.addEventListener('click', () => {
         syncSaleDraft();
         state.activeSaleTab = tabBtn.getAttribute('data-sale-tab') || 'lines';
+        renderSaleOrderForm(container);
+      });
+    });
+
+    container.querySelectorAll('[data-doc-type]').forEach((docBtn) => {
+      docBtn.addEventListener('click', () => {
+        syncSaleDraft();
+        state.currentSaleDocType = docBtn.getAttribute('data-doc-type') || 'quote';
+        renderSaleOrderForm(container);
+      });
+    });
+
+    container.querySelectorAll('.contract-input, .contract-radio').forEach((inp) => {
+      inp.addEventListener('change', () => {
+        syncSaleDraft();
         renderSaleOrderForm(container);
       });
     });
@@ -563,9 +631,9 @@
     }
 
     const saveOrderNow = async (forceSave = false) => {
-      if (!isEditable) {
-        showToast('No se puede modificar un pedido de venta confirmado o cancelado.', true);
-        throw new Error('No se puede modificar un pedido de venta confirmado o cancelado.');
+      if (!canSave) {
+        showToast('No se puede modificar un pedido de venta en este estado.', true);
+        throw new Error('No se puede modificar un pedido de venta en este estado.');
       }
       syncSaleDraft();
       if (!state.formDraft.partner_id) {
@@ -590,7 +658,8 @@
         validity_date: state.formDraft.validity_date,
         salesperson: state.formDraft.salesperson,
         notes: state.formDraft.notes,
-        lines: state.formDraft.lines
+        lines: state.formDraft.lines,
+        contract_data: state.formDraft.contract_data || {}
       };
       const res = await apiCall('/api/sales', 'POST', payload);
       state.activeRecordId = res.order.id;
@@ -614,16 +683,43 @@
       });
     }
 
+    const btnSaveContract = document.getElementById('btnSaveContractData');
+    if (btnSaveContract) {
+      btnSaveContract.addEventListener('click', () => {
+        withActionLock(btnSaveContract, async () => {
+          syncSaleDraft();
+          if (!isNew && !hasSaleDraftChanged(existing, state.formDraft)) {
+            showToast('No hay cambios pendientes por guardar.');
+            return;
+          }
+          await saveOrderNow(true);
+          showToast('Datos del contrato guardados con éxito.');
+          renderModuleWorkspace();
+        }).catch((err) => showToast(err.message, true));
+      });
+    }
+
     const btnSendSaleWa = document.getElementById('btnSendSaleWhatsApp');
     if (btnSendSaleWa) {
       btnSendSaleWa.addEventListener('click', () => {
         withActionLock(btnSendSaleWa, async () => {
-          const savedOrder = await saveOrderNow(false);
+          const savedOrder = canSave ? await saveOrderNow(false) : existing;
+          const order = savedOrder || existing;
+          const isDelivered = order.state === 'delivered';
+          const isContract = !isDelivered && (order.state === 'sale' || currentDocType === 'contract');
+          const containerSelector = isContract
+            ? '#contractPdfSheet'
+            : (isDelivered && linkedOrderMoves.length > 0 ? '#invoicePdfSheet' : '.o_sale_pdf_preview #salePdfSheet');
+          const cleanName = (order.name || 'COT').replace(/[\/\\]/g, '_');
+          const filename = isContract
+            ? `Contrato_${cleanName}.pdf`
+            : (isDelivered && linkedOrderMoves.length > 0 ? `Factura_${cleanName}.pdf` : `Cotizacion_${cleanName}.pdf`);
+
           await sendDocumentViaWhatsApp({
             model: 'sales',
-            record: savedOrder || existing,
-            containerSelector: '.o_sale_pdf_preview #salePdfSheet',
-            filename: `Cotizacion_${((savedOrder || existing).name || 'COT').replace(/[\/\\]/g, '_')}.pdf`
+            record: order,
+            containerSelector,
+            filename
           });
         }).catch((err) => showToast(err.message, true));
       });
@@ -647,7 +743,7 @@
 
             promptInvoiceCreation(existing, remaining, async (chosenAmount) => {
               try {
-                if (isEditable) {
+                if (canSave) {
                   await saveOrderNow(false);
                 }
                 const res = await apiCall(`/api/sales/${state.activeRecordId}/action`, 'POST', {
@@ -668,11 +764,18 @@
             return;
           }
 
-          if (isEditable) {
+          if (canSave) {
             await saveOrderNow(false);
           }
           const res = await apiCall(`/api/sales/${state.activeRecordId}/action`, 'POST', { action });
           state.formDraft = null;
+          if (action === 'confirm') {
+            state.activeSaleTab = 'contract';
+            state.currentSaleDocType = 'contract';
+          } else if (action === 'deliver') {
+            state.activeSaleTab = 'lines';
+            state.currentSaleDocType = 'invoice';
+          }
           showToast('Estado del pedido actualizado.');
           renderModuleWorkspace();
         }).catch((err) => showToast(err.message, true));
@@ -744,20 +847,25 @@
       });
     });
 
+    const handlePdfDownload = (autoPrint) => {
+      syncSaleDraft();
+      if (currentDocType === 'contract' && typeof downloadContractPdf === 'function') {
+        downloadContractPdf(previewData, autoPrint);
+      } else if (currentDocType === 'invoice' && linkedOrderMoves.length > 0 && typeof downloadInvoicePdf === 'function') {
+        downloadInvoicePdf(linkedOrderMoves[0], autoPrint);
+      } else {
+        downloadSalePdf(previewData, autoPrint);
+      }
+    };
+
     const btnPrintSale = document.getElementById('btnPrintSalePdf');
     if (btnPrintSale) {
-      btnPrintSale.addEventListener('click', () => {
-        syncSaleDraft();
-        downloadSalePdf(previewData, true);
-      });
+      btnPrintSale.addEventListener('click', () => handlePdfDownload(true));
     }
 
     const btnDownloadSale = document.getElementById('btnDownloadSalePdf');
     if (btnDownloadSale) {
-      btnDownloadSale.addEventListener('click', () => {
-        syncSaleDraft();
-        downloadSalePdf(previewData, false);
-      });
+      btnDownloadSale.addEventListener('click', () => handlePdfDownload(false));
     }
   }
 

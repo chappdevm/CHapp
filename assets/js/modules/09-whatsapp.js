@@ -219,9 +219,11 @@
       offscreen.style.left = '-9999px';
       offscreen.style.top = '0';
       offscreen.style.width = '210mm';
-      offscreen.innerHTML = type === 'sales'
-        ? renderSalePdfSheetHtml(record)
-        : renderInvoicePdfSheetHtml(record);
+      offscreen.innerHTML = type === 'contract'
+        ? (typeof renderContractPdfSheetHtml === 'function' ? renderContractPdfSheetHtml(record) : '')
+        : (type === 'sales'
+            ? renderSalePdfSheetHtml(record)
+            : renderInvoicePdfSheetHtml(record));
       document.body.appendChild(offscreen);
       targetEl = offscreen.firstElementChild || offscreen;
     }
@@ -248,7 +250,7 @@
     }
 
     const opt = {
-      margin: [8, 8, 8, 8],
+      margin: [6, 6, 6, 6],
       filename: filename || `${record.name}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true, logging: false },
@@ -282,10 +284,44 @@
       return;
     }
 
+    let sendModel = model;
+    let sendId = record.id;
+    let pdfType = model === 'sales' ? 'sales' : 'invoice';
+    let targetRecord = record;
+    let actualSelector = containerSelector;
+    let actualFilename = filename;
+
+    if (model === 'sales') {
+      if (record.state === 'sale') {
+        pdfType = 'contract';
+        actualSelector = '#contractPdfSheet';
+        if (!actualFilename) actualFilename = `Contrato_${record.name}.pdf`;
+      } else if (record.state === 'delivered') {
+        const moves = (state.data.accounting && state.data.accounting.moves) || [];
+        const linkedInv = moves.find((m) => (record.invoice_ids || []).includes(m.id) && m.state !== 'cancel') || moves.find((m) => (m.origin === record.name || m.ref === record.name) && m.state !== 'cancel');
+        if (linkedInv) {
+          sendModel = 'accounting';
+          sendId = linkedInv.id;
+          targetRecord = linkedInv;
+          pdfType = 'invoice';
+          actualSelector = '#invoicePdfSheet';
+          if (!actualFilename) actualFilename = `Factura_${linkedInv.name.replace(/\//g, '_')}.pdf`;
+        } else {
+          pdfType = 'sales';
+          if (!actualFilename) actualFilename = `Factura_Pedido_${record.name}.pdf`;
+        }
+      } else {
+        pdfType = 'sales';
+        if (!actualFilename) actualFilename = `Cotizacion_${record.name}.pdf`;
+      }
+    }
+
     try {
       const st = await apiCall('/api/whatsapp/status', 'GET');
       if (st.status !== 'CONECTADO') {
-        const docLabel = model === 'sales' ? (record.name || 'Cotización') : (record.name || 'Factura');
+        const docLabel = model === 'sales'
+          ? (record.state === 'sale' ? 'Contrato' : (record.state === 'delivered' ? 'Factura' : 'Cotización'))
+          : (record.name || 'Factura');
         const directText = `Hola ${partner ? partner.name : ''}, adjuntamos tu ${docLabel}.`;
         showWhatsAppQrModal(
           () => sendDocumentViaWhatsApp({ model, record, containerSelector, filename, defaultCaption }),
@@ -301,17 +337,17 @@
     showToast(`Generando PDF y enviando por WhatsApp a ${partner.name}...`);
 
     try {
-      const pdfBase64 = await generateDocumentPdfBase64(model === 'sales' ? 'sales' : 'invoice', record, containerSelector, filename);
+      const pdfBase64 = await generateDocumentPdfBase64(pdfType, targetRecord, actualSelector, actualFilename);
       if (!pdfBase64) {
         throw new Error('No se pudo generar el documento PDF.');
       }
 
       const res = await apiCall('/api/whatsapp/send', 'POST', {
-        model,
-        id: record.id,
+        model: sendModel,
+        id: sendId,
         to: phone,
         pdfBase64,
-        filename: filename || `${record.name}.pdf`,
+        filename: actualFilename || `${record.name}.pdf`,
         caption: defaultCaption
       });
 

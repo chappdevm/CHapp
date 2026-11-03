@@ -9,7 +9,9 @@
     const map = {
       draft: { cls: 'o_badge_info', text: 'Cotización' },
       sent: { cls: 'o_badge_warning', text: 'Cotización Enviada' },
-      sale: { cls: 'o_badge_success', text: 'Pedido de Venta' },
+      sale: { cls: 'o_badge_primary', text: 'Pedido de Venta' },
+      delivered: { cls: 'o_badge_success', text: 'Entregado' },
+      done: { cls: 'o_badge_success', text: 'Entregado' },
       cancel: { cls: 'o_badge_danger', text: 'Cancelado' }
     };
     const item = map[st] || { cls: 'o_badge_muted', text: st };
@@ -29,7 +31,7 @@
   function getFilteredSales() {
     let list = state.data.sales || [];
     if (state.submenu === 'quotations') list = list.filter((s) => s.state === 'draft' || s.state === 'sent');
-    else if (state.submenu === 'orders') list = list.filter((s) => s.state === 'sale');
+    else if (state.submenu === 'orders') list = list.filter((s) => s.state === 'sale' || s.state === 'delivered' || s.state === 'done');
 
     if (state.statusFilter !== 'all') {
       list = list.filter((s) => s.state === state.statusFilter);
@@ -99,7 +101,8 @@
       const stageCols = [
         { id: 'draft', title: 'Cotización', color: '#3b82f6', filter: (s) => s.state === 'draft' },
         { id: 'sent', title: 'Cotización Enviada', color: '#06b6d4', filter: (s) => s.state === 'sent' },
-        { id: 'sale', title: 'Pedido de Venta', color: '#10b981', filter: (s) => s.state === 'sale' || s.state === 'done' }
+        { id: 'sale', title: 'Pedido de Venta', color: '#8b5cf6', filter: (s) => s.state === 'sale' },
+        { id: 'delivered', title: 'Entregado', color: '#10b981', filter: (s) => s.state === 'delivered' || s.state === 'done' }
       ];
       if (sales.some((s) => s.state === 'cancel')) {
         stageCols.push({ id: 'cancel', title: 'Cancelado', color: '#ef4444', filter: (s) => s.state === 'cancel' });

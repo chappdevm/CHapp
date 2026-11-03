@@ -328,6 +328,29 @@ const EXP_META_START = '<!--CHAPP_EXP_META:';
 const EXP_META_END = '-->';
 const MOVE_META_START = '<!--CHAPP_MOVE_META:';
 const MOVE_META_END = '-->';
+const SALE_META_START = '<!--CHAPP_SALE_META:';
+const SALE_META_END = '-->';
+
+function extractSaleMeta(rawNotes) {
+  if (!rawNotes || typeof rawNotes !== 'string') {
+    return { cleanNotes: '', meta: null };
+  }
+  const idx = rawNotes.indexOf(SALE_META_START);
+  if (idx === -1) {
+    return { cleanNotes: rawNotes, meta: null };
+  }
+  const cleanNotes = rawNotes.slice(0, idx).trim();
+  const endIdx = rawNotes.lastIndexOf(SALE_META_END);
+  const jsonStr = endIdx > idx
+    ? rawNotes.slice(idx + SALE_META_START.length, endIdx)
+    : rawNotes.slice(idx + SALE_META_START.length);
+  try {
+    const meta = JSON.parse(jsonStr);
+    return { cleanNotes, meta };
+  } catch (_) {
+    return { cleanNotes, meta: null };
+  }
+}
 
 function extractExpenseMeta(rawNotes) {
   if (!rawNotes || typeof rawNotes !== 'string') {
@@ -505,6 +528,14 @@ function deserializeExpense(r) {
 }
 
 function serializeSaleOrder(s) {
+  const { cleanNotes } = extractSaleMeta(s.notes ? String(s.notes).trim() : '');
+  let notesVal = cleanNotes || null;
+  const hasContract = s.contract_data && typeof s.contract_data === 'object' && Object.keys(s.contract_data).length > 0;
+  if (hasContract) {
+    const metaBlock = `${SALE_META_START}${JSON.stringify({ contract_data: s.contract_data })}${SALE_META_END}`;
+    notesVal = cleanNotes ? `${cleanNotes}\n${metaBlock}` : metaBlock;
+  }
+
   return {
     id: Number(s.id),
     name: String(s.name || '').trim(),
@@ -519,7 +550,7 @@ function serializeSaleOrder(s) {
     amount_untaxed: Number(s.amount_untaxed || 0),
     amount_tax: Number(s.amount_tax || 0),
     amount_total: Number(s.amount_total || 0),
-    notes: s.notes ? String(s.notes).trim() : null
+    notes: notesVal
   };
 }
 
@@ -540,6 +571,7 @@ function serializeSaleOrderLine(l, orderId) {
 }
 
 function deserializeSaleOrder(r) {
+  const { cleanNotes, meta } = extractSaleMeta(r.notes || '');
   const lines = Array.isArray(r.sale_order_line)
     ? r.sale_order_line.map((l, i) => ({
         id: Number(l.id || i + 1),
@@ -571,7 +603,8 @@ function deserializeSaleOrder(r) {
     amount_untaxed: Number(r.amount_untaxed || 0),
     amount_tax: Number(r.amount_tax || 0),
     amount_total: Number(r.amount_total || 0),
-    notes: r.notes || '',
+    notes: cleanNotes,
+    contract_data: (meta && meta.contract_data) || {},
     invoice_ids: [],
     lines,
     chatter: []
