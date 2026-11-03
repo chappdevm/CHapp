@@ -610,6 +610,8 @@ function serializeAccountMove(m) {
     if (m.installment_number) metaObj.installment_number = Number(m.installment_number);
     if (m.is_installment) metaObj.is_installment = Boolean(m.is_installment);
     if (Array.isArray(m.payments_history) && m.payments_history.length > 0) metaObj.payments_history = m.payments_history;
+    if (m.last_payment_date) metaObj.last_payment_date = m.last_payment_date;
+    if (m.last_payment_amount !== undefined && m.last_payment_amount !== null) metaObj.last_payment_amount = Number(m.last_payment_amount);
 
     const metaBlock = `${MOVE_META_START}${JSON.stringify(metaObj)}${MOVE_META_END}`;
     originVal = cleanOrigin ? `${cleanOrigin}\n${metaBlock}` : metaBlock;
@@ -732,6 +734,12 @@ function deserializeAccountMove(r) {
     if (meta.installment_number !== undefined) out.installment_number = meta.installment_number;
     if (meta.is_installment !== undefined) out.is_installment = meta.is_installment;
     if (Array.isArray(meta.payments_history)) out.payments_history = meta.payments_history;
+    if (meta.last_payment_date !== undefined) out.last_payment_date = meta.last_payment_date;
+    if (meta.last_payment_amount !== undefined) out.last_payment_amount = meta.last_payment_amount;
+  }
+
+  if (!Array.isArray(out.payments_history)) {
+    out.payments_history = [];
   }
 
   return out;

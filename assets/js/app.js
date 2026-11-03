@@ -106,6 +106,7 @@
           } else {
             showToast('Pago registrado y conciliado exitosamente.');
           }
+          state.formDraft = null;
           renderModuleWorkspace();
         }).catch((err) => showToast(err.message, true));
       });

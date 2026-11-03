@@ -328,6 +328,12 @@
                   <span>${formatMoney(calcTotal)}</span>
                 </div>
               `}
+              ${(existing.payments_history || []).map((p) => `
+                <div class="o_totals_row" style="color: var(--o-success, #16a34a); font-size: 0.88rem;">
+                  <span>Pagado el ${esc(p.date)} (${esc(p.journal_name || p.journal_code)}):</span>
+                  <span>- ${formatMoney(p.amount)}</span>
+                </div>
+              `).join('')}
               <div class="o_totals_row">
                 <span>Importe Adeudado / Saldo:</span>
                 <strong>${formatMoney(calcResidual)}</strong>
@@ -513,41 +519,7 @@
     const openPayModalBtn = document.getElementById('btnOpenPaymentModal');
     if (openPayModalBtn) {
       openPayModalBtn.addEventListener('click', () => {
-        const dialog = document.getElementById('paymentDialog');
-        document.getElementById('payMoveId').value = String(existing.id);
-        const payJournalSelect = document.getElementById('payJournal');
-        if (payJournalSelect && state.data.accounting && state.data.accounting.journals) {
-          const activeJournals = state.data.accounting.journals.filter((j) => (j.type === 'bank' || j.type === 'cash') && j.active !== false);
-          payJournalSelect.innerHTML = `
-            <option value="" selected disabled>— Seleccione Diario / Cuenta —</option>
-            ${activeJournals.map((j) => `<option value="${esc(j.code)}">${esc(j.name)} (${esc(j.code)})</option>`).join('')}
-          `;
-        }
-        if (payJournalSelect) payJournalSelect.value = '';
-        const amtInput = document.getElementById('payAmount');
-        amtInput.value = String(existing.amount_residual);
-        amtInput.max = String(existing.amount_residual);
-        document.getElementById('payDate').value = new Date().toISOString().slice(0, 10);
-        document.getElementById('payRef').value = existing.name;
-
-        const resRow = document.getElementById('payResidualOptionRow');
-        const dispRes = document.getElementById('dispPayResidualAmount');
-        const updateResidualOption = () => {
-          const curVal = Number(amtInput.value || 0);
-          const diff = Number(existing.amount_residual || 0) - curVal;
-          if (resRow) {
-            if (diff > 0) {
-              resRow.style.display = 'block';
-              if (dispRes) dispRes.textContent = formatMoney(diff);
-            } else {
-              resRow.style.display = 'none';
-            }
-          }
-        };
-        amtInput.oninput = updateResidualOption;
-        updateResidualOption();
-
-        dialog.showModal();
+        openPaymentModal(existing);
       });
     }
 
@@ -607,5 +579,88 @@
         downloadInvoicePdf(previewData, true);
       });
     }
+
+    const btnGoToOrigin = document.getElementById('btnGoToOriginDoc');
+    if (btnGoToOrigin && existing.origin) {
+      btnGoToOrigin.addEventListener('click', () => {
+        const originStr = String(existing.origin).trim();
+        const sales = (state.data && state.data.sales) || [];
+        const sale = sales.find((s) => s.name === originStr || (s.invoice_ids || []).includes(existing.id));
+        if (sale) {
+          openApp('sales', { submenu: 'orders', viewType: 'form', recordId: sale.id });
+          return;
+        }
+        const expenses = (state.data && state.data.expenses) || [];
+        const exp = expenses.find((e) => e.name === originStr || e.reference === originStr || `Gasto ${e.reference}` === originStr || Number(e.id) === Number(originStr));
+        if (exp) {
+          openApp('expenses', { submenu: 'my_expenses', viewType: 'form', recordId: exp.id });
+          return;
+        }
+        showToast('Documento de origen: ' + originStr);
+      });
+    }
   }
+
+  function openPaymentModal(move) {
+    if (!move) return;
+    const dialog = document.getElementById('paymentDialog');
+    if (!dialog) return;
+    const moveIdInput = document.getElementById('payMoveId');
+    if (moveIdInput) moveIdInput.value = String(move.id);
+
+    const payJournalSelect = document.getElementById('payJournal');
+    if (payJournalSelect && state.data && state.data.accounting && state.data.accounting.journals) {
+      const activeJournals = state.data.accounting.journals.filter((j) => (j.type === 'bank' || j.type === 'cash') && j.active !== false);
+      payJournalSelect.innerHTML = `
+        <option value="" disabled>— Seleccione Diario / Cuenta —</option>
+        ${activeJournals.map((j) => `<option value="${esc(j.code)}">${esc(j.name)} (${esc(j.code)})</option>`).join('')}
+      `;
+      if (activeJournals.length > 0) {
+        payJournalSelect.value = activeJournals[0].code;
+      }
+    }
+
+    const residual = Number(move.amount_residual !== undefined ? move.amount_residual : move.amount_total);
+    const amtInput = document.getElementById('payAmount');
+    if (amtInput) {
+      amtInput.value = String(residual);
+      amtInput.max = String(residual);
+    }
+    const dateInput = document.getElementById('payDate');
+    if (dateInput) {
+      dateInput.value = new Date().toISOString().slice(0, 10);
+    }
+    const refInput = document.getElementById('payRef');
+    if (refInput) {
+      refInput.value = move.name || '';
+    }
+
+    const chkResidual = document.getElementById('chkGenerateResidualInvoice');
+    if (chkResidual) {
+      chkResidual.checked = false;
+    }
+
+    const resRow = document.getElementById('payResidualOptionRow');
+    const dispRes = document.getElementById('dispPayResidualAmount');
+    const updateResidualOption = () => {
+      const curVal = Number((amtInput && amtInput.value) || 0);
+      const diff = residual - curVal;
+      if (resRow) {
+        if (diff > 0) {
+          resRow.style.display = 'block';
+          if (dispRes) dispRes.textContent = formatMoney(diff);
+        } else {
+          resRow.style.display = 'none';
+        }
+      }
+    };
+    if (amtInput) {
+      amtInput.oninput = updateResidualOption;
+    }
+    updateResidualOption();
+
+    dialog.showModal();
+  }
+  window.openPaymentModal = openPaymentModal;
+
 

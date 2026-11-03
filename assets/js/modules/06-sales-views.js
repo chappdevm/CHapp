@@ -315,8 +315,10 @@
                   <td class="text-end"><strong>${formatMoney(inv.amount_total)}</strong></td>
                   <td class="text-end">${formatMoney(inv.amount_residual)}</td>
                   <td>${paymentStateBadge(inv.payment_state, inv.state)}</td>
-                  <td class="text-end">
-                    <span class="btn btn-sm btn-secondary" style="pointer-events: none;">Ver Factura y PDF</span>
+                  <td class="text-end" style="white-space: nowrap;">
+                    <button type="button" class="btn btn-sm btn-secondary btn-goto-invoice" data-invoice-id="${inv.id}">Ver Factura</button>
+                    ${inv.state === 'posted' && inv.amount_residual > 0 ? `<button type="button" class="btn btn-sm btn-action btn-pay-sale-invoice" data-invoice-id="${inv.id}">Registrar Pago</button>` : ''}
+                    ${inv.state === 'draft' ? `<button type="button" class="btn btn-sm btn-action btn-post-sale-invoice" data-invoice-id="${inv.id}">Publicar</button>` : ''}
                   </td>
                 </tr>
               `).join('')}
@@ -549,10 +551,18 @@
       const balanceAfter = Math.max(0, round2(total - accumulated));
       const pct = total > 0 ? round2((amount / total) * 100) : round2(100 / n);
 
-      const matchedInv = validMoves[idx] || null;
+      const matchedInv = validMoves.find((m) => Number(m.installment_number) === cuotaNum) || validMoves[idx] || null;
       let status = 'pending';
       if (matchedInv) {
-        status = matchedInv.payment_state === 'paid' ? 'paid' : 'invoiced';
+        if (matchedInv.state === 'draft') {
+          status = 'draft';
+        } else if (matchedInv.payment_state === 'paid') {
+          status = 'paid';
+        } else if (matchedInv.payment_state === 'partial') {
+          status = 'partial';
+        } else {
+          status = 'invoiced';
+        }
       } else if (total > 0 && totalInvoiced >= accumulated) {
         status = 'invoiced';
       }
@@ -569,7 +579,11 @@
         balance_after: balanceAfter,
         status,
         invoice_id: matchedInv ? matchedInv.id : null,
-        invoice_name: matchedInv ? matchedInv.name : null
+        invoice_name: matchedInv ? matchedInv.name : null,
+        invoice_state: matchedInv ? matchedInv.state : null,
+        payment_state: matchedInv ? matchedInv.payment_state : null,
+        amount_residual: matchedInv ? matchedInv.amount_residual : 0,
+        amount_total: matchedInv ? matchedInv.amount_total : 0
       };
     });
   }
@@ -646,9 +660,32 @@
                   const statusBadge =
                     row.status === 'paid'
                       ? `<span class="o_badge o_badge_success">Pagada ${row.invoice_name ? '· ' + esc(row.invoice_name) : ''}</span>`
-                      : row.status === 'invoiced'
-                        ? `<span class="o_badge o_badge_info">Facturada ${row.invoice_name ? '· ' + esc(row.invoice_name) : ''}</span>`
-                        : `<span class="o_badge o_badge_warning">Programada / Pendiente</span>`;
+                      : row.status === 'partial'
+                        ? `<span class="o_badge o_badge_warning">Pago Parcial ${row.invoice_name ? '· ' + esc(row.invoice_name) : ''} (${formatMoney(row.amount_residual)} pendiente)</span>`
+                        : row.status === 'draft'
+                          ? `<span class="o_badge o_badge_info">Borrador ${row.invoice_name ? '· ' + esc(row.invoice_name) : ''}</span>`
+                          : row.status === 'invoiced'
+                            ? `<span class="o_badge o_badge_info">Facturada ${row.invoice_name ? '· ' + esc(row.invoice_name) : ''}</span>`
+                            : `<span class="o_badge o_badge_warning">Programada / Pendiente</span>`;
+
+                  const cuotaActionButtons = row.invoice_id
+                    ? `
+                      <button type="button" class="btn btn-sm btn-secondary btn-goto-invoice" data-invoice-id="${row.invoice_id}">Ver Factura</button>
+                      ${
+                        row.invoice_state === 'posted' && row.amount_residual > 0
+                          ? `<button type="button" class="btn btn-sm btn-action btn-pay-plan-invoice" data-invoice-id="${row.invoice_id}">Registrar Pago</button>`
+                          : ''
+                      }
+                      ${
+                        row.invoice_state === 'draft'
+                          ? `<button type="button" class="btn btn-sm btn-action btn-post-plan-invoice" data-invoice-id="${row.invoice_id}">Publicar Factura</button>`
+                          : ''
+                      }
+                    `
+                    : canInvoiceCuotas && row.status === 'pending'
+                      ? `<button type="button" class="btn btn-sm btn-action btn-invoice-plan-cuota" data-plan-amount="${row.amount}" data-plan-date="${esc(row.due_date)}" data-plan-num="${row.installment_number}">Facturar Cuota</button>`
+                      : '';
+
                   return `
                     <tr data-cuota-num="${row.installment_number}" data-cuota-date="${esc(row.due_date)}" data-cuota-amount="${row.amount}">
                       <th>Cuota #${row.installment_number} de ${row.total_installments}</th>
@@ -663,11 +700,7 @@
                       <td>
                         <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
                           ${statusBadge}
-                          ${
-                            canInvoiceCuotas && row.status === 'pending'
-                              ? `<button type="button" class="btn btn-sm btn-action btn-invoice-plan-cuota" data-plan-amount="${row.amount}" data-plan-date="${esc(row.due_date)}" data-plan-num="${row.installment_number}">Facturar Cuota</button>`
-                              : ''
-                          }
+                          ${cuotaActionButtons}
                         </div>
                       </td>
                     </tr>

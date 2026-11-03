@@ -5,13 +5,15 @@
 'use strict';
 
   // ==================== MODULE 4: CONTABILIDAD (account.move) ====================
-  function paymentStateBadge(st) {
+  function paymentStateBadge(st, moveState) {
+    if (moveState === 'draft') return '<span class="o_badge o_badge_info">Borrador</span>';
+    if (moveState === 'cancel') return '<span class="o_badge o_badge_muted">Cancelado</span>';
     const map = {
       paid: { cls: 'o_badge_success', text: 'Pagado' },
       partial: { cls: 'o_badge_warning', text: 'Pago Parcial' },
       not_paid: { cls: 'o_badge_danger', text: 'No Pagado' }
     };
-    const item = map[st] || { cls: 'o_badge_muted', text: st };
+    const item = map[st] || { cls: 'o_badge_muted', text: st || '—' };
     return `<span class="o_badge ${item.cls}">${esc(item.text)}</span>`;
   }
 
@@ -405,13 +407,7 @@
       const bankCashAccounts = (kpis.accounts_summary && kpis.accounts_summary.length > 0)
         ? kpis.accounts_summary
         : (acc.journals || []).filter((j) => (j.type === 'bank' || j.type === 'cash') && j.active !== false).map((j) => ({
-            id: j.id,
-            code: j.code,
-            name: j.name,
-            type: j.type,
-            balance: Number(j.balance || 0),
-            inbound_total: 0,
-            outbound_total: 0
+            id: j.id, code: j.code, name: j.name, type: j.type, balance: Number(j.balance || 0), inbound_total: 0, outbound_total: 0
           }));
 
       container.innerHTML = `

@@ -205,7 +205,15 @@ describe('Supabase Persistence Layer & PostgREST Architecture', () => {
       amount_untaxed: 1000000,
       amount_tax: 190000,
       amount_total: 1190000,
-      amount_residual: 500000
+      amount_residual: 500000,
+      lines: [
+        { id: 1, name: 'Consultoría ERP', quantity: 1, price_unit: 1000000, tax_rate: 19, subtotal: 1000000, tax_amount: 190000, total: 1190000 }
+      ],
+      payments_history: [
+        { id: 1, amount: 690000, date: '2026-10-26', journal_code: 'BNK1', journal_name: 'Banco Bancolombia Cta Cte', residual_after: 500000 }
+      ],
+      last_payment_date: '2026-10-26',
+      last_payment_amount: 690000
     };
 
     const serialized = serializeAccountMove(original);
@@ -217,6 +225,10 @@ describe('Supabase Persistence Layer & PostgREST Architecture', () => {
     assert.equal(deserialized.journal_code, 'INV');
     assert.equal(deserialized.payment_state, 'partial');
     assert.equal(deserialized.amount_residual, 500000);
+    assert.equal(deserialized.last_payment_date, '2026-10-26');
+    assert.equal(deserialized.last_payment_amount, 690000);
+    assert.equal(deserialized.payments_history.length, 1);
+    assert.equal(deserialized.payments_history[0].amount, 690000);
     assert.ok(deserialized.lines.length >= 1, 'Should reconstruct default invoice lines');
   });
 

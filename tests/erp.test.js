@@ -2592,4 +2592,179 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.ok(salesViewsJs.includes('renderSaleInstallmentPlanHtml'), '06-sales-views.js must define renderSaleInstallmentPlanHtml');
     assert.ok(salesViewsJs.includes('id="saleInvoicePlanTable"'), '06-sales-views.js must render saleInvoicePlanTable');
   });
+
+  it('Flujo Completo de Factura y Pagos: ciclo de vida de estados (borrador -> publicada -> parcial -> pagada), registro de pagos y sincronización visual del plan de cuotas', async () => {
+    // 1. Crear cliente y orden de venta con plazos a 60 Días (2 cuotas)
+    const partnerRes = await req('/api/contacts', 'POST', {
+      name: 'Constructora Flujo Completo S.A.S.',
+      vat: '901999888-1',
+      city: 'Pereira'
+    });
+    assert.equal(partnerRes.status, 200);
+    const pid = partnerRes.json.contact.id;
+
+    const orderRes = await req('/api/sales', 'POST', {
+      partner_id: pid,
+      date_order: '2026-11-03',
+      payment_term: '60 Días',
+      lines: [
+        {
+          product_id: 1,
+          name: 'Ventanas y Puertas Serie 744',
+          measure: 1,
+          quantity: 2,
+          price_unit: 1000000,
+          discount: 0,
+          tax_rate: 19
+        }
+      ]
+    });
+    assert.equal(orderRes.status, 200);
+    const order = orderRes.json.order;
+    assert.equal(order.amount_total, 2380000);
+    assert.equal(order.installment_plan.length, 2);
+    assert.equal(order.installment_plan[0].amount, 1190000);
+    assert.equal(order.installment_plan[1].amount, 1190000);
+    assert.equal(order.installment_plan[0].status, 'pending');
+
+    // Confirmar orden
+    const confRes = await req(`/api/sales/${order.id}/action`, 'POST', { action: 'confirm' });
+    assert.equal(confRes.status, 200);
+    assert.equal(confRes.json.order.state, 'sale');
+
+    // 2. Facturar Cuota #1
+    const inv1Res = await req(`/api/sales/${order.id}/action`, 'POST', {
+      action: 'create_invoice',
+      amount: 1190000,
+      due_date: '2026-12-03'
+    });
+    assert.equal(inv1Res.status, 200);
+    const inv1 = inv1Res.json.invoice;
+    assert.equal(inv1.state, 'posted', 'Factura debe nacer en estado publicada');
+    assert.equal(inv1.payment_state, 'not_paid', 'Estado de pago inicial debe ser not_paid');
+    assert.equal(inv1.amount_residual, 1190000);
+
+    // Verificar que el plan de cuotas de la orden refleja cuota 1 facturada
+    const updatedPlan1 = inv1Res.json.order.installment_plan;
+    assert.equal(updatedPlan1[0].status, 'invoiced');
+    assert.equal(updatedPlan1[0].invoice_id, inv1.id);
+    assert.equal(updatedPlan1[0].payment_state, 'not_paid');
+    assert.equal(updatedPlan1[0].amount_residual, 1190000);
+    assert.equal(updatedPlan1[1].status, 'pending');
+
+    // 3. Registrar Pago Parcial sobre Cuota #1 ($ 500.000)
+    const payPartRes = await req(`/api/accounting/moves/${inv1.id}/action`, 'POST', {
+      action: 'register_payment',
+      amount: 500000,
+      journal_code: 'BNK1',
+      date: '2026-11-10',
+      ref: 'Abono parcial cuota 1'
+    });
+    assert.equal(payPartRes.status, 200);
+    const inv1AfterPart = payPartRes.json.move;
+    assert.equal(inv1AfterPart.payment_state, 'partial', 'Estado de pago debe cambiar a partial');
+    assert.equal(inv1AfterPart.amount_residual, 690000);
+    assert.equal(inv1AfterPart.payments_history.length, 1);
+    assert.equal(inv1AfterPart.payments_history[0].amount, 500000);
+
+    // Verificar sincronización del plan en la orden de venta vinculada
+    const freshOrder1 = (payPartRes.json.state.sales || []).find((s) => s.id === order.id);
+    assert.ok(freshOrder1, 'Venta vinculada debe estar presente en el estado');
+    assert.equal(freshOrder1.installment_plan[0].status, 'partial', 'Cuota 1 debe reflejar status partial');
+    assert.equal(freshOrder1.installment_plan[0].payment_state, 'partial');
+    assert.equal(freshOrder1.installment_plan[0].amount_residual, 690000);
+
+    // 4. Registrar Pago Restante sobre Cuota #1 ($ 690.000)
+    const payFullRes = await req(`/api/accounting/moves/${inv1.id}/action`, 'POST', {
+      action: 'register_payment',
+      amount: 690000,
+      journal_code: 'BNK1',
+      date: '2026-11-20',
+      ref: 'Liquidación cuota 1'
+    });
+    assert.equal(payFullRes.status, 200);
+    const inv1AfterFull = payFullRes.json.move;
+    assert.equal(inv1AfterFull.payment_state, 'paid', 'Estado de pago debe cambiar a paid');
+    assert.equal(inv1AfterFull.amount_residual, 0);
+
+    const freshOrder2 = (payFullRes.json.state.sales || []).find((s) => s.id === order.id);
+    assert.equal(freshOrder2.installment_plan[0].status, 'paid', 'Cuota 1 debe reflejar status paid');
+    assert.equal(freshOrder2.installment_plan[0].payment_state, 'paid');
+    assert.equal(freshOrder2.installment_plan[0].amount_residual, 0);
+
+    // 5. Facturar Cuota #2 restante ($ 1.190.000)
+    const inv2Res = await req(`/api/sales/${order.id}/action`, 'POST', {
+      action: 'create_invoice',
+      amount: 1190000,
+      due_date: '2027-01-03'
+    });
+    assert.equal(inv2Res.status, 200);
+    assert.equal(inv2Res.json.order.invoice_status, 'invoiced', 'Orden debe pasar a estado completamente facturada');
+    const inv2 = inv2Res.json.invoice;
+
+    // Pagar Cuota #2 totalmente
+    const payInv2 = await req(`/api/accounting/moves/${inv2.id}/action`, 'POST', {
+      action: 'register_payment',
+      amount: 1190000,
+      journal_code: 'CSH1',
+      date: '2026-12-01'
+    });
+    assert.equal(payInv2.status, 200);
+    assert.equal(payInv2.json.move.payment_state, 'paid');
+
+    const freshOrderFinal = (payInv2.json.state.sales || []).find((s) => s.id === order.id);
+    assert.equal(freshOrderFinal.installment_plan[0].status, 'paid');
+    assert.equal(freshOrderFinal.installment_plan[1].status, 'paid');
+
+    // 6. Prueba de Restablecer a Borrador: reversión contable completa y limpieza de historial
+    const resetRes = await req(`/api/accounting/moves/${inv2.id}/action`, 'POST', { action: 'draft' });
+    assert.equal(resetRes.status, 200);
+    assert.equal(resetRes.json.move.state, 'draft');
+    assert.equal(resetRes.json.move.payment_state, 'not_paid');
+    assert.equal(resetRes.json.move.amount_residual, 1190000);
+    assert.equal(resetRes.json.move.payments_history.length, 0, 'Historial de pagos debe quedar limpio al volver a borrador');
+    assert.equal(resetRes.json.move.last_payment_date, null);
+
+    const freshOrderReset = (resetRes.json.state.sales || []).find((s) => s.id === order.id);
+    assert.equal(freshOrderReset.installment_plan[1].status, 'draft', 'Cuota 2 debe reflejar status draft al restablecerse');
+
+    // 7. Verificación de Contratos de Frontend: métodos globales y botones interactivos
+    const acctFormJs = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'modules', '13-accounting-form.js'), 'utf8');
+    const acctDashJs = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'modules', '12-accounting-dashboard.js'), 'utf8');
+    const salesViewsJs = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'modules', '06-sales-views.js'), 'utf8');
+    const salesFormJs = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'modules', '10-sales-form.js'), 'utf8');
+    const appJs = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
+
+    assert.ok(acctFormJs.includes('window.openPaymentModal = openPaymentModal;'), '13-accounting-form.js must expose window.openPaymentModal');
+    assert.ok(acctFormJs.includes('btnGoToOriginDoc'), '13-accounting-form.js must include btnGoToOriginDoc button');
+    assert.ok(acctFormJs.includes('btnGoToOrigin.addEventListener'), '13-accounting-form.js must wire event listener for origin doc jump');
+    assert.ok(acctFormJs.includes('existing.payments_history'), '13-accounting-form.js must render payments history breakdown');
+    assert.ok(acctDashJs.includes("moveState === 'draft'"), '12-accounting-dashboard.js must accurately handle draft state in paymentStateBadge');
+    assert.ok(acctDashJs.includes("moveState === 'cancel'"), '12-accounting-dashboard.js must accurately handle cancel state in paymentStateBadge');
+    assert.ok(salesViewsJs.includes('btn-pay-sale-invoice'), '06-sales-views.js must provide btn-pay-sale-invoice');
+    assert.ok(salesViewsJs.includes('btn-pay-plan-invoice'), '06-sales-views.js must provide btn-pay-plan-invoice');
+    assert.ok(salesViewsJs.includes('btn-post-sale-invoice'), '06-sales-views.js must provide btn-post-sale-invoice');
+    assert.ok(salesViewsJs.includes('btn-post-plan-invoice'), '06-sales-views.js must provide btn-post-plan-invoice');
+    assert.ok(salesFormJs.includes('.btn-pay-sale-invoice, .btn-pay-plan-invoice'), '10-sales-form.js must listen for payment buttons');
+    assert.ok(appJs.includes('state.formDraft = null;'), 'app.js must reset formDraft after registering payment');
+
+    // 8. Verificación estricta: CERO emojis en botones de archivos modificados
+    const btnEmojiRegex = /<button[\s\S]*?<\/button>/gi;
+    const emojiCheck = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u;
+    [salesViewsJs, salesFormJs, acctFormJs, acctDashJs].forEach((content) => {
+      const btns = content.match(btnEmojiRegex) || [];
+      for (const b of btns) {
+        assert.ok(!emojiCheck.test(b), `Found forbidden emoji in button: ${b}`);
+      }
+    });
+
+    // 9. Verificación de límite de líneas: todos los módulos deben mantenerse < 900 líneas
+    const modulesDir = path.join(__dirname, '..', 'assets', 'js', 'modules');
+    fs.readdirSync(modulesDir).forEach((file) => {
+      if (file.endsWith('.js')) {
+        const lineCount = fs.readFileSync(path.join(modulesDir, file), 'utf8').split('\n').length;
+        assert.ok(lineCount < 900, `Module ${file} has ${lineCount} lines, which exceeds or equals the 900 line limit`);
+      }
+    });
+  });
 });

@@ -1570,10 +1570,18 @@ class ERPStore {
       const balanceAfter = Math.max(0, round2(total - accumulated));
       const pct = total > 0 ? round2((amount / total) * 100) : round2(100 / n);
 
-      const matchedInv = validMoves[idx] || null;
+      const matchedInv = validMoves.find((m) => Number(m.installment_number) === cuotaNum) || validMoves[idx] || null;
       let status = 'pending';
       if (matchedInv) {
-        status = matchedInv.payment_state === 'paid' ? 'paid' : 'invoiced';
+        if (matchedInv.state === 'draft') {
+          status = 'draft';
+        } else if (matchedInv.payment_state === 'paid') {
+          status = 'paid';
+        } else if (matchedInv.payment_state === 'partial') {
+          status = 'partial';
+        } else {
+          status = 'invoiced';
+        }
       } else if (total > 0 && totalInvoiced >= accumulated) {
         status = 'invoiced';
       }
@@ -1589,7 +1597,11 @@ class ERPStore {
         balance_after: balanceAfter,
         status,
         invoice_id: matchedInv ? matchedInv.id : null,
-        invoice_name: matchedInv ? matchedInv.name : null
+        invoice_name: matchedInv ? matchedInv.name : null,
+        invoice_state: matchedInv ? matchedInv.state : null,
+        payment_state: matchedInv ? matchedInv.payment_state : null,
+        amount_residual: matchedInv ? matchedInv.amount_residual : 0,
+        amount_total: matchedInv ? matchedInv.amount_total : 0
       };
     });
   }
@@ -3008,7 +3020,7 @@ class ERPStore {
       invoice_date: nextDate,
       invoice_date_due: nextDueDate,
       ref: move.name,
-      origin: move.origin || move.name,
+      origin: move.origin || move.ref || move.name,
       state: 'posted',
       payment_state: 'not_paid',
       lines: [
@@ -3078,8 +3090,11 @@ class ERPStore {
     this.data.accounting.moves.unshift(nextInvoice);
 
     const linkedSale = this.data.sales.find((s) => (s.invoice_ids || []).includes(move.id) || s.name === move.origin || s.name === move.ref);
-    if (linkedSale && !(linkedSale.invoice_ids || []).includes(nextInvoice.id)) {
-      linkedSale.invoice_ids = [...(linkedSale.invoice_ids || []), nextInvoice.id];
+    if (linkedSale) {
+      if (!(linkedSale.invoice_ids || []).includes(nextInvoice.id)) {
+        linkedSale.invoice_ids = [...(linkedSale.invoice_ids || []), nextInvoice.id];
+      }
+      this.recomputeSaleOrderInvoiceStatus(linkedSale);
     }
 
     move.chatter.push({
@@ -3106,6 +3121,9 @@ class ERPStore {
         this.adjustJournalBalance(p.journal_code, reversalDelta);
       });
       this.data.accounting.payments = this.data.accounting.payments.filter((p) => Number(p.move_id) !== Number(move.id));
+      move.payments_history = [];
+      move.last_payment_date = null;
+      move.last_payment_amount = 0;
     };
 
     if (action === 'post') {
@@ -3134,7 +3152,7 @@ class ERPStore {
       }
       const payAmount = round2(extra.amount ?? move.amount_residual);
       if (payAmount <= 0) throw new Error('El monto del pago debe ser mayor a 0.');
-      if (payAmount > move.amount_residual) {
+      if (round2(payAmount - move.amount_residual) > 0.001) {
         throw new Error('El monto del pago no puede superar el saldo pendiente.');
       }
 
@@ -3172,14 +3190,15 @@ class ERPStore {
         date: extra.date || todayStr(),
         journal_code: journalCode,
         journal_name: journalName,
-        residual_after: round2(move.amount_residual - payAmount)
+        residual_after: Math.max(0, round2(move.amount_residual - payAmount))
       };
       move.payments_history.push(paymentItem);
       move.last_payment_date = extra.date || todayStr();
       move.last_payment_amount = payAmount;
 
-      move.amount_residual = round2(move.amount_residual - payAmount);
-      move.payment_state = move.amount_residual === 0 ? 'paid' : 'partial';
+      move.amount_residual = Math.max(0, round2(move.amount_residual - payAmount));
+      move.payment_state = move.amount_residual <= 0.001 ? 'paid' : 'partial';
+      if (move.payment_state === 'paid') move.amount_residual = 0;
       move.chatter.push({
         id: this.nextChatterId(),
         author: this.getActiveAuthor(),
@@ -3222,8 +3241,11 @@ class ERPStore {
     }
 
     // Recompute linked sale order invoice status if applicable
-    const linkedSale = this.data.sales.find((s) => (s.invoice_ids || []).includes(move.id));
+    const linkedSale = this.data.sales.find((s) => (s.invoice_ids || []).includes(move.id) || s.name === move.origin || s.name === move.ref);
     if (linkedSale) {
+      if (!(linkedSale.invoice_ids || []).includes(move.id)) {
+        linkedSale.invoice_ids = [...(linkedSale.invoice_ids || []), move.id];
+      }
       this.recomputeSaleOrderInvoiceStatus(linkedSale);
     }
 

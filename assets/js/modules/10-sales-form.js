@@ -716,6 +716,34 @@
       });
     });
 
+    container.querySelectorAll('.btn-pay-sale-invoice, .btn-pay-plan-invoice').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const moveId = Number(btn.getAttribute('data-invoice-id'));
+        const moves = (state.data.accounting && state.data.accounting.moves) || [];
+        const targetMove = moves.find((m) => Number(m.id) === moveId);
+        if (!targetMove) {
+          return showToast('Factura no encontrada.', true);
+        }
+        if (typeof window.openPaymentModal === 'function') {
+          window.openPaymentModal(targetMove);
+        }
+      });
+    });
+
+    container.querySelectorAll('.btn-post-sale-invoice, .btn-post-plan-invoice').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        withActionLock(btn, async () => {
+          const moveId = Number(btn.getAttribute('data-invoice-id'));
+          await apiCall(`/api/accounting/moves/${moveId}/action`, 'POST', { action: 'post' });
+          state.formDraft = null;
+          showToast('Factura publicada.');
+          renderModuleWorkspace();
+        }).catch((err) => showToast(err.message, true));
+      });
+    });
+
     const btnPrintSale = document.getElementById('btnPrintSalePdf');
     if (btnPrintSale) {
       btnPrintSale.addEventListener('click', () => {
