@@ -91,7 +91,8 @@
     homeFocusedIndex: 0,
     partnerContextFilter: null, // { id, name }
     formDraft: null,
-    activeNotebookTab: 'lines'
+    activeNotebookTab: 'lines',
+    activeSaleTab: 'lines'
   };
 
   // ==================== UTILITIES ====================

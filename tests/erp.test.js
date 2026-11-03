@@ -2498,4 +2498,98 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.ok(!expJs.includes('#1e293b'), 'Supplier dropdown must not hardcode dark #1e293b background that breaks Light theme readability');
     assert.ok(expJs.includes('var(--o-view-bg') && expJs.includes('var(--o-text-main'), 'Supplier dropdown must use theme-adaptive --o-view-bg and --o-text-main variables');
   });
+
+  it('Module 3 (Ventas a Plazos & Plan de Facturas): genera pestaña Plan de Facturas mes a mes según el plazo con fechas, cuotas diferidas y saldos', async () => {
+    const contactRes = await req('/api/contacts', 'POST', {
+      name: 'Inmobiliaria Plazos SAS',
+      vat: '901.777.888-1',
+      payment_term: '90 Días',
+      is_company: true
+    });
+    assert.equal(contactRes.status, 200);
+    const pid = contactRes.json.contact.id;
+
+    // 1. Crear venta a plazos de 90 Días (3 Meses / 3 Cuotas) por $ 3.000.000
+    const salePlazosRes = await req('/api/sales', 'POST', {
+      partner_id: pid,
+      date_order: '2026-11-03',
+      payment_term: '90 Días',
+      lines: [
+        {
+          product_id: 1,
+          name: 'Cerramiento en Aluminio y Vidrio Templado',
+          measure: 1,
+          quantity: 3,
+          price_unit: 1000000,
+          discount: 0,
+          tax_rate: 0
+        }
+      ]
+    });
+    assert.equal(salePlazosRes.status, 200);
+    const orderPlazos = salePlazosRes.json.order;
+    assert.equal(orderPlazos.amount_total, 3000000);
+    assert.ok(Array.isArray(orderPlazos.installment_plan), 'Order must include installment_plan array');
+    assert.equal(orderPlazos.installment_plan.length, 3, '90 Días must generate 3 monthly installments');
+
+    assert.equal(orderPlazos.installment_plan[0].installment_number, 1);
+    assert.equal(orderPlazos.installment_plan[0].due_date, '2026-12-03');
+    assert.equal(orderPlazos.installment_plan[0].amount, 1000000);
+    assert.equal(orderPlazos.installment_plan[0].balance_after, 2000000);
+    assert.equal(orderPlazos.installment_plan[0].status, 'pending');
+
+    assert.equal(orderPlazos.installment_plan[1].installment_number, 2);
+    assert.equal(orderPlazos.installment_plan[1].due_date, '2027-01-03');
+    assert.equal(orderPlazos.installment_plan[1].amount, 1000000);
+    assert.equal(orderPlazos.installment_plan[1].balance_after, 1000000);
+
+    assert.equal(orderPlazos.installment_plan[2].installment_number, 3);
+    assert.equal(orderPlazos.installment_plan[2].due_date, '2027-02-03');
+    assert.equal(orderPlazos.installment_plan[2].amount, 1000000);
+    assert.equal(orderPlazos.installment_plan[2].balance_after, 0);
+
+    // 2. Confirmar pedido y facturar primera cuota de $ 1.000.000
+    const confRes = await req(`/api/sales/${orderPlazos.id}/action`, 'POST', { action: 'confirm' });
+    assert.equal(confRes.status, 200);
+
+    const inv1Res = await req(`/api/sales/${orderPlazos.id}/action`, 'POST', {
+      action: 'create_invoice',
+      amount: 1000000
+    });
+    assert.equal(inv1Res.status, 200);
+    assert.equal(inv1Res.json.invoice.invoice_date_due, '2026-12-03', 'First installment invoice must take scheduled due date 2026-12-03');
+    assert.equal(inv1Res.json.order.installment_plan[0].status, 'invoiced');
+    assert.equal(inv1Res.json.order.installment_plan[0].invoice_name, inv1Res.json.invoice.name);
+    assert.equal(inv1Res.json.order.installment_plan[1].status, 'pending');
+
+    // 3. Crear venta de Contado y verificar que no genera cuotas diferidas
+    const saleContadoRes = await req('/api/sales', 'POST', {
+      partner_id: pid,
+      date_order: '2026-11-03',
+      payment_term: 'Contado',
+      lines: [
+        {
+          product_id: 1,
+          name: 'Servicio de Mantenimiento',
+          measure: 1,
+          quantity: 1,
+          price_unit: 500000,
+          discount: 0,
+          tax_rate: 0
+        }
+      ]
+    });
+    assert.equal(saleContadoRes.status, 200);
+    assert.equal(saleContadoRes.json.order.installment_plan.length, 0, 'Contado sale must have empty installment_plan');
+
+    // 4. Verificar contratos de UI para la pestaña Plan de Facturas al lado de Líneas del Pedido
+    const salesFormJs = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'modules', '10-sales-form.js'), 'utf8');
+    const salesViewsJs = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'modules', '06-sales-views.js'), 'utf8');
+    assert.ok(salesFormJs.includes('id="tabBtnSaleInvoicePlan"'), '10-sales-form.js must render tabBtnSaleInvoicePlan');
+    assert.ok(salesFormJs.includes('Plan de Facturas'), '10-sales-form.js must label the tab Plan de Facturas');
+    assert.ok(salesFormJs.includes('id="saleTabInvoicePlanPanel"'), '10-sales-form.js must render saleTabInvoicePlanPanel');
+    assert.ok(salesViewsJs.includes('buildSaleInstallmentPlan'), '06-sales-views.js must define buildSaleInstallmentPlan');
+    assert.ok(salesViewsJs.includes('renderSaleInstallmentPlanHtml'), '06-sales-views.js must define renderSaleInstallmentPlanHtml');
+    assert.ok(salesViewsJs.includes('id="saleInvoicePlanTable"'), '06-sales-views.js must render saleInvoicePlanTable');
+  });
 });

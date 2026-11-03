@@ -452,7 +452,7 @@
                 <label for="fContactPaymentTerm">Plazo de Pago Predeterminado</label>
                 <select id="fContactPaymentTerm" class="o_select">
                   <option value="" ${!existing.payment_term ? 'selected disabled' : ''}>— Seleccione un plazo de pago —</option>
-                  ${['Contado', '15 Días', '30 Días', '45 Días', '60 Días']
+                  ${['Contado', '15 Días', '30 Días', '45 Días', '60 Días', '90 Días', '120 Días', '150 Días', '180 Días', '210 Días', '240 Días', '270 Días', '300 Días', '330 Días', '360 Días']
                     .map((t) => `<option value="${t}" ${existing.payment_term === t ? 'selected' : ''}>${t}</option>`)
                     .join('')}
                 </select>

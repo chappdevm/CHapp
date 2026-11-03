@@ -18,6 +18,20 @@ function addDays(dateStr, days) {
   return d.toISOString().slice(0, 10);
 }
 
+function addMonths(dateStr, monthsToAdd) {
+  const clean = String(dateStr || todayStr()).slice(0, 10);
+  const parts = clean.split('-').map(Number);
+  const y = parts[0] || new Date().getUTCFullYear();
+  const m = (parts[1] || 1) - 1;
+  const d = parts[2] || 1;
+  const targetMonthTotal = m + Number(monthsToAdd || 0);
+  const targetYear = y + Math.floor(targetMonthTotal / 12);
+  const targetMonth = ((targetMonthTotal % 12) + 12) % 12;
+  const maxDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  const finalDay = Math.min(d, maxDay);
+  return `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}-${String(finalDay).padStart(2, '0')}`;
+}
+
 function round2(n) {
   const num = Number(n);
   if (!Number.isFinite(num)) return 0;
@@ -941,6 +955,9 @@ class ERPStore {
   }
 
   getBootstrapState() {
+    (this.data.sales || []).forEach((s) => {
+      s.installment_plan = this.buildSaleInstallmentPlan(s);
+    });
     return {
       meta: this.data.meta,
       settings: this.data.settings,
@@ -1497,8 +1514,90 @@ class ERPStore {
     }
   }
 
+  buildSaleInstallmentPlan(order) {
+    if (!order) return [];
+    const rawTerm = String(order.payment_term || '').trim();
+    const lower = rawTerm.toLowerCase();
+    if (!rawTerm || lower === 'contado' || lower === 'immediate' || lower === 'inmediato') {
+      return [];
+    }
+
+    const baseDate = String(order.date_order || todayStr()).slice(0, 10);
+    const total = Math.max(0, round2(order.amount_total || 0));
+
+    let schedule = [];
+    if (lower.includes('15') && lower.includes('d')) {
+      schedule = [{ installment_number: 1, period_label: 'Quincena (15 Días)', due_date: addDays(baseDate, 15) }];
+    } else if (lower.includes('45') && lower.includes('d')) {
+      schedule = [
+        { installment_number: 1, period_label: 'Mes 1 (30 Días)', due_date: addMonths(baseDate, 1) },
+        { installment_number: 2, period_label: 'Plazo Final (45 Días)', due_date: addDays(baseDate, 45) }
+      ];
+    } else {
+      let numCuotas = 1;
+      const matchMonths = lower.match(/(\d+)\s*(?:mes|meses|cuota|cuotas)/i);
+      const matchDays = lower.match(/(\d+)\s*d[ií]a/i);
+      if (matchMonths) {
+        numCuotas = Math.max(1, parseInt(matchMonths[1], 10));
+      } else if (matchDays) {
+        const days = parseInt(matchDays[1], 10);
+        numCuotas = Math.max(1, Math.round(days / 30));
+      }
+      for (let k = 1; k <= numCuotas; k++) {
+        schedule.push({
+          installment_number: k,
+          period_label: `Mes ${k} (${k * 30} Días)`,
+          due_date: addMonths(baseDate, k)
+        });
+      }
+    }
+
+    const n = schedule.length;
+    const isInt = Number.isInteger(total);
+    const baseAmount = n > 0 ? (isInt ? Math.floor(total / n) : Math.floor((total / n) * 100) / 100) : 0;
+
+    const moves = (this.data && this.data.accounting && this.data.accounting.moves) || [];
+    const validMoves = moves
+      .filter((m) => m && m.state !== 'cancel' && ((order.invoice_ids || []).includes(m.id) || m.origin === order.name || m.ref === order.name))
+      .sort((a, b) => Number(a.id) - Number(b.id));
+    const totalInvoiced = round2(validMoves.reduce((s, m) => s + Number(m.amount_total || 0), 0));
+
+    let accumulated = 0;
+    return schedule.map((item, idx) => {
+      const cuotaNum = idx + 1;
+      const amount = cuotaNum === n ? Math.max(0, round2(total - accumulated)) : baseAmount;
+      accumulated = round2(accumulated + amount);
+      const balanceAfter = Math.max(0, round2(total - accumulated));
+      const pct = total > 0 ? round2((amount / total) * 100) : round2(100 / n);
+
+      const matchedInv = validMoves[idx] || null;
+      let status = 'pending';
+      if (matchedInv) {
+        status = matchedInv.payment_state === 'paid' ? 'paid' : 'invoiced';
+      } else if (total > 0 && totalInvoiced >= accumulated) {
+        status = 'invoiced';
+      }
+
+      return {
+        installment_number: cuotaNum,
+        total_installments: n,
+        period_label: item.period_label,
+        due_date: item.due_date,
+        percentage: pct,
+        amount,
+        accumulated,
+        balance_after: balanceAfter,
+        status,
+        invoice_id: matchedInv ? matchedInv.id : null,
+        invoice_name: matchedInv ? matchedInv.name : null
+      };
+    });
+  }
+
   recomputeSaleOrderInvoiceStatus(order) {
-    if (!order || order.state !== 'sale') return;
+    if (!order) return;
+    order.installment_plan = this.buildSaleInstallmentPlan(order);
+    if (order.state !== 'sale') return;
     const validMoves = (order.invoice_ids || [])
       .map((mid) => this.data.accounting.moves.find((m) => Number(m.id) === Number(mid)))
       .filter((m) => m && m.state !== 'cancel');
@@ -2406,6 +2505,7 @@ class ERPStore {
         { id: this.nextChatterId(), author: this.getActiveAuthor(), date: this.formatNowShort(), text: `Cotización ${name} creada.` }
       ]
     };
+    newOrder.installment_plan = this.buildSaleInstallmentPlan(newOrder);
     this.data.sales.unshift(newOrder);
     this.save();
     if (this.supabase) {
@@ -2506,8 +2606,12 @@ class ERPStore {
       const invSeq = this.nextSeq('move_inv');
       const moveId = this.data.accounting.moves.reduce((m, x) => Math.max(m, Number(x.id)), 0) + 1;
       const invName = `INV/2026/${this.padSeq(invSeq, 4)}`;
+      const planItems = this.buildSaleInstallmentPlan(order);
+      const matchedPlanItem = planItems.find((p) => Number(p.installment_number) === Number(installmentNum));
       const invDate = (params && params.invoice_date) ? String(params.invoice_date).trim() : todayStr();
-      const dueDate = addDays(invDate, 30);
+      const dueDate = (params && params.due_date)
+        ? String(params.due_date).trim()
+        : (matchedPlanItem && matchedPlanItem.due_date ? matchedPlanItem.due_date : addDays(invDate, 30));
 
       const conceptNote = isAbono
         ? `Abono / Cuota #${installmentNum} a la orden ${order.name} (Saldo restante: $ ${pendingResidualAfterThis.toLocaleString('es-CO')})`
@@ -2612,6 +2716,7 @@ class ERPStore {
       order.invoice_ids = [...(order.invoice_ids || []), invoice.id];
       const newInvoicedTotal = round2(invoicedTotal + billTotal);
       order.invoice_status = newInvoicedTotal >= round2(order.amount_total) ? 'invoiced' : 'to invoice';
+      order.installment_plan = this.buildSaleInstallmentPlan(order);
       order.chatter.push({
         id: this.nextChatterId(),
         author: this.getActiveAuthor(),

@@ -336,6 +336,14 @@
       document.body.appendChild(modal);
     }
 
+    const moves = (state.data && state.data.accounting && state.data.accounting.moves) || [];
+    const linkedInvs = moves.filter((m) => (order.invoice_ids || []).includes(m.id) || m.origin === order.name || m.ref === order.name);
+    const planItems = typeof buildSaleInstallmentPlan === 'function' ? buildSaleInstallmentPlan(order.payment_term, order.date_order, order.amount_total, linkedInvs) : [];
+    const nextPendingCuota = planItems.find((p) => p.status === 'pending');
+    const suggestedPartial = nextPendingCuota && nextPendingCuota.amount > 0
+      ? Math.min(remaining, nextPendingCuota.amount)
+      : Math.min(remaining, Math.round(remaining / 2));
+
     modal.innerHTML = `
       <div class="o_dialog_box" style="max-width: 520px;">
         <div class="o_dialog_header">
@@ -377,7 +385,7 @@
 
           <div id="boxPartialAmount" style="display: none; background: var(--o-view-bg); border: 1.5px solid var(--o-action); border-radius: 8px; padding: 0.85rem; margin-bottom: 1rem;">
             <label for="invPartialAmount" style="font-weight: 600; font-size: 0.84rem; display: block; margin-bottom: 0.35rem;">Valor del Abono (COP):</label>
-            <input type="number" id="invPartialAmount" class="o_input" min="1" max="${remaining}" step="any" value="${Math.min(remaining, Math.round(remaining / 2))}" style="font-size: 1.1rem; font-weight: 700;" />
+            <input type="number" id="invPartialAmount" class="o_input" min="1" max="${remaining}" step="any" value="${suggestedPartial}" style="font-size: 1.1rem; font-weight: 700;" />
             <div id="lblResidualCalc" style="font-size: 0.8rem; color: var(--o-text-muted); margin-top: 0.5rem;"></div>
           </div>
         </div>
@@ -433,3 +441,251 @@
     });
   }
 
+
+
+  const SALE_PAYMENT_TERMS_OPTIONS = [
+    { value: 'Contado', label: 'Contado' },
+    { value: '15 Días', label: '15 Días (1 Cuota Quincenal)' },
+    { value: '30 Días', label: '30 Días (1 Mes / 1 Cuota)' },
+    { value: '45 Días', label: '45 Días (2 Cuotas)' },
+    { value: '60 Días', label: '60 Días (2 Meses / 2 Cuotas)' },
+    { value: '90 Días', label: '90 Días (3 Meses / 3 Cuotas)' },
+    { value: '120 Días', label: '120 Días (4 Meses / 4 Cuotas)' },
+    { value: '150 Días', label: '150 Días (5 Meses / 5 Cuotas)' },
+    { value: '180 Días', label: '180 Días (6 Meses / 6 Cuotas)' },
+    { value: '210 Días', label: '210 Días (7 Meses / 7 Cuotas)' },
+    { value: '240 Días', label: '240 Días (8 Meses / 8 Cuotas)' },
+    { value: '270 Días', label: '270 Días (9 Meses / 9 Cuotas)' },
+    { value: '300 Días', label: '300 Días (10 Meses / 10 Cuotas)' },
+    { value: '330 Días', label: '330 Días (11 Meses / 11 Cuotas)' },
+    { value: '360 Días', label: '360 Días (12 Meses / 12 Cuotas)' }
+  ];
+
+  function isInstallmentPaymentTerm(paymentTerm) {
+    const s = String(paymentTerm || '').trim().toLowerCase();
+    if (!s || s === 'contado' || s === 'immediate' || s === 'inmediato') return false;
+    return true;
+  }
+
+  function addDaysISO(dateStr, daysToAdd) {
+    const clean = String(dateStr || new Date().toISOString().slice(0, 10)).slice(0, 10);
+    const parts = clean.split('-').map(Number);
+    const dt = new Date(Date.UTC(parts[0] || 2026, (parts[1] || 1) - 1, (parts[2] || 1) + Number(daysToAdd || 0)));
+    return dt.toISOString().slice(0, 10);
+  }
+
+  function addMonthsISO(dateStr, monthsToAdd) {
+    const clean = String(dateStr || new Date().toISOString().slice(0, 10)).slice(0, 10);
+    const parts = clean.split('-').map(Number);
+    const y = parts[0] || new Date().getUTCFullYear();
+    const m = (parts[1] || 1) - 1;
+    const d = parts[2] || 1;
+    const targetMonthTotal = m + Number(monthsToAdd || 0);
+    const targetYear = y + Math.floor(targetMonthTotal / 12);
+    const targetMonth = ((targetMonthTotal % 12) + 12) % 12;
+    const maxDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+    const finalDay = Math.min(d, maxDay);
+    return `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}-${String(finalDay).padStart(2, '0')}`;
+  }
+
+  function formatDateShortEs(dateStr) {
+    const clean = String(dateStr || '').slice(0, 10);
+    const parts = clean.split('-').map(Number);
+    if (parts.length !== 3 || !parts[0]) return clean;
+    const monthsEs = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    const dd = String(parts[2]).padStart(2, '0');
+    const mName = monthsEs[(parts[1] - 1) % 12] || '';
+    return `${dd} ${mName} ${parts[0]}`;
+  }
+
+  function buildSaleInstallmentPlan(paymentTerm, dateOrder, totalAmount, linkedInvoices = []) {
+    if (!isInstallmentPaymentTerm(paymentTerm)) return [];
+    const rawTerm = String(paymentTerm || '').trim();
+    const lower = rawTerm.toLowerCase();
+    const baseDate = String(dateOrder || new Date().toISOString().slice(0, 10)).slice(0, 10);
+    const total = Math.max(0, round2(totalAmount || 0));
+
+    let schedule = [];
+    if (lower.includes('15') && lower.includes('d')) {
+      schedule = [{ installment_number: 1, period_label: 'Quincena (15 Días)', due_date: addDaysISO(baseDate, 15) }];
+    } else if (lower.includes('45') && lower.includes('d')) {
+      schedule = [
+        { installment_number: 1, period_label: 'Mes 1 (30 Días)', due_date: addMonthsISO(baseDate, 1) },
+        { installment_number: 2, period_label: 'Plazo Final (45 Días)', due_date: addDaysISO(baseDate, 45) }
+      ];
+    } else {
+      let numCuotas = 1;
+      const matchMonths = lower.match(/(\d+)\s*(?:mes|meses|cuota|cuotas)/i);
+      const matchDays = lower.match(/(\d+)\s*d[ií]a/i);
+      if (matchMonths) {
+        numCuotas = Math.max(1, parseInt(matchMonths[1], 10));
+      } else if (matchDays) {
+        const days = parseInt(matchDays[1], 10);
+        numCuotas = Math.max(1, Math.round(days / 30));
+      }
+      for (let k = 1; k <= numCuotas; k++) {
+        schedule.push({
+          installment_number: k,
+          period_label: `Mes ${k} (${k * 30} Días)`,
+          due_date: addMonthsISO(baseDate, k)
+        });
+      }
+    }
+
+    const n = schedule.length;
+    const isInt = Number.isInteger(total);
+    const baseAmount = n > 0 ? (isInt ? Math.floor(total / n) : Math.floor((total / n) * 100) / 100) : 0;
+
+    const validMoves = (linkedInvoices || [])
+      .filter((m) => m && m.state !== 'cancel')
+      .sort((a, b) => Number(a.id) - Number(b.id));
+    const totalInvoiced = round2(validMoves.reduce((s, m) => s + Number(m.amount_total || 0), 0));
+
+    let accumulated = 0;
+    return schedule.map((item, idx) => {
+      const cuotaNum = idx + 1;
+      const amount = cuotaNum === n ? Math.max(0, round2(total - accumulated)) : baseAmount;
+      accumulated = round2(accumulated + amount);
+      const balanceAfter = Math.max(0, round2(total - accumulated));
+      const pct = total > 0 ? round2((amount / total) * 100) : round2(100 / n);
+
+      const matchedInv = validMoves[idx] || null;
+      let status = 'pending';
+      if (matchedInv) {
+        status = matchedInv.payment_state === 'paid' ? 'paid' : 'invoiced';
+      } else if (total > 0 && totalInvoiced >= accumulated) {
+        status = 'invoiced';
+      }
+
+      return {
+        installment_number: cuotaNum,
+        total_installments: n,
+        period_label: item.period_label,
+        due_date: item.due_date,
+        due_date_display: formatDateShortEs(item.due_date),
+        percentage: pct,
+        amount,
+        accumulated,
+        balance_after: balanceAfter,
+        status,
+        invoice_id: matchedInv ? matchedInv.id : null,
+        invoice_name: matchedInv ? matchedInv.name : null
+      };
+    });
+  }
+
+  function renderSaleInstallmentPlanHtml(plan, paymentTerm, dateOrder, totalAmount, order, isEditable) {
+    const cuotasCount = plan.length;
+    const firstAmount = cuotasCount > 0 ? plan[0].amount : 0;
+    const canInvoiceCuotas = Boolean(order && order.id && order.state === 'sale' && order.invoice_status !== 'invoiced' && totalAmount > 0);
+    const installmentTerms = SALE_PAYMENT_TERMS_OPTIONS.filter((opt) => opt.value !== 'Contado');
+
+    return `
+      <div class="o_installment_plan_panel" id="saleInstallmentPlanContainer">
+        <div class="o_installment_plan_toolbar">
+          <div class="o_installment_plan_title_wrap">
+            <h4 class="o_installment_plan_title">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+              Cronograma Automático del Plan de Facturas (Mes a Mes)
+            </h4>
+            <p class="o_installment_plan_subtitle">
+              Proyección diferida línea por línea según el plazo acordado (${esc(paymentTerm)}) a partir del ${esc(dateOrder)} (${esc(formatDateShortEs(dateOrder))}).
+            </p>
+          </div>
+          ${
+            isEditable
+              ? `
+            <div class="o_installment_plan_selector">
+              <label for="fPlanQuickTermSelect">Ajustar Plazo / Cuotas:</label>
+              <select id="fPlanQuickTermSelect" class="o_select">
+                ${installmentTerms
+                  .map((opt) => `<option value="${esc(opt.value)}" ${paymentTerm === opt.value ? 'selected' : ''}>${esc(opt.label)}</option>`)
+                  .join('')}
+              </select>
+            </div>
+          `
+              : ''
+          }
+        </div>
+
+        <div class="o_installment_plan_summary">
+          <div class="o_installment_stat">
+            <span class="o_installment_stat_label">Total Diferido de la Venta</span>
+            <strong class="o_installment_stat_value">${formatMoney(totalAmount)}</strong>
+          </div>
+          <div class="o_installment_stat">
+            <span class="o_installment_stat_label">Total de Cuotas</span>
+            <strong class="o_installment_stat_value">${cuotasCount} ${cuotasCount === 1 ? 'Cuota' : 'Cuotas'}</strong>
+          </div>
+          <div class="o_installment_stat">
+            <span class="o_installment_stat_label">Valor por Cuota</span>
+            <strong class="o_installment_stat_value is-accent">${formatMoney(firstAmount)}</strong>
+          </div>
+          <div class="o_installment_stat">
+            <span class="o_installment_stat_label">Vencimiento Final</span>
+            <strong class="o_installment_stat_value">${cuotasCount > 0 ? esc(plan[cuotasCount - 1].due_date) : esc(dateOrder)}</strong>
+          </div>
+        </div>
+
+        <div tabindex="0" role="region" aria-label="Tabla de plan de facturas por cuotas" class="table-wrapper" style="margin-bottom: 0.75rem;">
+          <table class="o_list_table" id="saleInvoicePlanTable" style="--label-2: 'Mes / Plazo'; --label-3: 'Fecha de Pago'; --label-4: '% Diferido'; --label-5: 'Cantidad a Pagar'; --label-6: 'Saldo Restante'; --label-7: 'Estado';">
+            <thead>
+              <tr>
+                <th>N° de Cuota</th>
+                <th>Mes / Plazo</th>
+                <th>Fecha de Pago</th>
+                <th class="text-end">% Diferido</th>
+                <th class="text-end">Cantidad a Pagar</th>
+                <th class="text-end">Saldo Diferido Restante</th>
+                <th>Estado / Factura</th>
+              </tr>
+            </thead>
+            <tbody id="saleInvoicePlanTbody">
+              ${plan
+                .map((row) => {
+                  const statusBadge =
+                    row.status === 'paid'
+                      ? `<span class="o_badge o_badge_success">Pagada ${row.invoice_name ? '· ' + esc(row.invoice_name) : ''}</span>`
+                      : row.status === 'invoiced'
+                        ? `<span class="o_badge o_badge_info">Facturada ${row.invoice_name ? '· ' + esc(row.invoice_name) : ''}</span>`
+                        : `<span class="o_badge o_badge_warning">Programada / Pendiente</span>`;
+                  return `
+                    <tr data-cuota-num="${row.installment_number}" data-cuota-date="${esc(row.due_date)}" data-cuota-amount="${row.amount}">
+                      <th>Cuota #${row.installment_number} de ${row.total_installments}</th>
+                      <td><strong>${esc(row.period_label)}</strong></td>
+                      <td>
+                        <span class="o_plan_date_badge">${esc(row.due_date)}</span>
+                        <span style="font-size: 0.78rem; color: var(--o-text-muted); margin-left: 4px;">(${esc(row.due_date_display)})</span>
+                      </td>
+                      <td class="text-end">${row.percentage}%</td>
+                      <td class="text-end"><strong style="color: var(--o-action, #074073); font-size: 0.96rem;">${formatMoney(row.amount)}</strong></td>
+                      <td class="text-end">${formatMoney(row.balance_after)}</td>
+                      <td>
+                        <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
+                          ${statusBadge}
+                          ${
+                            canInvoiceCuotas && row.status === 'pending'
+                              ? `<button type="button" class="btn btn-sm btn-action btn-invoice-plan-cuota" data-plan-amount="${row.amount}" data-plan-date="${esc(row.due_date)}" data-plan-num="${row.installment_number}">Facturar Cuota</button>`
+                              : ''
+                          }
+                        </div>
+                      </td>
+                    </tr>
+                  `;
+                })
+                .join('')}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="3">Total Plan de Facturas (${cuotasCount} ${cuotasCount === 1 ? 'Cuota' : 'Cuotas'})</td>
+                <td class="text-end">100%</td>
+                <td class="text-end"><strong>${formatMoney(totalAmount)}</strong></td>
+                <td class="text-end">${formatMoney(0)}</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    `;
+  }

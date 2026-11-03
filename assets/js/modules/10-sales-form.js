@@ -47,6 +47,7 @@
     }
 
     if (!state.formDraft || state.formDraft.recordId !== state.activeRecordId) {
+      state.activeSaleTab = 'lines';
       state.formDraft = {
         recordId: state.activeRecordId,
         partner_id: (state.formDraft && state.formDraft.partner_id) || existing.partner_id || '',
@@ -85,6 +86,16 @@
       return acc + sub * (Number(l.tax_rate || 0) / 100);
     }, 0);
     const calcTotal = calcUntaxed + calcTax;
+    const currentPaymentTerm = String(draft.payment_term || '').trim();
+    const isInstallment = typeof isInstallmentPaymentTerm === 'function' ? isInstallmentPaymentTerm(currentPaymentTerm) : (Boolean(currentPaymentTerm) && currentPaymentTerm.toLowerCase() !== 'contado' && currentPaymentTerm.toLowerCase() !== 'immediate');
+    const activeSaleTab = isInstallment && state.activeSaleTab === 'invoice_plan' ? 'invoice_plan' : 'lines';
+    const allAccountingMoves = (state.data.accounting && state.data.accounting.moves) || [];
+    const linkedOrderMoves = !isNew
+      ? allAccountingMoves.filter((m) => (existing.invoice_ids || []).includes(m.id) || m.origin === existing.name || m.ref === existing.name)
+      : [];
+    const installmentPlan = typeof buildSaleInstallmentPlan === 'function'
+      ? buildSaleInstallmentPlan(currentPaymentTerm, draft.date_order || existing.date_order, calcTotal, linkedOrderMoves)
+      : [];
 
     const previewData = {
       ...existing,
@@ -201,8 +212,18 @@
                     <label for="fSalePaymentTerm">Plazos de Pago</label>
                     <select id="fSalePaymentTerm" class="o_select" ${!isEditable ? 'disabled' : ''}>
                       <option value="" ${!draft.payment_term ? 'selected disabled' : ''}>— Seleccione plazo de pago —</option>
-                      ${['Contado', '15 Días', '30 Días', '45 Días', '60 Días']
-                        .map((t) => `<option value="${t}" ${draft.payment_term === t ? 'selected' : ''}>${t}</option>`)
+                      ${(typeof SALE_PAYMENT_TERMS_OPTIONS !== 'undefined' ? SALE_PAYMENT_TERMS_OPTIONS : [
+                        { value: 'Contado', label: 'Contado' },
+                        { value: '15 Días', label: '15 Días (1 Cuota Quincenal)' },
+                        { value: '30 Días', label: '30 Días (1 Mes / 1 Cuota)' },
+                        { value: '45 Días', label: '45 Días (2 Cuotas)' },
+                        { value: '60 Días', label: '60 Días (2 Meses / 2 Cuotas)' },
+                        { value: '90 Días', label: '90 Días (3 Meses / 3 Cuotas)' },
+                        { value: '120 Días', label: '120 Días (4 Meses / 4 Cuotas)' },
+                        { value: '180 Días', label: '180 Días (6 Meses / 6 Cuotas)' },
+                        { value: '360 Días', label: '360 Días (12 Meses / 12 Cuotas)' }
+                      ])
+                        .map((opt) => `<option value="${opt.value}" ${draft.payment_term === opt.value ? 'selected' : ''}>${opt.label}</option>`)
                         .join('')}
                     </select>
                   </div>
@@ -221,9 +242,15 @@
                 </div>
 
                 <div class="o_notebook_headers">
-                  <button type="button" class="o_notebook_tab is-active">Líneas del Pedido</button>
+                  <button type="button" class="o_notebook_tab ${activeSaleTab === 'lines' ? 'is-active' : ''}" id="tabBtnSaleLines" data-sale-tab="lines">Líneas del Pedido</button>
+                  ${
+                    isInstallment
+                      ? `<button type="button" class="o_notebook_tab ${activeSaleTab === 'invoice_plan' ? 'is-active' : ''}" id="tabBtnSaleInvoicePlan" data-sale-tab="invoice_plan">Plan de Facturas</button>`
+                      : ''
+                  }
                 </div>
 
+                <div id="saleTabLinesPanel" style="${activeSaleTab === 'invoice_plan' ? 'display: none;' : ''}">
                 <div tabindex="0" role="region" aria-label="Líneas del pedido de venta" class="table-wrapper" style="margin-bottom: 0.75rem;">
                   <table class="o_list_table" style="--label-2: 'Medida'; --label-3: 'U. Medida'; --label-4: 'Precio Unit.'; --label-5: 'Cant.'; --label-6: 'Desc %'; --label-7: 'IVA %'; --label-8: 'Subtotal'; --label-9: 'Acción';">
                     <thead>
@@ -283,6 +310,13 @@
                 </div>
 
                 ${isEditable ? `<button type="button" class="btn btn-secondary btn-sm" id="btnAddSaleLine">Agregar producto / línea</button>` : ''}
+                </div>
+
+                ${
+                  isInstallment && typeof renderSaleInstallmentPlanHtml === 'function'
+                    ? `<div id="saleTabInvoicePlanPanel" style="${activeSaleTab === 'invoice_plan' ? '' : 'display: none;'}">${renderSaleInstallmentPlanHtml(installmentPlan, currentPaymentTerm, draft.date_order || existing.date_order, calcTotal, existing, isEditable)}</div>`
+                    : ''
+                }
 
                 <div class="o_totals_box">
                   <div class="o_totals_row">
@@ -385,9 +419,61 @@
     if (partnerSelectEl) {
       partnerSelectEl.addEventListener('change', () => {
         syncSaleDraft();
+        const chosenContact = (state.data.contacts || []).find((c) => Number(c.id) === Number(state.formDraft.partner_id));
+        if (chosenContact && chosenContact.payment_term && !state.formDraft.payment_term) {
+          state.formDraft.payment_term = chosenContact.payment_term;
+        }
         renderSaleOrderForm(container);
       });
     }
+
+    container.querySelectorAll('[data-sale-tab]').forEach((tabBtn) => {
+      tabBtn.addEventListener('click', () => {
+        syncSaleDraft();
+        state.activeSaleTab = tabBtn.getAttribute('data-sale-tab') || 'lines';
+        renderSaleOrderForm(container);
+      });
+    });
+
+    const quickPlanTermEl = document.getElementById('fPlanQuickTermSelect');
+    if (quickPlanTermEl) {
+      quickPlanTermEl.addEventListener('change', () => {
+        syncSaleDraft();
+        state.formDraft.payment_term = quickPlanTermEl.value;
+        state.activeSaleTab = 'invoice_plan';
+        renderSaleOrderForm(container);
+      });
+    }
+
+    container.querySelectorAll('.btn-invoice-plan-cuota').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        withActionLock(btn, async () => {
+          const planAmount = Number(btn.getAttribute('data-plan-amount') || 0);
+          const planDate = btn.getAttribute('data-plan-date') || '';
+          const moves = (state.data.accounting && state.data.accounting.moves) || [];
+          const existingInvs = moves.filter((m) => (existing.invoice_ids || []).includes(m.id) && m.state !== 'cancel');
+          const invoicedTotal = existingInvs.reduce((s, m) => s + Number(m.amount_total || 0), 0);
+          const orderTotal = Number(existing.amount_total || 0);
+          const remaining = Math.max(0, orderTotal - invoicedTotal);
+          const chosenAmount = Math.min(remaining, planAmount > 0 ? planAmount : remaining);
+          if (chosenAmount <= 0) {
+            return showToast('Este pedido de venta ya fue facturado en su totalidad.', true);
+          }
+          const res = await apiCall(`/api/sales/${state.activeRecordId}/action`, 'POST', {
+            action: 'create_invoice',
+            amount: chosenAmount,
+            due_date: planDate
+          });
+          state.formDraft = null;
+          showToast(`Factura ${res.invoice ? res.invoice.name : ''} generada para la cuota.`);
+          if (res.invoice) {
+            openApp('accounting', { submenu: 'out_invoice', viewType: 'form', recordId: res.invoice.id, returnTo: { app: 'sales', submenu: state.submenu, viewType: 'form', recordId: state.activeRecordId } });
+          } else {
+            renderModuleWorkspace();
+          }
+        }).catch((err) => showToast(err.message, true));
+      });
+    });
 
     ['fSalePaymentTerm', 'fSaleDate', 'fSaleValidity', 'fSalePerson', 'fSaleNotes'].forEach((id) => {
       const el = document.getElementById(id);
