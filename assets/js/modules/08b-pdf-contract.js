@@ -441,27 +441,31 @@
     const disabledAttr = !isEditable ? 'disabled' : '';
 
     return `
-      <div class="o_contract_form_tab" style="padding: 1rem 0;">
-        <div style="background: var(--o-bg-subtle, #f8fafc); border: 1px solid var(--o-border-color, #e2e8f0); border-radius: 8px; padding: 1rem; margin-bottom: 1.25rem;">
-          <h4 style="margin: 0 0 0.5rem 0; font-size: 0.95rem; color: var(--o-heading, #074073); display: flex; align-items: center; gap: 0.5rem;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-            Datos Oficiales del Contrato de Compraventa y Pagaré
-          </h4>
-          <p style="margin: 0; font-size: 0.82rem; color: var(--o-text-muted, #64748b);">
+      <div class="o_contract_tab_wrap">
+        <div class="o_contract_info_banner">
+          <div class="o_contract_info_title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+            <span>Datos Oficiales del Contrato de Compraventa y Pagaré</span>
+          </div>
+          <p class="o_contract_info_desc">
             Los campos se autocompletan con la información del cliente y del pedido. Modifique o complete los datos que falten para generar el formato oficial idéntico al talonario físico.
           </p>
         </div>
 
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; margin-bottom: 1.25rem;">
-          <!-- Col 1: Direcciones -->
-          <div class="o_group" style="background: var(--o-view-bg, #fff); border: 1px solid var(--o-border-color, #e2e8f0); border-radius: 8px; padding: 1rem;">
-            <strong style="display: block; margin-bottom: 0.75rem; color: var(--o-heading, #074073); font-size: 0.88rem; border-bottom: 1px solid var(--o-border-color, #e2e8f0); padding-bottom: 0.35rem;">1. Residencia y Trabajo del Cliente</strong>
+        <div class="o_contract_cards_grid">
+          <!-- Tarjeta 1: Residencia y Trabajo del Cliente -->
+          <div class="o_contract_form_card">
+            <h4 class="o_contract_card_header">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+              <span>1. Residencia y Trabajo del Cliente</span>
+            </h4>
             
-            <div class="o_field_row" style="margin-bottom: 0.5rem;">
+            <div class="o_field_row">
               <label for="fContractResAddress">Dirección Residencia</label>
               <input type="text" id="fContractResAddress" class="o_input contract-input" data-contract-field="residence_address" value="${esc(cd.residence_address)}" ${disabledAttr} />
             </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
+
+            <div class="o_contract_row_2col">
               <div class="o_field_row">
                 <label for="fContractResBarrio">Barrio Residencia</label>
                 <input type="text" id="fContractResBarrio" class="o_input contract-input" data-contract-field="residence_neighborhood" value="${esc(cd.residence_neighborhood)}" ${disabledAttr} />
@@ -472,11 +476,12 @@
               </div>
             </div>
 
-            <div class="o_field_row" style="margin-bottom: 0.5rem; margin-top: 0.75rem;">
+            <div class="o_field_row">
               <label for="fContractWorkAddress">Dirección Trabajo</label>
               <input type="text" id="fContractWorkAddress" class="o_input contract-input" data-contract-field="work_address" value="${esc(cd.work_address)}" placeholder="Ej: Calle 20 # 5-40" ${disabledAttr} />
             </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+
+            <div class="o_contract_row_2col">
               <div class="o_field_row">
                 <label for="fContractWorkBarrio">Barrio Trabajo</label>
                 <input type="text" id="fContractWorkBarrio" class="o_input contract-input" data-contract-field="work_neighborhood" value="${esc(cd.work_neighborhood)}" placeholder="Centro" ${disabledAttr} />
@@ -488,11 +493,14 @@
             </div>
           </div>
 
-          <!-- Col 2: Financiación y Fechas -->
-          <div class="o_group" style="background: var(--o-view-bg, #fff); border: 1px solid var(--o-border-color, #e2e8f0); border-radius: 8px; padding: 1rem;">
-            <strong style="display: block; margin-bottom: 0.75rem; color: var(--o-heading, #074073); font-size: 0.88rem; border-bottom: 1px solid var(--o-border-color, #e2e8f0); padding-bottom: 0.35rem;">2. Condiciones Financieras y Fechas</strong>
+          <!-- Tarjeta 2: Condiciones Financieras y Fechas -->
+          <div class="o_contract_form_card">
+            <h4 class="o_contract_card_header">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
+              <span>2. Condiciones Financieras y Fechas</span>
+            </h4>
             
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <div class="o_contract_row_2col">
               <div class="o_field_row">
                 <label for="fContractNumCuotas">No. Cuotas</label>
                 <input type="number" id="fContractNumCuotas" class="o_input contract-input" data-contract-field="installments_count" min="1" step="1" value="${esc(String(cd.installments_count))}" ${disabledAttr} />
@@ -503,7 +511,7 @@
               </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <div class="o_contract_row_2col">
               <div class="o_field_row">
                 <label for="fContractFechaPagos">Fecha / Periodicidad Pagos</label>
                 <input type="text" id="fContractFechaPagos" class="o_input contract-input" data-contract-field="payment_dates" value="${esc(cd.payment_dates)}" placeholder="Mensual / 15 y 30" ${disabledAttr} />
@@ -514,7 +522,7 @@
               </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <div class="o_contract_row_2col">
               <div class="o_field_row">
                 <label for="fContractFechaInstalar">Fecha Instalar</label>
                 <input type="date" id="fContractFechaInstalar" class="o_input contract-input" data-contract-field="installation_date" value="${esc(cd.installation_date)}" ${disabledAttr} />
@@ -525,36 +533,42 @@
               </div>
             </div>
 
-            <div class="o_field_row" style="margin-top: 0.5rem;">
+            <div class="o_field_row">
               <label>Lugar de Cobro Acordado</label>
-              <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.25rem;">
-                <label style="font-size: 0.8rem; font-weight: normal; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;">
-                  <input type="radio" name="fContractColPlace" value="oficina" class="contract-radio" ${cd.collection_place === 'oficina' || !cd.collection_place ? 'checked' : ''} ${disabledAttr} /> Paga en oficina
+              <div class="o_contract_radio_grid">
+                <label class="o_contract_radio_chip ${cd.collection_place === 'oficina' || !cd.collection_place ? 'is-active' : ''}">
+                  <input type="radio" name="fContractColPlace" value="oficina" class="contract-radio" ${cd.collection_place === 'oficina' || !cd.collection_place ? 'checked' : ''} ${disabledAttr} />
+                  <span>Paga en oficina</span>
                 </label>
-                <label style="font-size: 0.8rem; font-weight: normal; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;">
-                  <input type="radio" name="fContractColPlace" value="casa" class="contract-radio" ${cd.collection_place === 'casa' ? 'checked' : ''} ${disabledAttr} /> En la casa
+                <label class="o_contract_radio_chip ${cd.collection_place === 'casa' ? 'is-active' : ''}">
+                  <input type="radio" name="fContractColPlace" value="casa" class="contract-radio" ${cd.collection_place === 'casa' ? 'checked' : ''} ${disabledAttr} />
+                  <span>En la casa</span>
                 </label>
-                <label style="font-size: 0.8rem; font-weight: normal; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;">
-                  <input type="radio" name="fContractColPlace" value="trabajo" class="contract-radio" ${cd.collection_place === 'trabajo' ? 'checked' : ''} ${disabledAttr} /> En el trabajo
+                <label class="o_contract_radio_chip ${cd.collection_place === 'trabajo' ? 'is-active' : ''}">
+                  <input type="radio" name="fContractColPlace" value="trabajo" class="contract-radio" ${cd.collection_place === 'trabajo' ? 'checked' : ''} ${disabledAttr} />
+                  <span>En el trabajo</span>
                 </label>
-                <label style="font-size: 0.8rem; font-weight: normal; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;">
-                  <input type="radio" name="fContractColPlace" value="vendedor" class="contract-radio" ${cd.collection_place === 'vendedor' ? 'checked' : ''} ${disabledAttr} /> Vendedor
+                <label class="o_contract_radio_chip ${cd.collection_place === 'vendedor' ? 'is-active' : ''}">
+                  <input type="radio" name="fContractColPlace" value="vendedor" class="contract-radio" ${cd.collection_place === 'vendedor' ? 'checked' : ''} ${disabledAttr} />
+                  <span>Vendedor</span>
                 </label>
               </div>
             </div>
           </div>
-        </div>
 
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem;">
-          <!-- Col 3: Codeudor y Firmas -->
-          <div class="o_group" style="background: var(--o-view-bg, #fff); border: 1px solid var(--o-border-color, #e2e8f0); border-radius: 8px; padding: 1rem;">
-            <strong style="display: block; margin-bottom: 0.75rem; color: var(--o-heading, #074073); font-size: 0.88rem; border-bottom: 1px solid var(--o-border-color, #e2e8f0); padding-bottom: 0.35rem;">3. Codeudor y Datos de Firmas</strong>
+          <!-- Tarjeta 3: Codeudor y Datos de Firmas -->
+          <div class="o_contract_form_card">
+            <h4 class="o_contract_card_header">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+              <span>3. Codeudor y Datos de Firmas</span>
+            </h4>
             
-            <div class="o_field_row" style="margin-bottom: 0.5rem;">
+            <div class="o_field_row">
               <label for="fContractCodeudorName">Nombre del Codeudor</label>
               <input type="text" id="fContractCodeudorName" class="o_input contract-input" data-contract-field="codeudor_name" value="${esc(cd.codeudor_name)}" placeholder="Nombre completo" ${disabledAttr} />
             </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
+
+            <div class="o_contract_row_2col">
               <div class="o_field_row">
                 <label for="fContractCodeudorVat">C.C. Codeudor</label>
                 <input type="text" id="fContractCodeudorVat" class="o_input contract-input" data-contract-field="codeudor_vat" value="${esc(cd.codeudor_vat)}" placeholder="Cédula" ${disabledAttr} />
@@ -564,65 +578,70 @@
                 <input type="text" id="fContractCodeudorPhone" class="o_input contract-input" data-contract-field="codeudor_phone" value="${esc(cd.codeudor_phone)}" placeholder="310..." ${disabledAttr} />
               </div>
             </div>
-            <div class="o_field_row" style="margin-bottom: 0.5rem;">
+
+            <div class="o_field_row">
               <label for="fContractCodeudorAddress">Dirección Codeudor</label>
               <input type="text" id="fContractCodeudorAddress" class="o_input contract-input" data-contract-field="codeudor_address" value="${esc(cd.codeudor_address)}" placeholder="Dirección residencia codeudor" ${disabledAttr} />
             </div>
+
             <div class="o_field_row">
               <label for="fContractSalespersonVat">C.C. / Celular Vendedor</label>
               <input type="text" id="fContractSalespersonVat" class="o_input contract-input" data-contract-field="salesperson_vat" value="${esc(cd.salesperson_vat)}" placeholder="3138483191" ${disabledAttr} />
             </div>
           </div>
 
-          <!-- Col 4: Referencias y Observaciones -->
-          <div class="o_group" style="background: var(--o-view-bg, #fff); border: 1px solid var(--o-border-color, #e2e8f0); border-radius: 8px; padding: 1rem;">
-            <strong style="display: block; margin-bottom: 0.75rem; color: var(--o-heading, #074073); font-size: 0.88rem; border-bottom: 1px solid var(--o-border-color, #e2e8f0); padding-bottom: 0.35rem;">4. Referencias y Observaciones</strong>
+          <!-- Tarjeta 4: Referencias y Observaciones -->
+          <div class="o_contract_form_card">
+            <h4 class="o_contract_card_header">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+              <span>4. Referencias y Observaciones</span>
+            </h4>
             
-            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <div class="o_contract_row_ref">
               <div class="o_field_row">
                 <label for="fContractRefCom1">Ref. Comercial 1</label>
                 <input type="text" id="fContractRefCom1" class="o_input contract-input" data-contract-field="ref_commercial_1" value="${esc(cd.ref_commercial_1)}" placeholder="Nombre establecimiento" ${disabledAttr} />
               </div>
               <div class="o_field_row">
                 <label for="fContractRefComPhone1">Teléfono</label>
-                <input type="text" id="fContractRefComPhone1" class="o_input contract-input" data-contract-field="ref_commercial_phone_1" value="${esc(cd.ref_commercial_phone_1)}" ${disabledAttr} />
+                <input type="text" id="fContractRefComPhone1" class="o_input contract-input" data-contract-field="ref_commercial_phone_1" value="${esc(cd.ref_commercial_phone_1)}" placeholder="Teléfono" ${disabledAttr} />
               </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <div class="o_contract_row_ref">
               <div class="o_field_row">
                 <label for="fContractRefCom2">Ref. Comercial 2</label>
                 <input type="text" id="fContractRefCom2" class="o_input contract-input" data-contract-field="ref_commercial_2" value="${esc(cd.ref_commercial_2)}" placeholder="Segundo establecimiento" ${disabledAttr} />
               </div>
               <div class="o_field_row">
                 <label for="fContractRefComPhone2">Teléfono</label>
-                <input type="text" id="fContractRefComPhone2" class="o_input contract-input" data-contract-field="ref_commercial_phone_2" value="${esc(cd.ref_commercial_phone_2)}" ${disabledAttr} />
+                <input type="text" id="fContractRefComPhone2" class="o_input contract-input" data-contract-field="ref_commercial_phone_2" value="${esc(cd.ref_commercial_phone_2)}" placeholder="Teléfono" ${disabledAttr} />
               </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <div class="o_contract_row_ref">
               <div class="o_field_row">
                 <label for="fContractRefFam1">Ref. Familiar 1</label>
                 <input type="text" id="fContractRefFam1" class="o_input contract-input" data-contract-field="ref_family_1" value="${esc(cd.ref_family_1)}" placeholder="Nombre familiar" ${disabledAttr} />
               </div>
               <div class="o_field_row">
                 <label for="fContractRefFamPhone1">Teléfono</label>
-                <input type="text" id="fContractRefFamPhone1" class="o_input contract-input" data-contract-field="ref_family_phone_1" value="${esc(cd.ref_family_phone_1)}" ${disabledAttr} />
+                <input type="text" id="fContractRefFamPhone1" class="o_input contract-input" data-contract-field="ref_family_phone_1" value="${esc(cd.ref_family_phone_1)}" placeholder="Teléfono" ${disabledAttr} />
               </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <div class="o_contract_row_ref">
               <div class="o_field_row">
                 <label for="fContractRefFam2">Ref. Familiar 2</label>
                 <input type="text" id="fContractRefFam2" class="o_input contract-input" data-contract-field="ref_family_2" value="${esc(cd.ref_family_2)}" placeholder="Segundo familiar" ${disabledAttr} />
               </div>
               <div class="o_field_row">
                 <label for="fContractRefFamPhone2">Teléfono</label>
-                <input type="text" id="fContractRefFamPhone2" class="o_input contract-input" data-contract-field="ref_family_phone_2" value="${esc(cd.ref_family_phone_2)}" ${disabledAttr} />
+                <input type="text" id="fContractRefFamPhone2" class="o_input contract-input" data-contract-field="ref_family_phone_2" value="${esc(cd.ref_family_phone_2)}" placeholder="Teléfono" ${disabledAttr} />
               </div>
             </div>
 
-            <div class="o_field_row" style="margin-top: 0.5rem;">
+            <div class="o_field_row">
               <label for="fContractObs">Observaciones del Cliente</label>
               <textarea id="fContractObs" class="o_input contract-input" data-contract-field="observations" rows="2" placeholder="Especificaciones de instalación, entrega o acuerdos especiales" ${disabledAttr}>${esc(cd.observations)}</textarea>
             </div>

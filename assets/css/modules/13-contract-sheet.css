@@ -514,3 +514,250 @@
   color: #ffffff;
   box-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
+
+/* ==========================================================================
+   Responsive Contract Form Tab Styles (Pestaña Datos del Contrato)
+   ========================================================================== */
+
+.o_contract_tab_wrap {
+  width: 100%;
+  padding: 0.75rem 0 0.5rem 0;
+  box-sizing: border-box;
+  container-type: inline-size;
+}
+
+.o_contract_info_banner {
+  background: var(--o-bg-subtle, #f8fafc);
+  border: 1px solid var(--o-border-color, #e2e8f0);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1.25rem;
+  box-sizing: border-box;
+}
+
+.o_contract_info_title {
+  margin: 0 0 0.35rem 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--o-heading, #074073);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.o_contract_info_desc {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--o-text-muted, #64748b);
+}
+
+.o_contract_cards_grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.o_contract_form_card {
+  background: var(--o-view-bg, #ffffff);
+  border: 1px solid var(--o-border-color, #e2e8f0);
+  border-radius: 8px;
+  padding: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.o_contract_card_header {
+  margin: 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--o-border-color, #e2e8f0);
+  color: var(--o-heading, #074073);
+  font-size: 0.88rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.o_contract_row_2col {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.o_contract_row_ref {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(0, 1.2fr);
+  gap: 0.75rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.o_contract_tab_wrap .o_field_row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.o_contract_tab_wrap .o_field_row label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--o-text-muted, #64748b);
+  line-height: 1.25;
+}
+
+.o_contract_tab_wrap .contract-input,
+.o_contract_tab_wrap .o_input {
+  width: 100%;
+  min-height: 38px;
+  box-sizing: border-box;
+  font-size: 0.88rem;
+}
+
+.o_contract_tab_wrap textarea.contract-input {
+  min-height: 60px;
+  resize: vertical;
+}
+
+/* Modern responsive radio pills for collection place */
+.o_contract_radio_grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.o_contract_radio_chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.65rem;
+  min-height: 40px;
+  border: 1px solid var(--o-border-color, #cbd5e1);
+  border-radius: 6px;
+  background: var(--o-bg-subtle, #f8fafc);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--o-text-main, #1e293b);
+  transition: all 0.15s ease;
+  user-select: none;
+  box-sizing: border-box;
+  touch-action: manipulation;
+}
+
+.o_contract_radio_chip:hover {
+  border-color: var(--o-action, #074073);
+  background: #ffffff;
+}
+
+.o_contract_radio_chip:has(input:checked),
+.o_contract_radio_chip.is-active {
+  border-color: var(--o-action, #074073);
+  background: rgba(7, 64, 115, 0.08);
+  color: var(--o-action, #074073);
+  font-weight: 600;
+}
+
+.o_contract_radio_chip input[type="radio"] {
+  accent-color: var(--o-action, #074073);
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   Responsive Adaptations & Breakpoints (Media Queries & Container Queries)
+   ========================================================================== */
+
+/* Tablet & medium width / split view */
+@media (max-width: 960px) {
+  .o_contract_cards_grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+@container (width < 760px) {
+  .o_contract_cards_grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+  }
+}
+
+/* Narrow mobile devices / tight split panels */
+@media (max-width: 580px) {
+  .o_contract_row_2col,
+  .o_contract_row_ref {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+
+  .o_contract_form_card {
+    padding: 0.95rem 0.85rem;
+  }
+
+  .o_contract_tab_wrap .contract-input,
+  .o_contract_tab_wrap .o_input {
+    min-height: 42px;
+    font-size: 16px; /* Prevents iOS Safari auto-zoom */
+  }
+
+  .o_contract_radio_grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .o_contract_radio_chip {
+    min-height: 44px; /* WCAG touch target */
+    padding: 0.45rem 0.5rem;
+    font-size: 0.78rem;
+    justify-content: flex-start;
+  }
+}
+
+@container (width < 500px) {
+  .o_contract_row_2col,
+  .o_contract_row_ref {
+    grid-template-columns: 1fr !important;
+    gap: 0.65rem !important;
+  }
+
+  .o_contract_form_card {
+    padding: 0.95rem 0.85rem !important;
+  }
+
+  .o_contract_radio_grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .o_contract_radio_chip {
+    min-height: 44px !important;
+  }
+}
+
+/* Ultra small devices (< 360px) */
+@media (max-width: 360px) {
+  .o_contract_radio_grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@container (width < 340px) {
+  .o_contract_radio_grid {
+    grid-template-columns: 1fr !important;
+  }
+}

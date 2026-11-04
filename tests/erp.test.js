@@ -2919,6 +2919,15 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     // Kanban columns en sales-views
     assert.ok(salesViewsJs.includes("id: 'delivered'"), 'Kanban debe incluir columna Entregado');
 
+    // Diseño responsive del formulario de contrato
+    assert.ok(contractJs.includes('o_contract_tab_wrap'), 'El formulario de contrato debe usar contenedor responsive o_contract_tab_wrap');
+    assert.ok(contractJs.includes('o_contract_cards_grid'), 'El formulario de contrato debe usar rejilla responsive o_contract_cards_grid');
+    assert.ok(contractJs.includes('o_contract_row_2col'), 'El formulario de contrato debe usar filas adaptables o_contract_row_2col');
+    assert.ok(contractJs.includes('o_contract_radio_grid'), 'El formulario de contrato debe usar selector adaptado o_contract_radio_grid');
+    assert.ok(contractCss.includes('.o_contract_tab_wrap'), 'CSS debe definir .o_contract_tab_wrap');
+    assert.ok(contractCss.includes('container-type: inline-size;'), 'CSS debe habilitar container queries para el tab de contrato');
+    assert.ok(contractCss.includes('@media (max-width: 580px)'), 'CSS debe incluir reglas responsive para móviles en max-width: 580px');
+
     // 3. Verificación de CERO emojis en botones
     const btnEmojiRegex = /<button[\s\S]*?<\/button>/gi;
     const emojiCheck = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u;
