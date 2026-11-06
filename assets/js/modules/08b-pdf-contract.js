@@ -8,6 +8,7 @@
   function getSaleContractData(sale) {
     const s = sale || {};
     const cd = (s && s.contract_data) || {};
+    const company = (typeof state !== 'undefined' && state.data && state.data.settings) || {};
     const partner = (typeof state !== 'undefined' && state.data && state.data.contacts
       ? state.data.contacts.find((c) => Number(c.id) === Number(s.partner_id))
       : null) || {};
@@ -77,8 +78,8 @@
       codeudor_vat: cd.codeudor_vat || cd.codebtor_vat || '',
       codeudor_phone: cd.codeudor_phone || cd.codebtor_phone || '',
       codeudor_address: cd.codeudor_address || cd.codebtor_address || '',
-      salesperson_name: cd.salesperson_name || s.salesperson || 'CH Aluminios',
-      salesperson_vat: cd.salesperson_vat || '3138483191',
+      salesperson_name: cd.salesperson_name || s.salesperson || company.company_name || 'CH Aluminios',
+      salesperson_vat: cd.salesperson_vat || company.company_vat || company.company_phone || '3138483191',
       collection_place: (() => {
         const raw = String(cd.collection_place || '').toLowerCase();
         if (raw === 'work' || raw === 'trabajo') return 'trabajo';
@@ -86,8 +87,8 @@
         if (raw === 'seller' || raw === 'vendedor') return 'vendedor';
         return 'oficina';
       })(),
-      city_payment: cd.city_payment || 'Pereira',
-      order_to_name: cd.order_to_name || 'ALUMINIOS C.H.',
+      city_payment: cd.city_payment || company.company_city || 'Pereira',
+      order_to_name: cd.order_to_name || company.company_name || 'ALUMINIOS C.H.',
       interest_rate: cd.interest_rate !== undefined && cd.interest_rate !== '' ? cd.interest_rate : '0',
       mora_rate: cd.mora_rate !== undefined && cd.mora_rate !== '' ? cd.mora_rate : '3'
     };
@@ -174,6 +175,14 @@
     const isColCasa = data.collection_place === 'casa';
     const isColOficina = data.collection_place === 'oficina';
     const isColVendedor = data.collection_place === 'vendedor';
+    const company = (typeof state !== 'undefined' && state.data && state.data.settings) || {};
+    const contractCompanyTitle = company.company_name && company.company_name !== 'CH Aluminios' ? company.company_name : 'ALUMINIOS C.H.';
+    const contractCompanyAddr = company.company_address
+      ? `${company.company_address}${company.company_city ? ` - ${company.company_city}` : ''}`
+      : 'MZ 32 CASA 584 LAS MERCEDES CUBA - PEREIRA';
+    const contractCompanyPhone = company.company_phone || '3138483191';
+    const contractCompanyNit = company.company_vat ? ` · NIT: ${company.company_vat}` : '';
+    const contractCompanyEmail = company.company_email ? ` · ${company.company_email}` : '';
 
     return `
       <div class="o_contract_sheet" id="contractPdfSheet">
@@ -183,9 +192,9 @@
             <img src="${logoSrc}" alt="Aluminio C.H." class="o_contract_logo_left o_pdf_company_logo" onerror="if(!this.src.startsWith('data:'))this.style.display='none'" />
           </div>
           <div class="o_contract_title_col">
-            <h1 class="o_contract_main_title">ALUMINIOS C.H.</h1>
+            <h1 class="o_contract_main_title">${esc(contractCompanyTitle)}</h1>
             <div class="o_contract_slogan">CALIDAD PARA TU HOGAR</div>
-            <div class="o_contract_address_cel">DIRECCIÓN: MZ 32 CASA 584 LAS MERCEDES CUBA - PEREIRA &nbsp;&nbsp;&nbsp;&nbsp; CEL: 3138483191</div>
+            <div class="o_contract_address_cel">DIRECCIÓN: ${esc(contractCompanyAddr)} &nbsp;&nbsp;&nbsp;&nbsp; CEL: ${esc(contractCompanyPhone)}${esc(contractCompanyNit)}${esc(contractCompanyEmail)}</div>
           </div>
           <div class="o_contract_logo_right">
             ${renderContract3DLogoSvg()}

@@ -317,7 +317,11 @@
     }
 
     try {
-      const st = await apiCall('/api/whatsapp/status', 'GET');
+      let st = await apiCall('/api/whatsapp/status', 'GET');
+      if (st.status !== 'CONECTADO' && (st.hasSavedSession || st.status === 'CONECTANDO')) {
+        showToast('Restaurando sesión activa de WhatsApp...');
+        st = await apiCall('/api/whatsapp/connect', 'POST');
+      }
       if (st.status !== 'CONECTADO') {
         const docLabel = model === 'sales'
           ? (record.state === 'sale' ? 'Contrato' : (record.state === 'delivered' ? 'Factura' : 'Cotización'))

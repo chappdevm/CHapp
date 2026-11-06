@@ -337,7 +337,8 @@ function createHandler(store = new ERPStore(undefined, { useSupabase: isSupabase
 
         // WhatsApp Baileys endpoints
         if (method === 'GET' && pathname === '/api/whatsapp/status') {
-          return sendJson(res, 200, { ok: true, ...baileysManager.getStatus() });
+          const st = baileysManager.getStatusAsync ? await baileysManager.getStatusAsync() : baileysManager.getStatus();
+          return sendJson(res, 200, { ok: true, ...st });
         }
 
         if (method === 'POST' && pathname === '/api/whatsapp/connect') {
@@ -392,17 +393,18 @@ function createHandler(store = new ERPStore(undefined, { useSupabase: isSupabase
 
           const isSaleContract = model === 'sales' && record.state === 'sale';
           const isSaleDelivered = model === 'sales' && record.state === 'delivered';
+          const companyName = (store.data.settings && store.data.settings.company_name) || 'CH Aluminios';
 
           const defaultCaption = caption || (
             model === 'sales'
               ? (isSaleContract
-                  ? `Hola ${partnerName || ''}, adjuntamos su contrato de venta y pedido ${docName} de ALUMINIOS C.H. CALIDAD PARA TU HOGAR. Quedamos atentos a su firma.`
+                  ? `Hola ${partnerName || ''}, adjuntamos su contrato de venta y pedido ${docName} de ${companyName}. Quedamos atentos a su firma.`
                   : (isSaleDelivered
-                      ? `Hola ${partnerName || ''}, adjuntamos su factura electrónica de venta del pedido ${docName} de CH Aluminios. ¡Muchas gracias por su preferencia!`
-                      : `Hola ${partnerName || ''}, adjuntamos su cotización ${docName} de CH Aluminios. Quedamos a su entera disposición.`
+                      ? `Hola ${partnerName || ''}, adjuntamos su factura electrónica de venta del pedido ${docName} de ${companyName}. ¡Muchas gracias por su preferencia!`
+                      : `Hola ${partnerName || ''}, adjuntamos su cotización ${docName} de ${companyName}. Quedamos a su entera disposición.`
                     )
                 )
-              : `Hola ${partnerName || ''}, adjuntamos su factura electrónica ${docName} de CH Aluminios. Agradecemos su preferencia.`
+              : `Hola ${partnerName || ''}, adjuntamos su factura electrónica ${docName} de ${companyName}. Agradecemos su preferencia.`
           );
 
           const sendResult = await baileysManager.sendPdf(targetPhone, pdfBase64, filename || `${docName}.pdf`, defaultCaption);

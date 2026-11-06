@@ -81,6 +81,8 @@ class BaileysManager {
     this.qrRaw = null;
     this.qrDataUrl = null;
     this.connectedNumber = null;
+    this.hasSavedSession = false;
+    this.manualDisconnect = false;
     this.isStarting = false;
     this.reconnectTimeout = null;
     this.saveDebounceTimeout = null;
@@ -120,6 +122,13 @@ class BaileysManager {
         }
       }
       if (!files['creds.json']) return null;
+      try {
+        const parsed = JSON.parse(files['creds.json']);
+        const hasIdentity = Boolean(parsed?.me?.id || parsed?.registered || this.connectedNumber);
+        if (!hasIdentity) return null;
+      } catch (_) {
+        return null;
+      }
       return files;
     } catch (err) {
       console.warn('[Baileys] Error leyendo authDir para backup:', err.message);
@@ -147,9 +156,11 @@ class BaileysManager {
   }
 
   async persistSession() {
+    if (this.manualDisconnect) return false;
     const files = this.backupAuthFiles();
     if (!files || !files['creds.json']) return false;
     try {
+      this.hasSavedSession = true;
       const ok = await saveWhatsAppSession({
         connectedNumber: this.connectedNumber,
         files,
@@ -165,16 +176,21 @@ class BaileysManager {
     }
   }
 
-  async restoreSessionFromRemote() {
+  async restoreSessionFromRemote(options = {}) {
+    if (this.manualDisconnect && !options.ignoreManualFlag) return false;
+    const forceRemote = Boolean(options.forceRemote);
     const localCreds = path.join(this.authDir, 'creds.json');
-    if (fs.existsSync(localCreds)) {
+    if (!forceRemote && fs.existsSync(localCreds)) {
       try {
         const raw = fs.readFileSync(localCreds, 'utf8');
         const parsed = JSON.parse(raw);
-        if (parsed?.me?.id) {
-          this.connectedNumber = parsed.me.id.split(':')[0].replace(/\D/g, '');
+        if (parsed?.me?.id || parsed?.registered) {
+          if (parsed?.me?.id) {
+            this.connectedNumber = parsed.me.id.split(':')[0].replace(/\D/g, '');
+          }
+          this.hasSavedSession = true;
+          return true;
         }
-        return true;
       } catch (e) {}
     }
 
@@ -185,7 +201,15 @@ class BaileysManager {
         if (restored) {
           if (remoteSession.connectedNumber) {
             this.connectedNumber = remoteSession.connectedNumber;
+          } else {
+            try {
+              const parsed = JSON.parse(remoteSession.files['creds.json']);
+              if (parsed?.me?.id) {
+                this.connectedNumber = parsed.me.id.split(':')[0].replace(/\D/g, '');
+              }
+            } catch (_) {}
           }
+          this.hasSavedSession = true;
           console.log(`[Baileys] 🔄 Sesión restaurada de la base de datos (+${this.connectedNumber || ''}).`);
           return true;
         }
@@ -194,6 +218,42 @@ class BaileysManager {
       console.warn('[Baileys] Error cargando sesión remota:', err.message);
     }
     return false;
+  }
+
+  async autoStartSavedSession() {
+    try {
+      const restored = await this.restoreSessionFromRemote();
+      if (restored && !this.manualDisconnect) {
+        const isTest =
+          process.env.NODE_ENV === 'test' ||
+          Boolean(process.env.NODE_TEST_CONTEXT) ||
+          (Array.isArray(process.argv) && process.argv.some((a) => /test/i.test(a)));
+        if (!isTest) {
+          await this.init(10000);
+        }
+        return true;
+      }
+    } catch (err) {
+      console.warn('[Baileys] Error en autoStartSavedSession:', err.message);
+    }
+    return false;
+  }
+
+  async ensureConnected(waitMs = 10000) {
+    if (this.status === 'CONECTADO' && this.socket) return true;
+    if (this.manualDisconnect) return false;
+    const restored = await this.restoreSessionFromRemote();
+    if (!restored && !this.hasSavedSession && !this.connectedNumber) {
+      return false;
+    }
+    await this.init(waitMs);
+    if (this.status === 'CONECTADO' && this.socket) return true;
+    const deadline = Date.now() + Math.min(waitMs, 8000);
+    while (Date.now() < deadline && this.status === 'CONECTANDO') {
+      await new Promise((r) => setTimeout(r, 300));
+      if (this.status === 'CONECTADO' && this.socket) return true;
+    }
+    return this.status === 'CONECTADO' && Boolean(this.socket);
   }
 
   async clearSavedSession() {
@@ -229,6 +289,7 @@ class BaileysManager {
     // 3. Resetear memoria
     this.status = 'DESCONECTADO';
     this.connectedNumber = null;
+    this.hasSavedSession = false;
     this.qrRaw = null;
     this.qrDataUrl = null;
     this.isStarting = false;
@@ -239,6 +300,7 @@ class BaileysManager {
     return {
       status: this.status,
       connectedNumber: this.connectedNumber,
+      hasSavedSession: Boolean(this.hasSavedSession || this.connectedNumber),
       tieneQr: Boolean(this.qrDataUrl),
       qrDataUrl: this.qrDataUrl,
       baileysAvailable: Boolean(makeWASocket && useMultiFileAuthState),
@@ -246,7 +308,24 @@ class BaileysManager {
     };
   }
 
+  async getStatusAsync() {
+    if (this.status === 'DESCONECTADO' && !this.isStarting && !this.manualDisconnect) {
+      const restored = await this.restoreSessionFromRemote();
+      if (restored) {
+        const isTest =
+          process.env.NODE_ENV === 'test' ||
+          Boolean(process.env.NODE_TEST_CONTEXT) ||
+          (Array.isArray(process.argv) && process.argv.some((a) => /test/i.test(a)));
+        if (!isTest) {
+          await this.init(5000);
+        }
+      }
+    }
+    return this.getStatus();
+  }
+
   async init(waitForQrMs = 8000) {
+    this.manualDisconnect = false;
     await loadBaileys();
     if (!makeWASocket || !useMultiFileAuthState) {
       const detail = baileysLoadError ? `: ${baileysLoadError.message}` : '';
@@ -263,7 +342,7 @@ class BaileysManager {
     this.authDir = this.resolveAuthDir();
 
     // Intentar restaurar sesión de Supabase si en este contenedor aún no existe
-    await this.restoreSessionFromRemote();
+    await this.restoreSessionFromRemote({ ignoreManualFlag: true });
 
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
@@ -322,7 +401,7 @@ class BaileysManager {
             if (this.saveDebounceTimeout) clearTimeout(this.saveDebounceTimeout);
             this.saveDebounceTimeout = setTimeout(() => {
               this.persistSession().catch(() => {});
-            }, 1500);
+            }, 1000);
           } catch (err) {
             console.error('[Baileys] Error guardando credenciales:', err.message);
           }
@@ -346,10 +425,12 @@ class BaileysManager {
 
           if (connection === 'open') {
             this.status = 'CONECTADO';
+            this.manualDisconnect = false;
+            this.hasSavedSession = true;
             this.qrRaw = null;
             this.qrDataUrl = null;
             const userJid = sock.user?.id || '';
-            this.connectedNumber = userJid.split(':')[0].replace(/\D/g, '');
+            this.connectedNumber = userJid.split(':')[0].replace(/\D/g, '') || this.connectedNumber;
             console.log(`[Baileys] ✅ WhatsApp conectado exitosamente como: +${this.connectedNumber}`);
             clearTimeout(timer);
             await this.persistSession();
@@ -358,23 +439,31 @@ class BaileysManager {
 
           if (connection === 'close') {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
-            const isLoggedOut = statusCode === DisconnectReason?.loggedOut || statusCode === 401 || statusCode === 403;
-            const shouldReconnect = statusCode !== DisconnectReason?.loggedOut && !isLoggedOut;
-            console.log(`[Baileys] 🔌 Conexión cerrada (código: ${statusCode}). Reintentar: ${shouldReconnect}`);
-
             this.socket = null;
             this.qrRaw = null;
             this.qrDataUrl = null;
 
-            if (shouldReconnect) {
+            // Solo limpiar sesión si fue cerrada manualmente por el usuario.
+            // Si existe sesión guardada, mantenerla activa y reconectar automáticamente tras redeploy/push.
+            if (this.manualDisconnect) {
+              this.status = 'DESCONECTADO';
+              finish();
+              return;
+            }
+
+            const keepSessionActive = Boolean(this.hasSavedSession || this.connectedNumber) || statusCode !== DisconnectReason?.loggedOut;
+            console.log(`[Baileys] 🔌 Conexión cerrada (código: ${statusCode}). Mantener sesión activa: ${keepSessionActive}`);
+
+            if (keepSessionActive) {
               this.status = 'CONECTANDO';
-              this.reconnectTimeout = setTimeout(() => {
+              this.reconnectTimeout = setTimeout(async () => {
                 this.isStarting = false;
-                this.init(5000).catch((e) => console.error('[Baileys] Error reintentando conexión:', e));
+                await this.restoreSessionFromRemote({ forceRemote: true }).catch(() => {});
+                this.init(6000).catch((e) => console.error('[Baileys] Error reintentando conexión:', e));
               }, 3500);
             } else {
-              // Si se desvinculó (logout / teléfono anterior), limpiar local y remoto
-              await this.clearSavedSession();
+              this.status = 'DESCONECTADO';
+              finish();
             }
           }
         });
@@ -388,12 +477,16 @@ class BaileysManager {
   }
 
   async disconnect() {
+    this.manualDisconnect = true;
     await this.clearSavedSession();
     return { ok: true, status: 'DESCONECTADO' };
   }
 
   async sendPdf(phone, pdfInput, filename = 'documento.pdf', caption = '') {
     await loadBaileys();
+    if ((!this.socket || this.status !== 'CONECTADO') && !this.manualDisconnect) {
+      await this.ensureConnected(12000);
+    }
     if (!this.socket || this.status !== 'CONECTADO') {
       throw new Error('WhatsApp de la compañía no está conectado. Por favor vincule el dispositivo escaneando el código QR.');
     }
@@ -447,8 +540,8 @@ class BaileysManager {
 
 const baileysManager = new BaileysManager();
 
-// Intentar restaurar sesión guardada de forma asíncrona al iniciar
-baileysManager.restoreSessionFromRemote().catch(() => {});
+// Intentar restaurar y reconectar sesión guardada de forma asíncrona al iniciar
+baileysManager.autoStartSavedSession().catch(() => {});
 
 module.exports = {
   baileysManager,

@@ -1259,48 +1259,97 @@ class SupabasePersistence {
 }
 
 
+function isTestRuntime() {
+  return (
+    process.env.NODE_ENV === 'test' ||
+    Boolean(process.env.NODE_TEST_CONTEXT) ||
+    (Array.isArray(process.argv) && process.argv.some((a) => /test/i.test(a)))
+  );
+}
+
+function getWhatsAppSessionRowId() {
+  return isTestRuntime() ? 999001 : 999;
+}
+
+function getWhatsAppBackupFilePath() {
+  const fileName = isTestRuntime() ? 'whatsapp_session_test.json' : 'whatsapp_session.json';
+  return path.join(__dirname, '..', 'data', fileName);
+}
+
 async function saveWhatsAppSession(sessionData) {
-  if (!isSupabaseConfigured()) return false;
+  let localSaved = false;
   try {
+    const backupPath = getWhatsAppBackupFilePath();
+    const dir = path.dirname(backupPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(backupPath, JSON.stringify(sessionData), 'utf8');
+    localSaved = true;
+  } catch (_) {}
+
+  if (!isSupabaseConfigured()) return localSaved;
+  try {
+    const rowId = getWhatsAppSessionRowId();
     const res = await callPostgrest('/res_config_settings', {
       method: 'POST',
       headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
       body: {
-        id: 999,
+        id: rowId,
         company_name: '__WHATSAPP_SESSION__',
         active_user: sessionData,
         updated_at: new Date().toISOString()
       }
     });
-    return Boolean(res.ok);
+    return Boolean(res.ok) || localSaved;
   } catch (e) {
     console.warn('[Supabase] Error guardando sesión de WhatsApp:', e.message);
-    return false;
+    return localSaved;
   }
 }
 
 async function loadWhatsAppSession() {
-  if (!isSupabaseConfigured()) return null;
-  try {
-    const res = await callPostgrest('/res_config_settings?id=eq.999&select=active_user&limit=1');
-    if (res.ok && Array.isArray(res.data) && res.data[0]?.active_user) {
-      return res.data[0].active_user;
-    }
-    return null;
-  } catch (e) {
-    return null;
+  const rowId = getWhatsAppSessionRowId();
+  if (isSupabaseConfigured()) {
+    try {
+      const res = await callPostgrest(`/res_config_settings?id=eq.${rowId}&select=active_user&limit=1`);
+      if (res.ok && Array.isArray(res.data) && res.data[0]?.active_user) {
+        return res.data[0].active_user;
+      }
+    } catch (_) {}
   }
+  try {
+    const backupPath = getWhatsAppBackupFilePath();
+    if (fs.existsSync(backupPath)) {
+      const raw = fs.readFileSync(backupPath, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.files && parsed.files['creds.json']) {
+        return parsed;
+      }
+    }
+  } catch (_) {}
+  return null;
 }
 
 async function deleteWhatsAppSession() {
-  if (!isSupabaseConfigured()) return false;
+  let localDeleted = false;
   try {
-    const res = await callPostgrest('/res_config_settings?id=eq.999', {
+    const backupPath = getWhatsAppBackupFilePath();
+    if (fs.existsSync(backupPath)) {
+      fs.unlinkSync(backupPath);
+    }
+    localDeleted = true;
+  } catch (_) {}
+
+  if (!isSupabaseConfigured()) return localDeleted;
+  try {
+    const rowId = getWhatsAppSessionRowId();
+    const res = await callPostgrest(`/res_config_settings?id=eq.${rowId}`, {
       method: 'DELETE'
     });
-    return Boolean(res.ok);
+    return Boolean(res.ok) || localDeleted;
   } catch (e) {
-    return false;
+    return localDeleted;
   }
 }
 

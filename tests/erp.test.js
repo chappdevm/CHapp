@@ -2949,5 +2949,128 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
       assert.ok(lc < 900, `File ${path.basename(filePath)} has ${lc} lines, exceeds 900 limit`);
     });
   });
+
+  it('Persistencia de Sesión WhatsApp tras Redeploy y Datos Dinámicos de Configuración en Facturas (Sin Datos Quemados)', async () => {
+    // 1. Verificar que 07-pdf-invoice.js y 08-pdf-sale.js no tengan NIT, dirección ni PBX quemados
+    const invPdfJs = origReadFileSync(path.join(__dirname, '..', 'assets', 'js', 'modules', '07-pdf-invoice.js'), 'utf8');
+    const salePdfJs = origReadFileSync(path.join(__dirname, '..', 'assets', 'js', 'modules', '08-pdf-sale.js'), 'utf8');
+    assert.ok(!invPdfJs.includes('900.876.543-1'), '07-pdf-invoice.js no debe quemar NIT 900.876.543-1');
+    assert.ok(!invPdfJs.includes('(606) 315-0000'), '07-pdf-invoice.js no debe quemar PBX (606) 315-0000');
+    assert.ok(!invPdfJs.includes('Cra. 7 #18-45'), '07-pdf-invoice.js no debe quemar dirección Cra. 7 #18-45');
+    assert.ok(!salePdfJs.includes('900.876.543-1'), '08-pdf-sale.js no debe quemar NIT 900.876.543-1');
+    assert.ok(!salePdfJs.includes('(606) 315-0000'), '08-pdf-sale.js no debe quemar PBX (606) 315-0000');
+    assert.ok(!salePdfJs.includes('Cra. 7 #18-45'), '08-pdf-sale.js no debe quemar dirección Cra. 7 #18-45');
+
+    // 2. Actualizar configuración de empresa y verificar que las facturas tomen todos los datos dinámicamente
+    const customSettingsRes = await req('/api/settings', 'POST', {
+      company_name: 'Industrias Metálicas Chimby S.A.S.',
+      company_vat: '901.888.777-9',
+      company_email: 'facturacion@chimby.co',
+      company_phone: '3148889900',
+      company_address: 'Av. Sur #45-10 Bodega 3',
+      company_city: 'Dosquebradas',
+      company_country: 'Colombia',
+      fiscal_regime: 'Régimen Simple de Tributación'
+    });
+    assert.equal(customSettingsRes.status, 200);
+
+    const jsText = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
+    const vm = require('node:vm');
+    const fnModule = { exports: {} };
+    const evalEnv = `
+      const state = {
+        data: {
+          settings: ${JSON.stringify(customSettingsRes.json.settings)},
+          contacts: [
+            { id: 10, name: 'Cliente Prueba Factura', doc_type: 'NIT', vat: '900.111.222-3', street: 'Calle 20 #10-05', city: 'Pereira', state_name: 'Risaralda', mobile: '3101112233', email: 'cliente@prueba.co', payment_term: 'Contado' }
+          ],
+          sales: []
+        }
+      };
+      function esc(str) { return String(str == null ? '' : str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+      function formatMoney(amount, currency = '$') { const num = Number(amount) || 0; return currency + ' ' + num.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
+      ${jsText.substring(jsText.indexOf('function numberToWordsSpanish'), jsText.indexOf('function renderSaleOrderForm'))}
+      module.exports = { renderInvoicePdfSheetHtml, renderSalePdfSheetHtml };
+    `;
+    new vm.Script(evalEnv).runInContext(
+      vm.createContext({ module: fnModule, console, Math, Array, String, Number, Boolean, Date, encodeURIComponent })
+    );
+
+    const { renderInvoicePdfSheetHtml, renderSalePdfSheetHtml } = fnModule.exports;
+    const invHtml = renderInvoicePdfSheetHtml({
+      id: 77,
+      name: 'INV/2026/0077',
+      invoice_date: '2026-11-05',
+      invoice_date_due: '2026-11-05',
+      move_type: 'out_invoice',
+      state: 'posted',
+      payment_state: 'paid',
+      partner_id: 10,
+      amount_untaxed: 500000,
+      amount_tax: 95000,
+      amount_total: 595000,
+      amount_residual: 0,
+      lines: [{ name: 'Puerta Vidriera', quantity: 1, uom: 'Und', price_unit: 500000, tax_rate: 19, subtotal: 500000 }]
+    });
+
+    assert.ok(invHtml.includes('Industrias Metálicas Chimby S.A.S.'), 'Factura debe mostrar razón social de configuración');
+    assert.ok(invHtml.includes('901.888.777-9'), 'Factura debe mostrar NIT de configuración');
+    assert.ok(invHtml.includes('facturacion@chimby.co'), 'Factura debe mostrar correo de configuración');
+    assert.ok(invHtml.includes('3148889900'), 'Factura debe mostrar teléfono de configuración');
+    assert.ok(invHtml.includes('Av. Sur #45-10 Bodega 3'), 'Factura debe mostrar dirección de configuración');
+    assert.ok(invHtml.includes('Dosquebradas'), 'Factura debe mostrar ciudad de configuración');
+    assert.ok(invHtml.includes('Régimen Simple de Tributación'), 'Factura debe mostrar régimen tributario de configuración');
+    assert.ok(!invHtml.includes('900.876.543-1'), 'Factura no debe mostrar NIT quemado');
+    assert.ok(!invHtml.includes('(606) 315-0000'), 'Factura no debe mostrar teléfono quemado');
+
+    const quoteHtml = renderSalePdfSheetHtml({
+      id: 88,
+      name: 'S00088',
+      partner_id: 10,
+      date_order: '2026-11-05',
+      state: 'draft',
+      amount_untaxed: 500000,
+      amount_tax: 95000,
+      amount_total: 595000,
+      lines: [{ name: 'Puerta Vidriera', quantity: 1, uom: 'Und', price_unit: 500000, tax_rate: 19, subtotal: 500000 }]
+    });
+    assert.ok(quoteHtml.includes('Industrias Metálicas Chimby S.A.S.'), 'Cotización debe mostrar razón social de configuración');
+    assert.ok(quoteHtml.includes('901.888.777-9'), 'Cotización debe mostrar NIT de configuración');
+    assert.ok(quoteHtml.includes('facturacion@chimby.co'), 'Cotización debe mostrar correo de configuración');
+    assert.ok(quoteHtml.includes('3148889900'), 'Cotización debe mostrar teléfono de configuración');
+
+    // 3. Verificar ciclo de vida de sesión WhatsApp tras redeploy (git push) y cierre manual
+    const { BaileysManager } = require('../server/baileys');
+    const manager1 = new BaileysManager();
+    manager1.authDir = path.join(os.tmpdir(), `baileys_test_redeploy_1_${Date.now()}`);
+    fs.mkdirSync(manager1.authDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(manager1.authDir, 'creds.json'),
+      JSON.stringify({ me: { id: '573138483191:1@s.whatsapp.net' }, registered: true }),
+      'utf8'
+    );
+    manager1.connectedNumber = '573138483191';
+    const persisted = await manager1.persistSession();
+    assert.ok(persisted, 'persistSession debe guardar la sesión vinculada');
+
+    // Simular nuevo contenedor tras git push (directorio local vacío)
+    const managerAfterPush = new BaileysManager();
+    managerAfterPush.authDir = path.join(os.tmpdir(), `baileys_test_redeploy_2_${Date.now()}`);
+    const restoredAfterPush = await managerAfterPush.restoreSessionFromRemote({ forceRemote: true });
+    assert.ok(restoredAfterPush, 'La sesión debe restaurarse automáticamente tras hacer push/redeploy');
+    assert.equal(managerAfterPush.connectedNumber, '573138483191');
+    assert.equal(managerAfterPush.hasSavedSession, true);
+    assert.ok(fs.existsSync(path.join(managerAfterPush.authDir, 'creds.json')), 'creds.json debe restaurarse en el nuevo contenedor');
+
+    // Simular cierre manual (única forma en que se borra la sesión)
+    await managerAfterPush.disconnect();
+    assert.equal(managerAfterPush.status, 'DESCONECTADO');
+    assert.equal(managerAfterPush.hasSavedSession, false);
+    assert.equal(managerAfterPush.manualDisconnect, true);
+
+    try {
+      fs.rmSync(manager1.authDir, { recursive: true, force: true });
+    } catch (_) {}
+  });
 });
 

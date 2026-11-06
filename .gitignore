@@ -17,3 +17,4 @@ desktop.ini
 tmp/
 *.tmp
 baileys_auth_info/
+data/whatsapp_session*.json

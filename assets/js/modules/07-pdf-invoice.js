@@ -255,17 +255,19 @@
             <div class="o_pdf_company_info">
               <div class="o_pdf_company_details">
                 <div class="o_pdf_detail_row">
-                  <span><strong>NIT:</strong> ${esc(company.company_vat || '900.876.543-1')}</span>
+                  <span><strong>Empresa:</strong> ${esc(company.company_name || 'CH Aluminios')}</span>
+                  <span class="detail-sep">·</span>
+                  <span><strong>NIT:</strong> ${esc(company.company_vat || 'No registrado')}</span>
                   <span class="detail-sep">·</span>
                   <span>${esc(company.fiscal_regime || 'Responsable de IVA - Régimen Ordinario')}</span>
                 </div>
                 <div class="o_pdf_detail_row">
-                  <span><strong>Dirección:</strong> ${esc(company.company_address || 'Cra. 7 #18-45')} · ${esc(company.company_city || 'Pereira')}, ${esc(company.company_country || 'Colombia')}</span>
+                  <span><strong>Dirección:</strong> ${esc(company.company_address || 'No registrada')}${company.company_city ? ` · ${esc(company.company_city)}` : ''}${company.company_country ? `, ${esc(company.company_country)}` : ''}</span>
                 </div>
                 <div class="o_pdf_detail_row">
-                  <span><strong>PBX:</strong> (606) 315-0000</span>
+                  <span><strong>Teléfono:</strong> ${esc(company.company_phone || 'No registrado')}</span>
                   <span class="detail-sep">·</span>
-                  <span><strong>Email:</strong> ${esc(company.company_email || 'chappdevm@gmail.com')}</span>
+                  <span><strong>Email:</strong> ${esc(company.company_email || 'No registrado')}</span>
                 </div>
               </div>
             </div>
@@ -472,7 +474,7 @@
         <div class="o_pdf_legal_footer">
           Esta factura de venta es título valor conforme al Código de Comercio colombiano (Arts. 772, 773 y 774) y Ley 1231 de 2008.<br/>
           La firma o constancia de recibido implica la aceptación plena de las mercancías y servicios descritos.<br/>
-          Generado automáticamente por <strong>CH Aluminios</strong> — CHapp ERP.
+          Generado automáticamente por <strong>${esc(company.company_name || 'CH Aluminios')}</strong> — CHapp ERP.
         </div>
       </div>
     `;

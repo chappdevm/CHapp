@@ -38,8 +38,16 @@
               <input type="text" id="setCompanyCity" class="o_input" value="${esc(s.company_city || '')}" />
             </div>
             <div class="o_field_row">
+              <label for="setCompanyCountry">País</label>
+              <input type="text" id="setCompanyCountry" class="o_input" value="${esc(s.company_country || 'Colombia')}" />
+            </div>
+            <div class="o_field_row">
               <label for="setCompanyAddress">Dirección</label>
               <input type="text" id="setCompanyAddress" class="o_input" value="${esc(s.company_address || '')}" />
+            </div>
+            <div class="o_field_row">
+              <label for="setFiscalRegime">Régimen Tributario</label>
+              <input type="text" id="setFiscalRegime" class="o_input" value="${esc(s.fiscal_regime || '')}" />
             </div>
             <div class="o_field_row">
               <label for="setCurrency">Moneda Funcional</label>
@@ -270,8 +278,38 @@
       </div>
     `;
 
+    const collectSettingsInputsInto = (target) => {
+      const el = (id) => document.getElementById(id);
+      if (el('setCompanyName')) target.company_name = el('setCompanyName').value;
+      if (el('setCompanyVat')) target.company_vat = el('setCompanyVat').value;
+      if (el('setCompanyEmail')) target.company_email = el('setCompanyEmail').value;
+      if (el('setCompanyPhone')) target.company_phone = el('setCompanyPhone').value;
+      if (el('setCompanyCity')) target.company_city = el('setCompanyCity').value;
+      if (el('setCompanyCountry')) target.company_country = el('setCompanyCountry').value;
+      if (el('setCompanyAddress')) target.company_address = el('setCompanyAddress').value;
+      if (el('setCurrency')) target.currency = el('setCurrency').value;
+      if (el('setTheme')) target.theme = el('setTheme').value;
+
+      if (el('setValidityDays')) target.quotation_validity_days = Number(el('setValidityDays').value || 30);
+      if (el('setDefaultSaleTax')) target.default_sale_tax = Number(el('setDefaultSaleTax').value ?? 19);
+      if (el('setSaleTerms')) target.sale_terms = el('setSaleTerms').value;
+      if (el('setLineDiscounts')) target.enable_line_discounts = el('setLineDiscounts').value === 'true';
+
+      if (el('setFiscalRegime')) target.fiscal_regime = el('setFiscalRegime').value;
+      if (el('setDefaultPurchaseTax')) target.default_purchase_tax = Number(el('setDefaultPurchaseTax').value ?? 19);
+
+      if (el('setExpenseApproval')) target.expense_approval_required = el('setExpenseApproval').value === 'true';
+      if (el('setExpenseJournal')) target.expense_default_journal = el('setExpenseJournal').value;
+
+      if (el('setActiveUser')) target.active_user_id = Number(el('setActiveUser').value || 1);
+      return target;
+    };
+
     container.querySelectorAll('[data-set-tab]').forEach((b) => {
       b.addEventListener('click', () => {
+        if (state.data && state.data.settings) {
+          collectSettingsInputsInto(state.data.settings);
+        }
         state.submenu = b.getAttribute('data-set-tab');
         renderSettingsModule();
       });
@@ -286,30 +324,8 @@
     if (btnSave) {
       btnSave.addEventListener('click', () => {
         withActionLock(btnSave, async () => {
-          const payload = {};
-          const el = (id) => document.getElementById(id);
-
-          if (el('setCompanyName')) payload.company_name = el('setCompanyName').value;
-          if (el('setCompanyVat')) payload.company_vat = el('setCompanyVat').value;
-          if (el('setCompanyEmail')) payload.company_email = el('setCompanyEmail').value;
-          if (el('setCompanyPhone')) payload.company_phone = el('setCompanyPhone').value;
-          if (el('setCompanyCity')) payload.company_city = el('setCompanyCity').value;
-          if (el('setCompanyAddress')) payload.company_address = el('setCompanyAddress').value;
-          if (el('setCurrency')) payload.currency = el('setCurrency').value;
-          if (el('setTheme')) payload.theme = el('setTheme').value;
-
-          if (el('setValidityDays')) payload.quotation_validity_days = Number(el('setValidityDays').value || 30);
-          if (el('setDefaultSaleTax')) payload.default_sale_tax = Number(el('setDefaultSaleTax').value ?? 19);
-          if (el('setSaleTerms')) payload.sale_terms = el('setSaleTerms').value;
-          if (el('setLineDiscounts')) payload.enable_line_discounts = el('setLineDiscounts').value === 'true';
-
-          if (el('setFiscalRegime')) payload.fiscal_regime = el('setFiscalRegime').value;
-          if (el('setDefaultPurchaseTax')) payload.default_purchase_tax = Number(el('setDefaultPurchaseTax').value ?? 19);
-
-          if (el('setExpenseApproval')) payload.expense_approval_required = el('setExpenseApproval').value === 'true';
-          if (el('setExpenseJournal')) payload.expense_default_journal = el('setExpenseJournal').value;
-
-          if (el('setActiveUser')) payload.active_user_id = Number(el('setActiveUser').value || 1);
+          const payload = { ...(state.data.settings || {}) };
+          collectSettingsInputsInto(payload);
 
           const res = await apiCall('/api/settings', 'POST', payload);
           state.data.settings = res.settings;
@@ -388,7 +404,8 @@
         } else if (res.status === 'ESPERANDO_QR') {
           waStatusText.innerHTML = `<span style="color: #f59e0b;">Esperando escaneo QR</span>`;
         } else if (res.status === 'CONECTANDO') {
-          waStatusText.innerHTML = `<span style="color: #38bdf8;">Conectando...</span>`;
+          waStatusText.innerHTML = `<span style="color: #38bdf8;">Reconectando sesión activa${res.connectedNumber ? ` (+${res.connectedNumber})` : ''}...</span>`;
+          setTimeout(updateSettingsWaUi, 2500);
         } else {
           waStatusText.innerHTML = `<span style="color: #ef4444;">Desconectado</span>`;
         }

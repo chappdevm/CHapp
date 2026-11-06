@@ -105,17 +105,19 @@
             <div class="o_pdf_company_info">
               <div class="o_pdf_company_details">
                 <div class="o_pdf_detail_row">
-                  <span><strong>NIT:</strong> ${esc(company.company_vat || '900.876.543-1')}</span>
+                  <span><strong>Empresa:</strong> ${esc(company.company_name || 'CH Aluminios')}</span>
+                  <span class="detail-sep">·</span>
+                  <span><strong>NIT:</strong> ${esc(company.company_vat || 'No registrado')}</span>
                   <span class="detail-sep">·</span>
                   <span>${esc(company.fiscal_regime || 'Responsable de IVA - Régimen Ordinario')}</span>
                 </div>
                 <div class="o_pdf_detail_row">
-                  <span><strong>Dirección:</strong> ${esc(company.company_address || 'Cra. 7 #18-45')} · ${esc(company.company_city || 'Pereira')}, ${esc(company.company_country || 'Colombia')}</span>
+                  <span><strong>Dirección:</strong> ${esc(company.company_address || 'No registrada')}${company.company_city ? ` · ${esc(company.company_city)}` : ''}${company.company_country ? `, ${esc(company.company_country)}` : ''}</span>
                 </div>
                 <div class="o_pdf_detail_row">
-                  <span><strong>PBX:</strong> (606) 315-0000</span>
+                  <span><strong>Teléfono:</strong> ${esc(company.company_phone || 'No registrado')}</span>
                   <span class="detail-sep">·</span>
-                  <span><strong>Email:</strong> ${esc(company.company_email || 'chappdevm@gmail.com')}</span>
+                  <span><strong>Email:</strong> ${esc(company.company_email || 'No registrado')}</span>
                 </div>
               </div>
             </div>
@@ -125,8 +127,8 @@
             <div class="doc_number">${docNumber}</div>
             <div class="o_pdf_doc_meta">
               <div class="o_pdf_doc_meta_row"><span>Emisión:</span><strong>${esc(sale.date_order || '')}</strong></div>
-              <div class="o_pdf_doc_meta_row"><span>Validez:</span><strong>${esc(sale.validity_date || '30 Días')}</strong></div>
-              <div class="o_pdf_doc_meta_row"><span>Asesor:</span><strong style="color: #1e40af;">${esc(sale.salesperson || 'Laura Gómez')}</strong></div>
+              <div class="o_pdf_doc_meta_row"><span>Validez:</span><strong>${esc(sale.validity_date || `${company.quotation_validity_days || 30} Días`)}</strong></div>
+              <div class="o_pdf_doc_meta_row"><span>Asesor:</span><strong style="color: #1e40af;">${esc(sale.salesperson || (company.active_user && company.active_user.name) || company.company_name || 'Laura Gómez')}</strong></div>
               <div class="o_pdf_doc_meta_row"><span>Forma de Pago:</span><strong>${esc(paymentTerm)}</strong></div>
             </div>
             ${stampHtml}
@@ -134,7 +136,7 @@
         </div>
 
         <div class="o_pdf_resolution_bar is-quote" style="background: linear-gradient(90deg, #074073, #14B5D9) !important; color: #ffffff !important; font-weight: 600; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);">
-          Propuesta Comercial & Cotización de Bienes y Servicios · CH Aluminios · Validez de la Oferta: ${esc(sale.validity_date ? `Hasta ${sale.validity_date}` : '30 Días')}
+          Propuesta Comercial & Cotización de Bienes y Servicios · ${esc(company.company_name || 'CH Aluminios')} · Validez de la Oferta: ${esc(sale.validity_date ? `Hasta ${sale.validity_date}` : `${company.quotation_validity_days || 30} Días`)}
         </div>
 
         <div class="o_pdf_client_section">
@@ -239,7 +241,7 @@
         <div class="o_pdf_legal_footer">
           Esta cotización comercial es una propuesta informativa y no constituye una factura de venta electrónica.<br/>
           Los precios y disponibilidad están sujetos a las condiciones comerciales descritas durante la vigencia de la oferta.<br/>
-          Generado automáticamente por <strong>CH Aluminios</strong> — CHapp ERP.
+          Generado automáticamente por <strong>${esc(company.company_name || 'CH Aluminios')}</strong> — CHapp ERP.
         </div>
       </div>
     `;
