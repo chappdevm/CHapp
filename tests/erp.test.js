@@ -3072,5 +3072,79 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
       fs.rmSync(manager1.authDir, { recursive: true, force: true });
     } catch (_) {}
   });
+
+  it('División en Partes Iguales de Cuotas en Cotización/Contrato/Factura y Porcentaje de Financiación a Crédito Configurable', async () => {
+    const partnerRes = await req('/api/contacts', 'POST', {
+      name: 'Juan Parra Financiación',
+      vat: '123456789',
+      doc_type: 'CC',
+      city: 'Pereira',
+      mobile: '3022779797'
+    });
+    assert.equal(partnerRes.status, 200);
+    const partnerId = partnerRes.json.contact.id;
+
+    // 1. Configurar porcentaje de financiación por defecto en Ajustes (ej. 10%)
+    const setRes = await req('/api/settings', 'POST', {
+      default_financing_rate: 10
+    });
+    assert.equal(setRes.status, 200);
+    assert.equal(setRes.json.settings.default_financing_rate, 10);
+
+    // 2. Crear cotización con plazo de pago "90 Días" (3 cuotas) por $1.000.000 (IVA 0%)
+    // Al iniciar el formulario, contract_data suele traer installments_count: "1" e installment_amount: "0" del DOM inicial;
+    // el backend debe normalizarlo a 3 cuotas iguales y aplicar el 10% de financiación ($100.000) -> Total $1.100.000
+    const saleRes = await req('/api/sales', 'POST', {
+      partner_id: partnerId,
+      payment_term: '90 Días',
+      contract_data: {
+        installments_count: '1',
+        installment_amount: '0',
+        payment_dates: 'De contado',
+        down_payment: '0'
+      },
+      lines: [
+        {
+          product_id: 1,
+          product_name: 'Cocina Integral',
+          description: 'Cocina Integral',
+          measure: 1,
+          uom: 'Und',
+          quantity: 1,
+          price_unit: 1000000,
+          discount: 0,
+          tax_rate: 0
+        }
+      ]
+    });
+    assert.equal(saleRes.status, 200);
+    const order = saleRes.json.order;
+    assert.equal(order.payment_term, '90 Días');
+    assert.equal(order.financing_rate, 10, 'Debe aplicar el porcentaje de financiación configurado por defecto (10%)');
+    assert.equal(order.amount_untaxed, 1000000);
+    assert.equal(order.amount_financing, 100000, 'Debe calcular el valor de financiación ($100.000)');
+    assert.equal(order.amount_total, 1100000, 'El total debe sumar base + IVA + financiación ($1.100.000)');
+    assert.equal(String(order.contract_data.installments_count), '3', 'Debe asignar 3 cuotas cuando se selecciona 90 Días');
+    assert.equal(Number(order.contract_data.installment_amount), Math.round(1100000 / 3), 'El valor de la cuota debe dividir el total en 3 partes iguales ($366.667)');
+    assert.equal(order.contract_data.payment_dates, 'Mensual');
+
+    // 3. Confirmar pedido y entregar (lo cual genera la factura automáticamente)
+    const confirmRes = await req(`/api/sales/${order.id}/action`, 'POST', { action: 'confirm' });
+    assert.equal(confirmRes.status, 200);
+    assert.equal(confirmRes.json.order.state, 'sale');
+    assert.equal(String(confirmRes.json.order.contract_data.installments_count), '3');
+    assert.equal(Number(confirmRes.json.order.contract_data.installment_amount), Math.round(1100000 / 3));
+
+    const deliverRes = await req(`/api/sales/${order.id}/action`, 'POST', { action: 'deliver' });
+    assert.equal(deliverRes.status, 200);
+    const invoice = deliverRes.json.invoice;
+    assert.ok(invoice, 'Al entregar el pedido debe generarse la factura');
+    assert.equal(invoice.payment_term, '90 Días', 'La factura debe conservar el plazo de 90 Días');
+    assert.equal(invoice.installments_count, 3, 'La factura debe registrar 3 cuotas');
+    assert.equal(invoice.installment_amount, Math.round(1100000 / 3), 'La factura debe dividir el valor en 3 partes iguales');
+    assert.equal(invoice.financing_rate, 10, 'La factura debe conservar el porcentaje de financiación');
+    assert.equal(invoice.amount_financing, 100000, 'La factura debe conservar el monto de financiación');
+    assert.equal(invoice.amount_total, 1100000);
+  });
 });
 

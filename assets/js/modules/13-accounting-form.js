@@ -47,10 +47,15 @@
     }
 
     if (!state.formDraft || state.formDraft.moveRecordId !== state.activeRecordId) {
+      const linkedSaleForInit = (state.data && state.data.sales || []).find((s) => s.name === existing.origin || s.name === existing.ref);
+      const initPayTerm = existing.payment_term || (linkedSaleForInit && linkedSaleForInit.payment_term) || 'Contado';
+      const initIsInst = typeof isInstallmentPaymentTerm === 'function' ? isInstallmentPaymentTerm(initPayTerm) : false;
       state.formDraft = {
         moveRecordId: state.activeRecordId,
         partner_id: existing.partner_id || '',
         ref: existing.ref || '',
+        payment_term: initPayTerm,
+        financing_rate: existing.financing_rate !== undefined && existing.financing_rate !== null ? Number(existing.financing_rate) : (initIsInst && existing.move_type === 'out_invoice' ? Number((state.data.settings && state.data.settings.default_financing_rate) || 0) : 0),
         invoice_date: existing.invoice_date,
         invoice_date_due: existing.invoice_date_due,
         retention_source_rate: existing.retention_source_rate || 0,
@@ -66,7 +71,13 @@
       (s, l) => s + Number(l.quantity || 0) * Number(l.price_unit || 0) * (Number(l.tax_rate ?? 19) / 100),
       0
     );
-    const calcTotal = calcUntaxed + calcTax;
+    const currentMoveTerm = String(draft.payment_term || existing.payment_term || 'Contado').trim();
+    const isMoveCredit = existing.move_type === 'out_invoice' && (typeof isInstallmentPaymentTerm === 'function' ? isInstallmentPaymentTerm(currentMoveTerm) : false);
+    const moveFinancingRate = isMoveCredit ? Math.max(0, Number(draft.financing_rate || 0)) : 0;
+    const calcFinancing = moveFinancingRate > 0 ? round2((calcUntaxed + calcTax) * (moveFinancingRate / 100)) : 0;
+    const calcTotal = round2(calcUntaxed + calcTax + calcFinancing);
+    const moveCuotasCount = typeof getInstallmentsCountFromTerm === 'function' ? getInstallmentsCountFromTerm(currentMoveTerm) : 1;
+    const moveCuotaAmount = moveCuotasCount > 0 ? Math.round(calcTotal / moveCuotasCount) : calcTotal;
     const calcRetSourceRate = Number(draft.retention_source_rate || 0);
     const calcRetIcaRate = Number(draft.retention_ica_rate || 0);
     const calcRetSourceAmount = round2(calcUntaxed * (calcRetSourceRate / 100));
@@ -78,6 +89,11 @@
     const previewData = {
       ...existing,
       partner_id: draft.partner_id || existing.partner_id,
+      payment_term: currentMoveTerm,
+      financing_rate: moveFinancingRate,
+      amount_financing: calcFinancing,
+      installments_count: moveCuotasCount,
+      installment_amount: moveCuotaAmount,
       invoice_date: draft.invoice_date || existing.invoice_date,
       invoice_date_due: draft.invoice_date_due || existing.invoice_date_due,
       retention_source_rate: calcRetSourceRate,
@@ -186,6 +202,18 @@
                 <label for="fMoveDue">Fecha de Vencimiento</label>
                 <input type="date" id="fMoveDue" class="o_input" value="${esc(draft.invoice_date_due)}" ${!isEditable ? 'readonly' : ''} />
               </div>
+              ${existing.move_type === 'out_invoice' ? `
+              <div class="o_field_row">
+                <label for="fMovePaymentTerm">Plazo de Pago / Cuotas</label>
+                <select id="fMovePaymentTerm" class="o_select" ${!isEditable ? 'disabled' : ''}>
+                  ${(typeof SALE_PAYMENT_TERMS_OPTIONS !== 'undefined' ? SALE_PAYMENT_TERMS_OPTIONS : [{ value: 'Contado', label: 'Contado' }, { value: '30 Días', label: '30 Días (1 Mes / 1 Cuota)' }, { value: '60 Días', label: '60 Días (2 Meses / 2 Cuotas)' }, { value: '90 Días', label: '90 Días (3 Meses / 3 Cuotas)' }]).map((opt) => `<option value="${opt.value}" ${currentMoveTerm === opt.value ? 'selected' : ''}>${opt.label}</option>`).join('')}
+                </select>
+              </div>
+              <div class="o_field_row">
+                <label for="fMoveFinancingRate">Financiación Crédito (%)</label>
+                <input type="number" id="fMoveFinancingRate" class="o_input" min="0" max="100" step="any" value="${isMoveCredit ? moveFinancingRate : 0}" ${!isEditable || !isMoveCredit ? 'disabled' : ''} placeholder="0%" />
+              </div>
+              ` : ''}
             </div>
 
             <div class="o_group" style="margin-top: 0.65rem; background: var(--o-view-bg); padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--o-border-color); display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
@@ -301,10 +329,12 @@
                 <span>IVA (19%):</span>
                 <strong>${formatMoney(calcTax)}</strong>
               </div>
+              ${calcFinancing > 0 ? `<div class="o_totals_row" style="color: #0284c7;"><span>Financiación Crédito (${moveFinancingRate}%):</span><strong>+ ${formatMoney(calcFinancing)}</strong></div>` : ''}
               <div class="o_totals_row">
                 <span>Total Factura:</span>
                 <strong>${formatMoney(calcTotal)}</strong>
               </div>
+              ${moveCuotasCount > 1 && !existing.is_installment ? `<div class="o_totals_row" style="color: #074073; font-size: 0.85rem;"><span>Plan en ${moveCuotasCount} Cuotas Iguales:</span><strong>${moveCuotasCount} x ${formatMoney(moveCuotaAmount)}</strong></div>` : ''}
               ${calcRetSourceAmount > 0 ? `
                 <div class="o_totals_row" style="color: #b45309; font-size: 0.8rem;">
                   <span>(-) Retefuente (${calcRetSourceRate}%):</span>
@@ -374,12 +404,27 @@
     const syncMoveDraft = () => {
       const pEl = document.getElementById('fMovePartner');
       const rEl = document.getElementById('fMoveRef');
+      const termEl = document.getElementById('fMovePaymentTerm');
+      const finEl = document.getElementById('fMoveFinancingRate');
       const dEl = document.getElementById('fMoveDate');
       const dueEl = document.getElementById('fMoveDue');
       const retSourceEl = document.getElementById('fMoveRetSource');
       const retIcaEl = document.getElementById('fMoveRetIca');
+      const prevTerm = state.formDraft.payment_term || 'Contado';
       if (pEl) state.formDraft.partner_id = Number(pEl.value);
       if (rEl) state.formDraft.ref = rEl.value;
+      if (termEl) state.formDraft.payment_term = termEl.value;
+      const nowIsCredit = typeof isInstallmentPaymentTerm === 'function' ? isInstallmentPaymentTerm(state.formDraft.payment_term) : false;
+      if (prevTerm !== state.formDraft.payment_term) {
+        const prevWasCredit = typeof isInstallmentPaymentTerm === 'function' ? isInstallmentPaymentTerm(prevTerm) : false;
+        if (nowIsCredit && !prevWasCredit && !Number(state.formDraft.financing_rate || 0)) {
+          state.formDraft.financing_rate = Number((state.data.settings && state.data.settings.default_financing_rate) || 0);
+        } else if (!nowIsCredit) {
+          state.formDraft.financing_rate = 0;
+        }
+      } else if (finEl && nowIsCredit) {
+        state.formDraft.financing_rate = Math.max(0, Number(finEl.value || 0));
+      }
       if (dEl) state.formDraft.invoice_date = dEl.value;
       if (dueEl) state.formDraft.invoice_date_due = dueEl.value;
       if (retSourceEl) state.formDraft.retention_source_rate = Number(retSourceEl.value || 0);
@@ -458,6 +503,8 @@
         move_type: existing.move_type,
         partner_id: Number(state.formDraft.partner_id),
         ref: state.formDraft.ref,
+        payment_term: state.formDraft.payment_term,
+        financing_rate: Number(state.formDraft.financing_rate || 0),
         invoice_date: state.formDraft.invoice_date,
         invoice_date_due: state.formDraft.invoice_date_due,
         auto_post: autoPost,
@@ -540,29 +587,15 @@
       });
     }
 
-    const partnerMoveEl = document.getElementById('fMovePartner');
-    if (partnerMoveEl) {
-      partnerMoveEl.addEventListener('change', () => {
-        syncMoveDraft();
-        renderAccountMoveForm(container);
-      });
-    }
-
-    const retSourceInp = document.getElementById('fMoveRetSource');
-    if (retSourceInp) {
-      retSourceInp.addEventListener('change', () => {
-        syncMoveDraft();
-        renderAccountMoveForm(container);
-      });
-    }
-
-    const retIcaInp = document.getElementById('fMoveRetIca');
-    if (retIcaInp) {
-      retIcaInp.addEventListener('change', () => {
-        syncMoveDraft();
-        renderAccountMoveForm(container);
-      });
-    }
+    ['fMovePartner', 'fMovePaymentTerm', 'fMoveFinancingRate', 'fMoveRetSource', 'fMoveRetIca'].forEach((id) => {
+      const inp = document.getElementById(id);
+      if (inp) {
+        inp.addEventListener('change', () => {
+          syncMoveDraft();
+          renderAccountMoveForm(container);
+        });
+      }
+    });
 
     const btnDownloadPdf = document.getElementById('btnDownloadInvoicePdf');
     if (btnDownloadPdf) {

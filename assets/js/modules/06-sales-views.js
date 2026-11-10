@@ -314,7 +314,7 @@
                 <tr class="o_invoice_link_row" data-invoice-id="${inv.id}" style="cursor: pointer;" title="Haz clic en esta línea para ver ${esc(inv.name)} y su PDF">
                   <th>${esc(inv.name)}</th>
                   <td>${esc(inv.invoice_date)}</td>
-                  <td><span class="o_badge o_badge_info">${esc(inv.is_installment ? `Abono Cuota #${inv.installment_number || (idx + 1)}` : 'Factura')}</span></td>
+                  <td><span class="o_badge o_badge_info">${esc(inv.is_installment ? `Abono Cuota #${inv.installment_number || (idx + 1)}` : (Number(inv.installments_count || 1) > 1 ? `Factura (${inv.installments_count} Cuotas · ${formatMoney(inv.installment_amount || Math.round(Number(inv.amount_total || 0) / Number(inv.installments_count)))} c/u)` : 'Factura'))}</span></td>
                   <td class="text-end"><strong>${formatMoney(inv.amount_total)}</strong></td>
                   <td class="text-end">${formatMoney(inv.amount_residual)}</td>
                   <td>${paymentStateBadge(inv.payment_state, inv.state)}</td>
@@ -472,6 +472,29 @@
     return true;
   }
 
+  function getInstallmentsCountFromTerm(paymentTerm) {
+    if (!isInstallmentPaymentTerm(paymentTerm)) return 1;
+    const lower = String(paymentTerm || '').trim().toLowerCase();
+    if (lower.includes('15') && lower.includes('d')) return 1;
+    if (lower.includes('45') && lower.includes('d')) return 2;
+    const matchMonths = lower.match(/(\d+)\s*(?:mes|meses|cuota|cuotas)/i);
+    if (matchMonths) return Math.max(1, parseInt(matchMonths[1], 10));
+    const matchDays = lower.match(/(\d+)\s*d[ií]a/i);
+    if (matchDays) {
+      const days = parseInt(matchDays[1], 10);
+      return Math.max(1, Math.round(days / 30));
+    }
+    return 1;
+  }
+
+  function getPaymentPeriodicityFromTerm(paymentTerm, numCuotas) {
+    if (!isInstallmentPaymentTerm(paymentTerm)) return 'De contado';
+    const lower = String(paymentTerm || '').trim().toLowerCase();
+    if (lower.includes('15') || lower.includes('quincenal')) return 'Quincenal';
+    if (Number(numCuotas || getInstallmentsCountFromTerm(paymentTerm)) > 1) return 'Mensual';
+    return 'Mensual (30 Días)';
+  }
+
   function addDaysISO(dateStr, daysToAdd) {
     const clean = String(dateStr || new Date().toISOString().slice(0, 10)).slice(0, 10);
     const parts = clean.split('-').map(Number);
@@ -519,15 +542,7 @@
         { installment_number: 2, period_label: 'Plazo Final (45 Días)', due_date: addDaysISO(baseDate, 45) }
       ];
     } else {
-      let numCuotas = 1;
-      const matchMonths = lower.match(/(\d+)\s*(?:mes|meses|cuota|cuotas)/i);
-      const matchDays = lower.match(/(\d+)\s*d[ií]a/i);
-      if (matchMonths) {
-        numCuotas = Math.max(1, parseInt(matchMonths[1], 10));
-      } else if (matchDays) {
-        const days = parseInt(matchDays[1], 10);
-        numCuotas = Math.max(1, Math.round(days / 30));
-      }
+      const numCuotas = getInstallmentsCountFromTerm(paymentTerm);
       for (let k = 1; k <= numCuotas; k++) {
         schedule.push({
           installment_number: k,
@@ -722,6 +737,30 @@
             </tfoot>
           </table>
         </div>
+      </div>
+    `;
+  }
+
+  function renderInvoiceInstallmentSummaryHtml(invoice, linkedSale, paymentTerm, totalAmount) {
+    if (!invoice || invoice.move_type === 'in_invoice' || invoice.is_installment) return '';
+    const numCuotas = Math.max(1, Number(invoice.installments_count || (linkedSale && linkedSale.contract_data && linkedSale.contract_data.installments_count) || getInstallmentsCountFromTerm(paymentTerm)));
+    if (numCuotas <= 1) return '';
+    const baseDate = String(invoice.invoice_date || (linkedSale && linkedSale.date_order) || new Date().toISOString().slice(0, 10)).slice(0, 10);
+    const equalAmount = Number(invoice.installment_amount || Math.round(Number(totalAmount || 0) / numCuotas));
+    const rows = [];
+    for (let k = 1; k <= numCuotas; k++) {
+      const dueStr = addMonthsISO(baseDate, k);
+      const isLast = k === numCuotas;
+      const amt = isLast ? Math.max(0, round2(Number(totalAmount || 0) - equalAmount * (numCuotas - 1))) : equalAmount;
+      rows.push(`<tr><td><strong>Cuota #${k} de ${numCuotas}</strong></td><td>${esc(dueStr)} (${esc(formatDateShortEs(dueStr))})</td><td style="text-align:right;">${round2(100 / numCuotas)}%</td><td style="text-align:right;color:#074073;"><strong>${formatMoney(amt)}</strong></td></tr>`);
+    }
+    return `
+      <div class="o_pdf_payments_history_box" style="background:#f0f7fc;border-color:#93c5fd;">
+        <div style="font-weight:700;color:#074073;margin-bottom:4px;font-size:0.82rem;">Plan de Pago en ${numCuotas} Cuotas Iguales (${esc(paymentTerm)} · ${formatMoney(equalAmount)} c/u)</div>
+        <table class="o_pdf_subtable">
+          <thead><tr><th>Cuota</th><th>Fecha Vencimiento</th><th style="text-align:right;">Proporción</th><th style="text-align:right;">Valor Cuota</th></tr></thead>
+          <tbody>${rows.join('')}</tbody>
+        </table>
       </div>
     `;
   }

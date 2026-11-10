@@ -79,7 +79,12 @@
 
     const totalUntaxed = sale.amount_untaxed !== undefined ? Number(sale.amount_untaxed) : calcUntaxed;
     const totalTax = sale.amount_tax !== undefined ? Number(sale.amount_tax) : calcTax;
-    const totalAmount = sale.amount_total !== undefined ? Number(sale.amount_total) : (totalUntaxed + totalTax);
+    const isInst = typeof isInstallmentPaymentTerm === 'function' ? isInstallmentPaymentTerm(paymentTerm) : false;
+    const financingRate = isInst ? Math.max(0, Number(sale.financing_rate || 0)) : 0;
+    const totalFinancing = sale.amount_financing !== undefined ? Number(sale.amount_financing) : (financingRate > 0 ? Math.round((totalUntaxed + totalTax) * (financingRate / 100) * 100) / 100 : 0);
+    const totalAmount = sale.amount_total !== undefined ? Number(sale.amount_total) : Math.round((totalUntaxed + totalTax + totalFinancing) * 100) / 100;
+    const numCuotas = typeof getInstallmentsCountFromTerm === 'function' ? getInstallmentsCountFromTerm(paymentTerm) : 1;
+    const equalCuotaAmount = numCuotas > 0 ? Math.round(totalAmount / numCuotas) : totalAmount;
 
     const hasDiscounts = lines.some((l) => Number(l.discount || 0) > 0);
 
@@ -152,6 +157,7 @@
             <p><strong>Celular / Teléfono:</strong> ${esc([partner.mobile, partner.phone].filter(Boolean).join(' / ') || 'No registrado')}</p>
             <p><strong>Correo Electrónico:</strong> ${esc(partner.email || 'No registrado')}</p>
             <p><strong>Plazo de Pago Propuesto:</strong> ${esc(paymentTerm)}</p>
+            ${numCuotas > 1 ? `<p><strong>Plan de Cuotas:</strong> ${numCuotas} Cuotas Iguales de ${formatMoney(equalCuotaAmount)} c/u</p>` : ''}
             <p><strong>Tiempo de Entrega Estimado:</strong> Inmediato / Según disponibilidad</p>
           </div>
         </div>
@@ -230,10 +236,12 @@
                 <td>IVA:</td>
                 <td style="text-align: right;"><strong>${formatMoney(totalTax)}</strong></td>
               </tr>
+              ${totalFinancing > 0 ? `<tr style="color: #0284c7;"><td>Financiación Crédito (${financingRate}%):</td><td style="text-align: right;"><strong>+ ${formatMoney(totalFinancing)}</strong></td></tr>` : ''}
               <tr class="is-grand-total">
                 <td>TOTAL PROPUESTA:</td>
                 <td style="text-align: right;">${formatMoney(totalAmount)}</td>
               </tr>
+              ${numCuotas > 1 ? `<tr style="color: #074073; font-size: 0.78rem;"><td>Valor por Cuota (${numCuotas} Partes Iguales):</td><td style="text-align: right;"><strong>${formatMoney(equalCuotaAmount)}</strong></td></tr>` : ''}
             </table>
           </div>
         </div>

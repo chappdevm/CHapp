@@ -13,26 +13,60 @@
       ? state.data.contacts.find((c) => Number(c.id) === Number(s.partner_id))
       : null) || {};
 
-    const totalAmount = Number(s.amount_total || 0);
+    const totalAmount = (() => {
+      if (s.amount_total !== undefined && s.amount_total !== null && Number(s.amount_total) > 0) {
+        return Number(s.amount_total);
+      }
+      const dLines = Array.isArray(s.lines) ? s.lines : [];
+      const untaxed = dLines.reduce((acc, l) => acc + Number(l.quantity || 0) * Number(l.price_unit || 0) * (1 - Number(l.discount || 0) / 100), 0);
+      const tax = dLines.reduce((acc, l) => {
+        const sub = Number(l.quantity || 0) * Number(l.price_unit || 0) * (1 - Number(l.discount || 0) / 100);
+        return acc + sub * (Number(l.tax_rate || 0) / 100);
+      }, 0);
+      const isInst = typeof isInstallmentPaymentTerm === 'function' ? isInstallmentPaymentTerm(s.payment_term) : false;
+      const finRate = isInst ? Math.max(0, Number(s.financing_rate || 0)) : 0;
+      const finAmt = finRate > 0 ? (untaxed + tax) * (finRate / 100) : 0;
+      return Math.round((untaxed + tax + finAmt) * 100) / 100;
+    })();
     const dateStr = s.date_order ? String(s.date_order).slice(0, 10) : new Date().toISOString().slice(0, 10);
     const parts = dateStr.split('-');
     const dYear = parts[0] || String(new Date().getFullYear());
     const dMonth = parts[1] || String(new Date().getMonth() + 1).padStart(2, '0');
     const dDay = parts[2] || String(new Date().getDate()).padStart(2, '0');
 
-    let numCuotas = 1;
-    const term = String(s.payment_term || '').toLowerCase();
-    if (term.includes('quincenal') || term.includes('15')) numCuotas = 1;
-    else if (term.includes('45')) numCuotas = 2;
-    else if (term.includes('60')) numCuotas = 2;
-    else if (term.includes('90')) numCuotas = 3;
-    else if (term.includes('120')) numCuotas = 4;
-    else if (term.includes('180')) numCuotas = 6;
-    else if (term.includes('360')) numCuotas = 12;
+    const numCuotas = typeof getInstallmentsCountFromTerm === 'function'
+      ? getInstallmentsCountFromTerm(s.payment_term)
+      : (() => {
+          const term = String(s.payment_term || '').toLowerCase();
+          if (term.includes('45') || term.includes('60')) return 2;
+          if (term.includes('90')) return 3;
+          if (term.includes('120')) return 4;
+          if (term.includes('150')) return 5;
+          if (term.includes('180')) return 6;
+          if (term.includes('210')) return 7;
+          if (term.includes('240')) return 8;
+          if (term.includes('270')) return 9;
+          if (term.includes('300')) return 10;
+          if (term.includes('330')) return 11;
+          if (term.includes('360')) return 12;
+          return 1;
+        })();
+
+    const rawCdCuotas = Number(cd.installments_count || 0);
+    const effectiveCuotas = numCuotas > 1 && rawCdCuotas <= 1
+      ? numCuotas
+      : (rawCdCuotas >= 1 ? rawCdCuotas : Math.max(1, numCuotas));
 
     const downPayment = cd.down_payment !== undefined && cd.down_payment !== '' ? Number(cd.down_payment) : 0;
     const financedTotal = Math.max(0, totalAmount - downPayment);
-    const calcInstallmentVal = numCuotas > 0 ? Math.round(financedTotal / numCuotas) : financedTotal;
+    const calcInstallmentVal = effectiveCuotas > 0 ? Math.round(financedTotal / effectiveCuotas) : financedTotal;
+    const defaultPeriodicity = typeof getPaymentPeriodicityFromTerm === 'function'
+      ? getPaymentPeriodicityFromTerm(s.payment_term, effectiveCuotas)
+      : (effectiveCuotas > 1 ? 'Mensual' : 'De contado');
+    const rawPayDates = String(cd.payment_dates || '').trim();
+    const effectivePayDates = (!rawPayDates || (effectiveCuotas > 1 && rawPayDates.toLowerCase() === 'de contado'))
+      ? defaultPeriodicity
+      : rawPayDates;
 
     // Helper for adding days
     const calcInstDate = () => {
@@ -57,9 +91,9 @@
       work_address: cd.work_address || '',
       work_neighborhood: cd.work_neighborhood || '',
       work_phone: cd.work_phone || '',
-      installments_count: cd.installments_count !== undefined && cd.installments_count !== '' ? cd.installments_count : (numCuotas > 1 ? numCuotas : 1),
-      installment_amount: cd.installment_amount !== undefined && cd.installment_amount !== '' ? cd.installment_amount : calcInstallmentVal,
-      payment_dates: cd.payment_dates || (numCuotas > 1 ? 'Mensual' : 'De contado'),
+      installments_count: effectiveCuotas,
+      installment_amount: totalAmount > 0 ? calcInstallmentVal : (cd.installment_amount !== undefined && cd.installment_amount !== '' ? cd.installment_amount : 0),
+      payment_dates: effectivePayDates,
       down_payment: cd.down_payment !== undefined && cd.down_payment !== '' ? cd.down_payment : (downPayment > 0 ? downPayment : 0),
       total_amount: totalAmount,
       ref_commercial_1: cd.ref_commercial_1 || '',
@@ -92,6 +126,41 @@
       interest_rate: cd.interest_rate !== undefined && cd.interest_rate !== '' ? cd.interest_rate : '0',
       mora_rate: cd.mora_rate !== undefined && cd.mora_rate !== '' ? cd.mora_rate : '3'
     };
+  }
+
+  function syncContractInstallmentsWithTerm(draft, forceResetCuotas = false) {
+    if (!draft) return;
+    if (!draft.contract_data) draft.contract_data = {};
+    const cd = draft.contract_data;
+    const isInst = typeof isInstallmentPaymentTerm === 'function' ? isInstallmentPaymentTerm(draft.payment_term) : false;
+    const termCuotas = typeof getInstallmentsCountFromTerm === 'function' ? getInstallmentsCountFromTerm(draft.payment_term) : 1;
+    const defaultPeriodicity = typeof getPaymentPeriodicityFromTerm === 'function'
+      ? getPaymentPeriodicityFromTerm(draft.payment_term, termCuotas)
+      : (termCuotas > 1 ? 'Mensual' : 'De contado');
+
+    if (!isInst) {
+      cd.installments_count = '1';
+      cd.payment_dates = 'De contado';
+    } else if (forceResetCuotas || !cd.installments_count || (termCuotas > 1 && Number(cd.installments_count) <= 1)) {
+      cd.installments_count = String(termCuotas);
+      cd.payment_dates = defaultPeriodicity;
+    } else if (!cd.payment_dates || String(cd.payment_dates).toLowerCase() === 'de contado') {
+      cd.payment_dates = defaultPeriodicity;
+    }
+
+    const dLines = Array.isArray(draft.lines) ? draft.lines : [];
+    const untaxed = dLines.reduce((acc, l) => acc + Number(l.quantity || 0) * Number(l.price_unit || 0) * (1 - Number(l.discount || 0) / 100), 0);
+    const tax = dLines.reduce((acc, l) => {
+      const sub = Number(l.quantity || 0) * Number(l.price_unit || 0) * (1 - Number(l.discount || 0) / 100);
+      return acc + sub * (Number(l.tax_rate || 0) / 100);
+    }, 0);
+    const finRate = isInst ? Math.max(0, Number(draft.financing_rate || 0)) : 0;
+    const finAmt = finRate > 0 ? (untaxed + tax) * (finRate / 100) : 0;
+    const totalAmount = Math.round((untaxed + tax + finAmt) * 100) / 100;
+    const numCuotas = Math.max(1, Number(cd.installments_count || termCuotas || 1));
+    const downPayment = Math.max(0, Number(cd.down_payment || 0));
+    const financedTotal = Math.max(0, totalAmount - downPayment);
+    cd.installment_amount = String(Math.round(financedTotal / numCuotas));
   }
 
   function renderContract3DLogoSvg() {
@@ -128,9 +197,12 @@
 
   function renderContractPdfSheetHtml(sale, options = {}) {
     const data = getSaleContractData(sale);
-    const lines = sale && Array.isArray(sale.lines) && sale.lines.length > 0 ? sale.lines : [
+    const rawLines = sale && Array.isArray(sale.lines) && sale.lines.length > 0 ? sale.lines : [
       { quantity: 1, measure: 1, uom: 'Und', product_name: 'Venta de Productos y Servicios', total: sale.amount_total || 0 }
     ];
+    const lines = Number(sale && sale.amount_financing || 0) > 0
+      ? [...rawLines, { quantity: 1, measure: '', uom: '%', product_name: `Financiación Crédito (${Number(sale.financing_rate || 0)}%)`, total: Number(sale.amount_financing || 0) }]
+      : rawLines;
 
     const logoData = typeof getLogoDataUrl === 'function' ? getLogoDataUrl() : '';
     const logoSrc = logoData && logoData.startsWith('data:') ? logoData : '/assets/icons/logo.png';

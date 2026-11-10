@@ -38,6 +38,36 @@ function round2(n) {
   return Math.round((num + Number.EPSILON) * 100) / 100;
 }
 
+function isInstallmentPaymentTerm(paymentTerm) {
+  const s = String(paymentTerm || '').trim().toLowerCase();
+  if (!s || s === 'contado' || s === 'immediate' || s === 'inmediato') return false;
+  return true;
+}
+
+function getInstallmentsCountFromTerm(paymentTerm) {
+  const raw = String(paymentTerm || '').trim();
+  const lower = raw.toLowerCase();
+  if (!isInstallmentPaymentTerm(raw)) return 1;
+  if (lower.includes('15') && lower.includes('d')) return 1;
+  if (lower.includes('45') && lower.includes('d')) return 2;
+  const matchMonths = lower.match(/(\d+)\s*(?:mes|meses|cuota|cuotas)/i);
+  if (matchMonths) return Math.max(1, parseInt(matchMonths[1], 10));
+  const matchDays = lower.match(/(\d+)\s*d[ií]a/i);
+  if (matchDays) {
+    const days = parseInt(matchDays[1], 10);
+    return Math.max(1, Math.round(days / 30));
+  }
+  return 1;
+}
+
+function getPaymentPeriodicityFromTerm(paymentTerm, numCuotas) {
+  if (!isInstallmentPaymentTerm(paymentTerm)) return 'De contado';
+  const lower = String(paymentTerm || '').toLowerCase();
+  if (lower.includes('15')) return 'Quincenal';
+  if (lower.includes('45')) return '2 Cuotas (30 y 45 Días)';
+  return numCuotas >= 1 ? 'Mensual' : 'De contado';
+}
+
 function createInitialData() {
   return {
   "meta": {
@@ -71,6 +101,7 @@ function createInitialData() {
     "enable_line_discounts": true,
     "default_sale_tax": 19,
     "default_purchase_tax": 19,
+    "default_financing_rate": 0,
     "fiscal_regime": "Responsable de IVA - Régimen Ordinario",
     "expense_approval_required": true,
     "expense_default_journal": "EXJ",
@@ -954,8 +985,48 @@ class ERPStore {
     };
   }
 
+  normalizeSaleContractInstallments(order) {
+    if (!order || typeof order !== 'object') return;
+    if (!order.contract_data || typeof order.contract_data !== 'object') {
+      order.contract_data = {};
+    }
+    const cd = order.contract_data;
+    const term = String(order.payment_term || '').trim();
+    const isCredit = isInstallmentPaymentTerm(term);
+    const numCuotasFromTerm = getInstallmentsCountFromTerm(term);
+
+    const rawCount = cd.installments_count !== undefined && cd.installments_count !== '' ? Number(cd.installments_count) : 0;
+    let effectiveCuotas = numCuotasFromTerm;
+    if (rawCount > 1 && numCuotasFromTerm <= 1 && isCredit) {
+      effectiveCuotas = rawCount;
+    } else if (numCuotasFromTerm > 1) {
+      effectiveCuotas = numCuotasFromTerm;
+    } else if (rawCount > 0) {
+      effectiveCuotas = rawCount;
+    } else {
+      effectiveCuotas = 1;
+    }
+    if (!isCredit) effectiveCuotas = 1;
+
+    cd.installments_count = String(effectiveCuotas);
+    const downPayment = cd.down_payment !== undefined && cd.down_payment !== '' ? Math.max(0, Number(cd.down_payment) || 0) : 0;
+    const totalAmount = Math.max(0, Number(order.amount_total || 0));
+    const financedTotal = Math.max(0, round2(totalAmount - downPayment));
+    const equalInstallmentVal = effectiveCuotas > 0 ? Math.round(financedTotal / effectiveCuotas) : 0;
+    cd.installment_amount = String(equalInstallmentVal);
+
+    if (isCredit) {
+      if (!cd.payment_dates || cd.payment_dates === 'De contado') {
+        cd.payment_dates = getPaymentPeriodicityFromTerm(term, effectiveCuotas);
+      }
+    } else {
+      cd.payment_dates = 'De contado';
+    }
+  }
+
   getBootstrapState() {
     (this.data.sales || []).forEach((s) => {
+      this.normalizeSaleContractInstallments(s);
       s.installment_plan = this.buildSaleInstallmentPlan(s);
     });
     return {
@@ -2444,10 +2515,32 @@ class ERPStore {
     const lines = this.normalizeOrderLines(linesInput);
     const amountUntaxed = round2(lines.reduce((s, l) => s + l.subtotal, 0));
     const amountTax = round2(lines.reduce((s, l) => s + l.tax_amount, 0));
-    const amountTotal = round2(amountUntaxed + amountTax);
+
+    const resolvedTerm = String(payload.payment_term !== undefined ? payload.payment_term : (existing ? existing.payment_term : (partner && partner.payment_term) || '30 Días')).trim();
+    const isCreditOrder = isInstallmentPaymentTerm(resolvedTerm);
+    const defaultFinRate = Math.max(0, Number((this.data.settings && this.data.settings.default_financing_rate) || 0));
+    let financingRate = 0;
+    if (isCreditOrder) {
+      if (payload.financing_rate !== undefined && payload.financing_rate !== '' && payload.financing_rate !== null) {
+        financingRate = Math.max(0, Number(payload.financing_rate) || 0);
+      } else if (existing && existing.financing_rate !== undefined && isInstallmentPaymentTerm(existing.payment_term)) {
+        financingRate = Math.max(0, Number(existing.financing_rate) || 0);
+      } else {
+        financingRate = defaultFinRate;
+      }
+    }
+    const amountFinancing = isCreditOrder && financingRate > 0 ? round2((amountUntaxed + amountTax) * (financingRate / 100)) : 0;
+    const amountTotal = round2(amountUntaxed + amountTax + amountFinancing);
 
     if (existing) {
-      const contractData = payload.contract_data !== undefined ? payload.contract_data : (existing.contract_data || {});
+      const contractData = payload.contract_data !== undefined
+        ? JSON.parse(JSON.stringify(payload.contract_data || {}))
+        : JSON.parse(JSON.stringify(existing.contract_data || {}));
+      if (payload.payment_term !== undefined && String(payload.payment_term).trim() !== String(existing.payment_term || '').trim()) {
+        const nextCuotas = getInstallmentsCountFromTerm(resolvedTerm);
+        contractData.installments_count = String(nextCuotas);
+        contractData.payment_dates = getPaymentPeriodicityFromTerm(resolvedTerm, nextCuotas);
+      }
       const updated = {
         ...existing,
         partner_id: partner ? partner.id : existing.partner_id,
@@ -2455,7 +2548,9 @@ class ERPStore {
         date_order: payload.date_order || existing.date_order,
         validity_date: payload.validity_date || existing.validity_date,
         salesperson: String(payload.salesperson || existing.salesperson).trim(),
-        payment_term: String(payload.payment_term || existing.payment_term).trim(),
+        payment_term: resolvedTerm,
+        financing_rate: financingRate,
+        amount_financing: amountFinancing,
         contract_data: contractData,
         lines,
         amount_untaxed: amountUntaxed,
@@ -2463,9 +2558,10 @@ class ERPStore {
         amount_total: amountTotal,
         notes: String(payload.notes ?? existing.notes).trim()
       };
+      this.normalizeSaleContractInstallments(updated);
       this.recomputeSaleOrderInvoiceStatus(updated);
       const isLinesChanged = !areSaleLinesSemanticEqual(lines, existing.lines);
-      const isContractChanged = payload.contract_data !== undefined && JSON.stringify(payload.contract_data) !== JSON.stringify(existing.contract_data || {});
+      const isContractChanged = JSON.stringify(updated.contract_data) !== JSON.stringify(existing.contract_data || {});
       const isSaleChanged =
         (partner && Number(partner.id) !== Number(existing.partner_id)) ||
         (payload.date_order && String(payload.date_order) !== String(existing.date_order)) ||
@@ -2473,6 +2569,7 @@ class ERPStore {
         (payload.payment_term !== undefined && String(payload.payment_term).trim() !== String(existing.payment_term || '').trim()) ||
         (payload.salesperson !== undefined && String(payload.salesperson).trim() !== String(existing.salesperson || '').trim()) ||
         (payload.notes !== undefined && String(payload.notes).trim() !== String(existing.notes || '').trim()) ||
+        Number(financingRate) !== Number(existing.financing_rate || 0) ||
         isContractChanged ||
         Math.abs(amountTotal - Number(existing.amount_total || 0)) > 0.01;
 
@@ -2514,11 +2611,13 @@ class ERPStore {
       date_order: dateOrder,
       validity_date: payload.validity_date || addDays(dateOrder, validityDays),
       salesperson: String(payload.salesperson || this.getActiveAuthor()).trim(),
-      payment_term: String(payload.payment_term || (partner && partner.payment_term) || '30 Días').trim(),
+      payment_term: resolvedTerm,
+      financing_rate: financingRate,
+      amount_financing: amountFinancing,
       state: 'draft',
       invoice_status: 'no',
       lines,
-      contract_data: payload.contract_data || {},
+      contract_data: payload.contract_data ? JSON.parse(JSON.stringify(payload.contract_data)) : {},
       amount_untaxed: amountUntaxed,
       amount_tax: amountTax,
       amount_total: amountTotal,
@@ -2528,6 +2627,7 @@ class ERPStore {
         { id: this.nextChatterId(), author: this.getActiveAuthor(), date: this.formatNowShort(), text: `Cotización ${name} creada.` }
       ]
     };
+    this.normalizeSaleContractInstallments(newOrder);
     newOrder.installment_plan = this.buildSaleInstallmentPlan(newOrder);
     this.data.sales.unshift(newOrder);
     this.save();
@@ -2544,15 +2644,18 @@ class ERPStore {
   }
 
   _createSaleInvoiceInternal(order, reqAmount = null, params = {}) {
+    this.normalizeSaleContractInstallments(order);
     const existingInvoices = (order.invoice_ids || [])
       .map((mid) => this.data.accounting.moves.find((m) => Number(m.id) === Number(mid)))
       .filter((m) => m && m.state !== 'cancel');
     const invoicedUntaxed = round2(existingInvoices.reduce((s, m) => s + Number(m.amount_untaxed || 0), 0));
     const invoicedTax = round2(existingInvoices.reduce((s, m) => s + Number(m.amount_tax || 0), 0));
+    const invoicedFinancing = round2(existingInvoices.reduce((s, m) => s + Number(m.amount_financing || 0), 0));
     const invoicedTotal = round2(existingInvoices.reduce((s, m) => s + Number(m.amount_total || 0), 0));
 
     const deltaUntaxed = round2(order.amount_untaxed - invoicedUntaxed);
     const deltaTax = round2(order.amount_tax - invoicedTax);
+    const deltaFinancing = round2(Number(order.amount_financing || 0) - invoicedFinancing);
     const deltaTotal = round2(order.amount_total - invoicedTotal);
 
     if (deltaTotal <= 0) {
@@ -2574,14 +2677,18 @@ class ERPStore {
 
     let billUntaxed = 0;
     let billTax = 0;
+    let billFinancing = 0;
     if (Math.abs(billTotal - deltaTotal) < 0.001) {
       billUntaxed = deltaUntaxed;
       billTax = deltaTax;
+      billFinancing = deltaFinancing;
     } else {
       const orderTotal = round2(order.amount_total);
       const taxRatio = orderTotal > 0 ? (order.amount_tax / orderTotal) : 0;
+      const finRatio = orderTotal > 0 ? (Number(order.amount_financing || 0) / orderTotal) : 0;
       billTax = round2(billTotal * taxRatio);
-      billUntaxed = round2(billTotal - billTax);
+      billFinancing = round2(billTotal * finRatio);
+      billUntaxed = round2(billTotal - billTax - billFinancing);
     }
 
     const pendingResidualAfterThis = round2(deltaTotal - billTotal);
@@ -2594,13 +2701,19 @@ class ERPStore {
     const invName = `INV/2026/${this.padSeq(invSeq, 4)}`;
     const planItems = this.buildSaleInstallmentPlan(order);
     const matchedPlanItem = planItems.find((p) => Number(p.installment_number) === Number(installmentNum));
+    const lastPlanItem = planItems.length > 0 ? planItems[planItems.length - 1] : null;
     const invDate = (params && params.invoice_date) ? String(params.invoice_date).trim() : todayStr();
     const dueDate = (params && params.due_date)
       ? String(params.due_date).trim()
-      : (matchedPlanItem && matchedPlanItem.due_date ? matchedPlanItem.due_date : addDays(invDate, 30));
+      : (isAbono && matchedPlanItem && matchedPlanItem.due_date
+          ? matchedPlanItem.due_date
+          : (lastPlanItem && lastPlanItem.due_date ? lastPlanItem.due_date : addDays(invDate, 30)));
+
+    const totalInstallmentsCount = planItems.length > 0 ? planItems.length : getInstallmentsCountFromTerm(order.payment_term);
+    const equalInstallmentAmount = totalInstallmentsCount > 0 ? Math.round(round2(order.amount_total) / totalInstallmentsCount) : billTotal;
 
     const conceptNote = isAbono
-      ? `Abono / Cuota #${installmentNum} a la orden ${order.name} (Saldo restante: $ ${pendingResidualAfterThis.toLocaleString('es-CO')})`
+      ? `Abono / Cuota #${installmentNum} de ${totalInstallmentsCount} a la orden ${order.name} (Saldo restante: $ ${pendingResidualAfterThis.toLocaleString('es-CO')})`
       : `Facturación orden ${order.name}`;
 
     const moveLines = (!isAbono && !isDeltaInvoice)
@@ -2629,7 +2742,7 @@ class ERPStore {
             tax_rate: billUntaxed > 0 ? round2((billTax / billUntaxed) * 100) : 0,
             subtotal: billUntaxed,
             tax_amount: billTax,
-            total: billTotal
+            total: round2(billUntaxed + billTax)
           }
         ];
 
@@ -2649,6 +2762,15 @@ class ERPStore {
         credit: billUntaxed
       }
     ];
+    if (billFinancing > 0) {
+      journalItems.push({
+        account_code: '421005',
+        account_name: `Ingresos Financieros / Financiación Crédito (${Number(order.financing_rate || 0)}%)`,
+        label: `Financiación Crédito ${invName}`,
+        debit: 0,
+        credit: billFinancing
+      });
+    }
     if (billTax > 0) {
       journalItems.push({
         account_code: '240801',
@@ -2668,6 +2790,11 @@ class ERPStore {
       journal_name: 'Facturas de Clientes',
       partner_id: order.partner_id,
       partner_name: order.partner_name,
+      payment_term: order.payment_term || 'Contado',
+      financing_rate: Number(order.financing_rate || 0),
+      amount_financing: billFinancing,
+      installments_count: totalInstallmentsCount,
+      installment_amount: equalInstallmentAmount,
       invoice_date: invDate,
       invoice_date_due: dueDate,
       ref: order.name,
@@ -2693,7 +2820,7 @@ class ERPStore {
           date: this.formatNowShort(),
           text: isAbono
             ? `Factura ${invName} creada y publicada por concepto de Abono Cuota #${installmentNum} ($ ${billTotal.toLocaleString('es-CO')}). Saldo pendiente de la orden: $ ${pendingResidualAfterThis.toLocaleString('es-CO')}.`
-            : `Factura ${invName} creada y publicada desde el pedido ${order.name}.`
+            : `Factura ${invName} creada y publicada desde el pedido ${order.name}${totalInstallmentsCount > 1 ? ` (${totalInstallmentsCount} cuotas iguales de $ ${equalInstallmentAmount.toLocaleString('es-CO')})` : ''}.`
         }
       ]
     };
@@ -2885,7 +3012,30 @@ class ERPStore {
 
     const amountUntaxed = round2(lines.reduce((s, l) => s + l.subtotal, 0));
     const amountTax = round2(lines.reduce((s, l) => s + l.tax_amount, 0));
-    const amountTotal = round2(amountUntaxed + amountTax);
+
+    const paymentTerm = String(
+      payload.payment_term !== undefined
+        ? payload.payment_term
+        : (existing && existing.payment_term) || (partner && partner.payment_term) || 'Contado'
+    ).trim();
+    const isCreditMove = moveType === 'out_invoice' && isInstallmentPaymentTerm(paymentTerm);
+    const defaultFinRate = Math.max(0, Number((this.data.settings && this.data.settings.default_financing_rate) || 0));
+    let financingRate = 0;
+    if (isCreditMove) {
+      if (payload.financing_rate !== undefined && payload.financing_rate !== '' && payload.financing_rate !== null) {
+        financingRate = Math.max(0, Number(payload.financing_rate) || 0);
+      } else if (existing && existing.financing_rate !== undefined && isInstallmentPaymentTerm(existing.payment_term)) {
+        financingRate = Math.max(0, Number(existing.financing_rate) || 0);
+      } else {
+        financingRate = defaultFinRate;
+      }
+    }
+    const amountFinancing = isCreditMove && financingRate > 0 ? round2((amountUntaxed + amountTax) * (financingRate / 100)) : 0;
+    const amountTotal = round2(amountUntaxed + amountTax + amountFinancing);
+    const installmentsCount = moveType === 'out_invoice'
+      ? Math.max(1, Number(payload.installments_count || getInstallmentsCountFromTerm(paymentTerm) || 1))
+      : 1;
+    const installmentAmount = installmentsCount > 0 ? Math.round(amountTotal / installmentsCount) : amountTotal;
 
     const retSourceRate = Number(payload.retention_source_rate !== undefined ? payload.retention_source_rate : (existing ? existing.retention_source_rate : 0) || 0);
     const retIcaRate = Number(payload.retention_ica_rate !== undefined ? payload.retention_ica_rate : (existing ? existing.retention_ica_rate : 0) || 0);
@@ -2908,6 +3058,7 @@ class ERPStore {
             ...(retSourceAmount > 0 ? [{ account_code: '135515', account_name: 'Anticipo Impuestos - Retención en la Fuente', label: `Retefuente ${retSourceRate}%`, debit: retSourceAmount, credit: 0 }] : []),
             ...(retIcaAmount > 0 ? [{ account_code: '135518', account_name: 'Anticipo Impuestos - ReteICA', label: `ReteICA ${retIcaRate}%`, debit: retIcaAmount, credit: 0 }] : []),
             { account_code: '413501', account_name: 'Ingresos por Servicios de Software y Consultoría', label: 'Ingresos por facturación', debit: 0, credit: amountUntaxed },
+            ...(amountFinancing > 0 ? [{ account_code: '421005', account_name: `Ingresos Financieros / Financiación Crédito (${financingRate}%)`, label: `Financiación Crédito ${financingRate}%`, debit: 0, credit: amountFinancing }] : []),
             ...(amountTax > 0 ? [{ account_code: '240801', account_name: 'IVA Generado en Ventas (19%)', label: 'IVA Generado', debit: 0, credit: amountTax }] : [])
           ]
         : [
@@ -2930,6 +3081,11 @@ class ERPStore {
         journal_name: journal.name,
         partner_id: partner ? partner.id : existing.partner_id,
         partner_name: partnerName,
+        payment_term: paymentTerm,
+        financing_rate: financingRate,
+        amount_financing: amountFinancing,
+        installments_count: installmentsCount,
+        installment_amount: installmentAmount,
         invoice_date: invDate,
         invoice_date_due: dueDate,
         ref: payload.ref !== undefined ? String(payload.ref).trim() : existing.ref,
@@ -2952,6 +3108,8 @@ class ERPStore {
         (invDate && invDate !== existing.invoice_date) ||
         (dueDate && dueDate !== existing.invoice_date_due) ||
         (payload.ref !== undefined && String(payload.ref).trim() !== String(existing.ref || '').trim()) ||
+        paymentTerm !== String(existing.payment_term || '') ||
+        Number(financingRate) !== Number(existing.financing_rate || 0) ||
         Math.abs(amountTotal - Number(existing.amount_total || 0)) > 0.01;
 
       if (!isMoveLinesChanged && !isMoveChanged && !payload.auto_post) {
@@ -2995,6 +3153,11 @@ class ERPStore {
       journal_name: journal.name,
       partner_id: partner ? partner.id : null,
       partner_name: partnerName,
+      payment_term: paymentTerm,
+      financing_rate: financingRate,
+      amount_financing: amountFinancing,
+      installments_count: installmentsCount,
+      installment_amount: installmentAmount,
       invoice_date: invDate,
       invoice_date_due: dueDate,
       ref: String(payload.ref || '').trim(),
@@ -3356,9 +3519,13 @@ class ERPStore {
       }
     }
     const oldSettings = { ...this.data.settings };
+    const nextFinancingRate = payload.default_financing_rate !== undefined
+      ? Math.max(0, Number(payload.default_financing_rate) || 0)
+      : Math.max(0, Number(this.data.settings.default_financing_rate) || 0);
     this.data.settings = {
       ...this.data.settings,
       ...payload,
+      default_financing_rate: nextFinancingRate,
       active_user: activeUser,
       currency: nextCurrency,
       currency_symbol: currencySymbols[nextCurrency] || '$'

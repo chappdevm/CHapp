@@ -531,8 +531,13 @@ function serializeSaleOrder(s) {
   const { cleanNotes } = extractSaleMeta(s.notes ? String(s.notes).trim() : '');
   let notesVal = cleanNotes || null;
   const hasContract = s.contract_data && typeof s.contract_data === 'object' && Object.keys(s.contract_data).length > 0;
-  if (hasContract) {
-    const metaBlock = `${SALE_META_START}${JSON.stringify({ contract_data: s.contract_data })}${SALE_META_END}`;
+  const hasFinancing = s.financing_rate !== undefined || s.amount_financing !== undefined;
+  if (hasContract || hasFinancing) {
+    const metaPayload = {};
+    if (hasContract) metaPayload.contract_data = s.contract_data;
+    if (s.financing_rate !== undefined) metaPayload.financing_rate = Number(s.financing_rate || 0);
+    if (s.amount_financing !== undefined) metaPayload.amount_financing = Number(s.amount_financing || 0);
+    const metaBlock = `${SALE_META_START}${JSON.stringify(metaPayload)}${SALE_META_END}`;
     notesVal = cleanNotes ? `${cleanNotes}\n${metaBlock}` : metaBlock;
   }
 
@@ -598,6 +603,8 @@ function deserializeSaleOrder(r) {
     validity_date: r.validity_date ? String(r.validity_date).slice(0, 10) : null,
     salesperson: r.salesperson || '',
     payment_term: r.payment_term || '30 Días',
+    financing_rate: Number((meta && meta.financing_rate) || 0),
+    amount_financing: Number((meta && meta.amount_financing) || 0),
     state: r.state || 'draft',
     invoice_status: r.invoice_status || 'no',
     amount_untaxed: Number(r.amount_untaxed || 0),
@@ -631,6 +638,11 @@ function serializeAccountMove(m) {
         total: Number(l.total ?? 0)
       }))
     };
+    if (m.payment_term) metaObj.payment_term = String(m.payment_term);
+    if (m.financing_rate !== undefined) metaObj.financing_rate = Number(m.financing_rate || 0);
+    if (m.amount_financing !== undefined) metaObj.amount_financing = Number(m.amount_financing || 0);
+    if (m.installments_count !== undefined) metaObj.installments_count = Number(m.installments_count || 1);
+    if (m.installment_amount !== undefined) metaObj.installment_amount = Number(m.installment_amount || 0);
     if (m.retention_source_rate) metaObj.retention_source_rate = Number(m.retention_source_rate);
     if (m.retention_source_amount) metaObj.retention_source_amount = Number(m.retention_source_amount);
     if (m.retention_ica_rate) metaObj.retention_ica_rate = Number(m.retention_ica_rate);
@@ -755,6 +767,11 @@ function deserializeAccountMove(r) {
   };
 
   if (meta) {
+    if (meta.payment_term !== undefined) out.payment_term = meta.payment_term;
+    if (meta.financing_rate !== undefined) out.financing_rate = Number(meta.financing_rate || 0);
+    if (meta.amount_financing !== undefined) out.amount_financing = Number(meta.amount_financing || 0);
+    if (meta.installments_count !== undefined) out.installments_count = Number(meta.installments_count || 1);
+    if (meta.installment_amount !== undefined) out.installment_amount = Number(meta.installment_amount || 0);
     if (meta.retention_source_rate !== undefined) out.retention_source_rate = meta.retention_source_rate;
     if (meta.retention_source_amount !== undefined) out.retention_source_amount = meta.retention_source_amount;
     if (meta.retention_ica_rate !== undefined) out.retention_ica_rate = meta.retention_ica_rate;
@@ -813,6 +830,10 @@ function deserializePayment(r) {
 }
 
 function serializeSettings(s) {
+  const activeUserObj = s.active_user && typeof s.active_user === 'object' ? { ...s.active_user } : { id: 1, name: 'Administrador CHapp' };
+  if (s.default_financing_rate !== undefined) {
+    activeUserObj.default_financing_rate = Math.max(0, Number(s.default_financing_rate) || 0);
+  }
   return {
     id: 1,
     company_name: String(s.company_name || 'CH Aluminios').trim(),
@@ -834,13 +855,20 @@ function serializeSettings(s) {
     expense_default_journal: s.expense_default_journal || 'EXJ',
     default_bank_journal: s.default_bank_journal || 'BNK1',
     sale_terms: s.sale_terms ? String(s.sale_terms).trim() : 'Condiciones de pago y entrega según cotización.',
-    active_user: s.active_user || null,
+    active_user: activeUserObj,
     users: s.users || null,
     updated_at: new Date().toISOString()
   };
 }
 
 function deserializeSettings(r, fallbackSettings = {}) {
+  const rawActiveUser = r.active_user || fallbackSettings.active_user;
+  const extractedFinRate =
+    r.default_financing_rate !== undefined
+      ? Number(r.default_financing_rate)
+      : rawActiveUser && rawActiveUser.default_financing_rate !== undefined
+        ? Number(rawActiveUser.default_financing_rate)
+        : Number(fallbackSettings.default_financing_rate ?? 0);
   return {
     ...fallbackSettings,
     company_name: r.company_name || fallbackSettings.company_name || 'CH Aluminios',
@@ -857,12 +885,13 @@ function deserializeSettings(r, fallbackSettings = {}) {
     enable_line_discounts: r.enable_line_discounts !== false,
     default_sale_tax: Number(r.default_sale_tax ?? 19),
     default_purchase_tax: Number(r.default_purchase_tax ?? 19),
+    default_financing_rate: Math.max(0, Number.isFinite(extractedFinRate) ? extractedFinRate : 0),
     fiscal_regime: r.fiscal_regime || 'Responsable de IVA - Régimen Ordinario',
     expense_approval_required: r.expense_approval_required !== false,
     expense_default_journal: r.expense_default_journal || 'EXJ',
     default_bank_journal: r.default_bank_journal || 'BNK1',
     sale_terms: r.sale_terms || 'Condiciones de pago y entrega según cotización.',
-    active_user: r.active_user || fallbackSettings.active_user,
+    active_user: rawActiveUser,
     users: r.users || fallbackSettings.users
   };
 }

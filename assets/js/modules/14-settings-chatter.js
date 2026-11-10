@@ -103,6 +103,10 @@
               </select>
             </div>
             <div class="o_field_row">
+              <label for="setDefaultFinancingRate">Financiación / Crédito por Defecto (%)</label>
+              <input type="number" id="setDefaultFinancingRate" class="o_input" value="${Number(s.default_financing_rate ?? 0)}" min="0" max="100" step="any" placeholder="Ej: 10" />
+            </div>
+            <div class="o_field_row">
               <label for="setSaleTerms">Términos y Condiciones en Cotizaciones</label>
               <input type="text" id="setSaleTerms" class="o_input" value="${esc(s.sale_terms)}" />
             </div>
@@ -130,6 +134,10 @@
               <select id="setDefaultPurchaseTax" class="o_select">
                 ${[19, 5, 0].map((t) => `<option value="${t}" ${Number(s.default_purchase_tax ?? 19) === t ? 'selected' : ''}>${t}%</option>`).join('')}
               </select>
+            </div>
+            <div class="o_field_row">
+              <label for="setDefaultFinancingRate">Financiación / Crédito en Facturas por Defecto (%)</label>
+              <input type="number" id="setDefaultFinancingRate" class="o_input" value="${Number(s.default_financing_rate ?? 0)}" min="0" max="100" step="any" placeholder="Ej: 10" />
             </div>
           </div>
         </div>
@@ -292,6 +300,7 @@
 
       if (el('setValidityDays')) target.quotation_validity_days = Number(el('setValidityDays').value || 30);
       if (el('setDefaultSaleTax')) target.default_sale_tax = Number(el('setDefaultSaleTax').value ?? 19);
+      if (el('setDefaultFinancingRate')) target.default_financing_rate = Math.max(0, Number(el('setDefaultFinancingRate').value ?? 0));
       if (el('setSaleTerms')) target.sale_terms = el('setSaleTerms').value;
       if (el('setLineDiscounts')) target.enable_line_discounts = el('setLineDiscounts').value === 'true';
 

@@ -208,14 +208,18 @@
     }
 
 
-    const paymentTerm = partner.payment_term || '30 Días';
-    const isCredit = /d[ií]as/i.test(paymentTerm);
-    const paymentTypeDesc = isCredit ? `Crédito (${paymentTerm})` : 'Contado';
+    const paymentTerm = invoice.payment_term || (linkedSale && linkedSale.payment_term) || partner.payment_term || 'Contado';
+    const isCredit = typeof isInstallmentPaymentTerm === 'function' ? isInstallmentPaymentTerm(paymentTerm) : /d[ií]as|mes|cuota/i.test(paymentTerm);
+    const numCuotas = Math.max(1, Number(invoice.installments_count || (linkedSale && linkedSale.contract_data && linkedSale.contract_data.installments_count) || (typeof getInstallmentsCountFromTerm === 'function' ? getInstallmentsCountFromTerm(paymentTerm) : 1)));
+    const paymentTypeDesc = isCredit ? `Crédito (${paymentTerm}${numCuotas > 1 ? ` · ${numCuotas} Cuotas` : ''})` : 'Contado';
     const paymentMethodDesc = invoice.journal_name || (isCredit ? 'Crédito Comercial' : 'Transferencia Electrónica / Bancaria');
 
     const totalUntaxed = Number(invoice.amount_untaxed || 0);
     const totalTax = Number(invoice.amount_tax || 0);
+    const financingRate = isCredit ? Math.max(0, Number(invoice.financing_rate ?? (linkedSale && linkedSale.financing_rate) ?? 0)) : 0;
+    const totalFinancing = Number(invoice.amount_financing ?? (financingRate > 0 ? Math.round((totalUntaxed + totalTax) * (financingRate / 100) * 100) / 100 : 0));
     const totalAmount = Number(invoice.amount_total || 0);
+    const cuotaAmount = Number(invoice.installment_amount || (numCuotas > 0 ? Math.round(totalAmount / numCuotas) : totalAmount));
     const residualAmount = Number(invoice.amount_residual ?? 0);
     const paidAmount = Math.max(0, totalAmount - residualAmount);
 
@@ -301,10 +305,11 @@
             <div class="o_pdf_col_title">Datos de Contacto y Comerciales</div>
             <p><strong>Celular / Teléfono:</strong> ${esc([partner.mobile, partner.phone].filter(Boolean).join(' / ') || 'No registrado')}</p>
             <p><strong>Correo:</strong> ${esc(partner.email || 'No registrado')}</p>
-            <p><strong>Forma de Pago:</strong> ${esc(paymentTerm)}</p>
+            <p><strong>Forma de Pago:</strong> ${esc(paymentTerm)}${numCuotas > 1 && !isAbono ? ` (${numCuotas} Cuotas Iguales de ${formatMoney(cuotaAmount)})` : ''}</p>
             <p><strong>Medio de Pago:</strong> ${esc(paymentMethodDesc)}</p>
           </div>
         </div>
+        ${typeof renderInvoiceInstallmentSummaryHtml === 'function' ? renderInvoiceInstallmentSummaryHtml(invoice, linkedSale, paymentTerm, totalAmount) : ''}
 
         ${isAbono ? `
           <div class="o_pdf_trace_box">
@@ -423,10 +428,12 @@
                 <td>IVA (19%):</td>
                 <td style="text-align: right;"><strong>${formatMoney(totalTax)}</strong></td>
               </tr>
+              ${totalFinancing > 0 ? `<tr style="color: #0284c7;"><td>Financiación Crédito (${financingRate}%):</td><td style="text-align: right;"><strong>+ ${formatMoney(totalFinancing)}</strong></td></tr>` : ''}
               <tr class="is-grand-total">
                 <td>TOTAL:</td>
                 <td style="text-align: right;">${formatMoney(totalAmount)}</td>
               </tr>
+              ${numCuotas > 1 && !isAbono ? `<tr style="color: #074073; font-size: 0.78rem;"><td>Valor por Cuota (${numCuotas} Partes Iguales):</td><td style="text-align: right;"><strong>${formatMoney(cuotaAmount)}</strong></td></tr>` : ''}
               ${totalRetentions > 0 ? `
                 ${retefuenteAmount > 0 ? `
                   <tr style="color: #b45309; font-size: 0.76rem; background: rgba(254, 243, 199, 0.45);">

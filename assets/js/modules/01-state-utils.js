@@ -237,6 +237,7 @@
     if (!existing || !draft) return true;
     if (Number(existing.partner_id || 0) !== Number(draft.partner_id || 0)) return true;
     if (String(existing.payment_term || '').trim() !== String(draft.payment_term || '').trim()) return true;
+    if (Number(existing.financing_rate || 0) !== Number(draft.financing_rate || 0)) return true;
     if (String(existing.date_order || '').slice(0, 10) !== String(draft.date_order || '').slice(0, 10)) return true;
     if (String(existing.validity_date || '').slice(0, 10) !== String(draft.validity_date || '').slice(0, 10)) return true;
     if (String(existing.salesperson || '').trim() !== String(draft.salesperson || '').trim()) return true;
@@ -267,6 +268,8 @@
     if (!existing || !draft) return true;
     if (Number(existing.partner_id || 0) !== Number(draft.partner_id || 0)) return true;
     if (String(existing.ref || '').trim() !== String(draft.ref || '').trim()) return true;
+    if (String(existing.payment_term || '').trim() !== String(draft.payment_term || '').trim()) return true;
+    if (Number(existing.financing_rate || 0) !== Number(draft.financing_rate || 0)) return true;
     if (String(existing.invoice_date || '').slice(0, 10) !== String(draft.invoice_date || '').slice(0, 10)) return true;
     if (String(existing.invoice_date_due || '').slice(0, 10) !== String(draft.invoice_date_due || '').slice(0, 10)) return true;
     if (Number(existing.retention_source_rate || 0) !== Number(draft.retention_source_rate || 0)) return true;

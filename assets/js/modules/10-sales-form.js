@@ -19,21 +19,7 @@
           state: 'draft',
           invoice_status: 'no',
           lines: state.formDraft && state.formDraft.lines ? state.formDraft.lines : [
-            {
-              id: 1,
-              product_id: '',
-              product_name: '',
-              description: '',
-              measure: 1,
-              uom: '',
-              quantity: 1,
-              price_unit: 0,
-              discount: 0,
-              tax_rate: '',
-              subtotal: 0,
-              tax_amount: 0,
-              total: 0
-            }
+            { id: 1, product_id: '', product_name: '', description: '', measure: 1, uom: '', quantity: 1, price_unit: 0, discount: 0, tax_rate: '', subtotal: 0, tax_amount: 0, total: 0 }
           ],
           notes: state.data.settings.sale_terms || '',
           invoice_ids: [],
@@ -48,10 +34,13 @@
 
     if (!state.formDraft || state.formDraft.recordId !== state.activeRecordId) {
       state.activeSaleTab = existing.state === 'sale' ? 'contract' : 'lines';
+      const initTerm = existing.payment_term || '';
+      const initIsInst = typeof isInstallmentPaymentTerm === 'function' ? isInstallmentPaymentTerm(initTerm) : false;
       state.formDraft = {
         recordId: state.activeRecordId,
         partner_id: (state.formDraft && state.formDraft.partner_id) || existing.partner_id || '',
-        payment_term: existing.payment_term || '',
+        payment_term: initTerm,
+        financing_rate: existing.financing_rate !== undefined && existing.financing_rate !== null ? Number(existing.financing_rate) : (initIsInst ? Number((state.data.settings && state.data.settings.default_financing_rate) || 0) : 0),
         date_order: existing.date_order,
         validity_date: existing.validity_date,
         salesperson: existing.salesperson,
@@ -84,21 +73,20 @@
     const currentDocType = state.currentSaleDocType || 'quote';
 
     const draftLines = draft.lines;
-    const calcGross = draftLines.reduce((acc, l) => {
-      return acc + (Number(l.quantity || 0) * Number(l.price_unit || 0));
-    }, 0);
-    const calcDiscount = draftLines.reduce((acc, l) => {
-      const gross = Number(l.quantity || 0) * Number(l.price_unit || 0);
-      return acc + (gross * (Number(l.discount || 0) / 100));
-    }, 0);
+    const calcGross = draftLines.reduce((acc, l) => acc + (Number(l.quantity || 0) * Number(l.price_unit || 0)), 0);
+    const calcDiscount = draftLines.reduce((acc, l) => acc + (Number(l.quantity || 0) * Number(l.price_unit || 0) * (Number(l.discount || 0) / 100)), 0);
     const calcUntaxed = calcGross - calcDiscount;
     const calcTax = draftLines.reduce((acc, l) => {
       const sub = Number(l.quantity || 0) * Number(l.price_unit || 0) * (1 - Number(l.discount || 0) / 100);
       return acc + sub * (Number(l.tax_rate || 0) / 100);
     }, 0);
-    const calcTotal = calcUntaxed + calcTax;
     const currentPaymentTerm = String(draft.payment_term || '').trim();
     const isInstallment = typeof isInstallmentPaymentTerm === 'function' ? isInstallmentPaymentTerm(currentPaymentTerm) : (Boolean(currentPaymentTerm) && currentPaymentTerm.toLowerCase() !== 'contado' && currentPaymentTerm.toLowerCase() !== 'immediate');
+    const financingRate = isInstallment ? Math.max(0, Number(draft.financing_rate || 0)) : 0;
+    const calcFinancing = financingRate > 0 ? round2((calcUntaxed + calcTax) * (financingRate / 100)) : 0;
+    const calcTotal = round2(calcUntaxed + calcTax + calcFinancing);
+    draft.amount_total = calcTotal;
+    if (typeof syncContractInstallmentsWithTerm === 'function') syncContractInstallmentsWithTerm(draft, false);
     const activeSaleTab = state.activeSaleTab === 'contract' ? 'contract' : (isInstallment && state.activeSaleTab === 'invoice_plan' ? 'invoice_plan' : 'lines');
     const allAccountingMoves = (state.data.accounting && state.data.accounting.moves) || [];
     const linkedOrderMoves = !isNew
@@ -116,6 +104,8 @@
       validity_date: draft.validity_date || existing.validity_date,
       salesperson: draft.salesperson || existing.salesperson,
       payment_term: draft.payment_term || existing.payment_term,
+      financing_rate: financingRate,
+      amount_financing: calcFinancing,
       notes: draft.notes !== undefined ? draft.notes : existing.notes,
       contract_data: draft.contract_data || existing.contract_data || {},
       lines: draftLines.map((l) => ({
@@ -251,6 +241,10 @@
                     </select>
                   </div>
                   <div class="o_field_row">
+                    <label for="fSaleFinancingRate">Financiación Crédito (%)</label>
+                    <input type="number" id="fSaleFinancingRate" class="o_input" min="0" max="100" step="any" value="${isInstallment ? Number(draft.financing_rate || 0) : 0}" ${!isEditable || !isInstallment ? 'disabled' : ''} placeholder="0%" title="Porcentaje adicional sobre la factura cuando se financia a crédito" />
+                  </div>
+                  <div class="o_field_row">
                     <label for="fSaleDate">Fecha de Orden</label>
                     <input type="date" id="fSaleDate" class="o_input" value="${esc(draft.date_order)}" ${!isEditable ? 'disabled' : ''} />
                   </div>
@@ -365,10 +359,12 @@
                     <span>IVA:</span>
                     <strong>${formatMoney(calcTax)}</strong>
                   </div>
+                  ${calcFinancing > 0 ? `<div class="o_totals_row" style="color: #0284c7;"><span>Financiación Crédito (${financingRate}%):</span><strong>+ ${formatMoney(calcFinancing)}</strong></div>` : ''}
                   <div class="o_totals_row is-grand">
                     <span>Total:</span>
                     <span>${formatMoney(calcTotal)}</span>
                   </div>
+                  ${isInstallment && installmentPlan.length > 0 ? `<div class="o_totals_row" style="color: #074073; font-size: 0.86rem; border-top: 1px dashed var(--o-border-color); padding-top: 0.35rem; margin-top: 0.25rem;"><span>Plan en ${installmentPlan.length} Cuota(s) Igual(es):</span><strong>${installmentPlan.length} x ${formatMoney(Math.round(calcTotal / installmentPlan.length))}</strong></div>` : ''}
                 </div>
 
                 <div class="o_field_row" style="margin-top: 1rem;">
@@ -423,12 +419,26 @@
     const syncSaleDraft = () => {
       const partnerEl = document.getElementById('fSalePartner');
       const termEl = document.getElementById('fSalePaymentTerm');
+      const finEl = document.getElementById('fSaleFinancingRate');
       const dateEl = document.getElementById('fSaleDate');
       const valEl = document.getElementById('fSaleValidity');
       const personEl = document.getElementById('fSalePerson');
       const notesEl = document.getElementById('fSaleNotes');
+      const prevTerm = state.formDraft.payment_term || '';
       if (partnerEl) state.formDraft.partner_id = Number(partnerEl.value);
       if (termEl) state.formDraft.payment_term = termEl.value;
+      const termChanged = prevTerm !== (state.formDraft.payment_term || '');
+      const nowIsInst = typeof isInstallmentPaymentTerm === 'function' ? isInstallmentPaymentTerm(state.formDraft.payment_term) : false;
+      if (termChanged) {
+        const prevWasInst = typeof isInstallmentPaymentTerm === 'function' ? isInstallmentPaymentTerm(prevTerm) : false;
+        if (nowIsInst && !prevWasInst && !Number(state.formDraft.financing_rate || 0)) {
+          state.formDraft.financing_rate = Number((state.data.settings && state.data.settings.default_financing_rate) || 0);
+        } else if (!nowIsInst) {
+          state.formDraft.financing_rate = 0;
+        }
+      } else if (finEl && nowIsInst) {
+        state.formDraft.financing_rate = Math.max(0, Number(finEl.value || 0));
+      }
       if (dateEl) state.formDraft.date_order = dateEl.value;
       if (valEl) state.formDraft.validity_date = valEl.value;
       if (personEl) state.formDraft.salesperson = personEl.value;
@@ -466,6 +476,9 @@
       if (checkedRadio) {
         state.formDraft.contract_data.collection_place = checkedRadio.value;
       }
+      if (typeof syncContractInstallmentsWithTerm === 'function') {
+        syncContractInstallmentsWithTerm(state.formDraft, termChanged);
+      }
     };
 
     const partnerSelectEl = document.getElementById('fSalePartner');
@@ -475,6 +488,10 @@
         const chosenContact = (state.data.contacts || []).find((c) => Number(c.id) === Number(state.formDraft.partner_id));
         if (chosenContact && chosenContact.payment_term && !state.formDraft.payment_term) {
           state.formDraft.payment_term = chosenContact.payment_term;
+          if (typeof isInstallmentPaymentTerm === 'function' && isInstallmentPaymentTerm(chosenContact.payment_term) && !Number(state.formDraft.financing_rate || 0)) {
+            state.formDraft.financing_rate = Number((state.data.settings && state.data.settings.default_financing_rate) || 0);
+          }
+          if (typeof syncContractInstallmentsWithTerm === 'function') syncContractInstallmentsWithTerm(state.formDraft, true);
         }
         renderSaleOrderForm(container);
       });
@@ -508,6 +525,7 @@
       quickPlanTermEl.addEventListener('change', () => {
         syncSaleDraft();
         state.formDraft.payment_term = quickPlanTermEl.value;
+        if (typeof syncContractInstallmentsWithTerm === 'function') syncContractInstallmentsWithTerm(state.formDraft, true);
         state.activeSaleTab = 'invoice_plan';
         renderSaleOrderForm(container);
       });
@@ -543,7 +561,7 @@
       });
     });
 
-    ['fSalePaymentTerm', 'fSaleDate', 'fSaleValidity', 'fSalePerson', 'fSaleNotes'].forEach((id) => {
+    ['fSalePaymentTerm', 'fSaleFinancingRate', 'fSaleDate', 'fSaleValidity', 'fSalePerson', 'fSaleNotes'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) {
         el.addEventListener('change', () => {
@@ -654,6 +672,7 @@
         id: isNew ? undefined : existing.id,
         partner_id: Number(state.formDraft.partner_id),
         payment_term: state.formDraft.payment_term,
+        financing_rate: Number(state.formDraft.financing_rate || 0),
         date_order: state.formDraft.date_order,
         validity_date: state.formDraft.validity_date,
         salesperson: state.formDraft.salesperson,
