@@ -527,8 +527,9 @@
 }
 
 .o_contract_info_banner {
-  background: var(--o-bg-subtle, #f8fafc);
-  border: 1px solid var(--o-border-color, #e2e8f0);
+  background: var(--o-gray-100, #051a2c);
+  border: 1px solid var(--o-border-color, #0d4370);
+  border-left: 4px solid var(--o-action, #14B5D9);
   border-radius: 8px;
   padding: 0.85rem 1rem;
   margin-bottom: 1.25rem;
@@ -539,7 +540,7 @@
   margin: 0 0 0.35rem 0;
   font-size: 0.95rem;
   font-weight: 700;
-  color: var(--o-heading, #074073);
+  color: var(--o-action, #14B5D9);
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -549,7 +550,7 @@
   margin: 0;
   font-size: 0.82rem;
   line-height: 1.4;
-  color: var(--o-text-muted, #64748b);
+  color: var(--o-text-muted, #95b8d4);
 }
 
 .o_contract_cards_grid {
@@ -562,14 +563,14 @@
 }
 
 .o_contract_form_card {
-  background: var(--o-view-bg, #ffffff);
-  border: 1px solid var(--o-border-color, #e2e8f0);
+  background: var(--o-sheet-bg, #072c4d);
+  border: 1px solid var(--o-border-color, #0d4370);
   border-radius: 8px;
   padding: 1.15rem;
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
   box-sizing: border-box;
   min-width: 0;
 }
@@ -577,9 +578,9 @@
 .o_contract_card_header {
   margin: 0;
   padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--o-border-color, #e2e8f0);
-  color: var(--o-heading, #074073);
-  font-size: 0.88rem;
+  border-bottom: 1px solid var(--o-border-color, #0d4370);
+  color: var(--o-action, #14B5D9);
+  font-size: 0.9rem;
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -612,7 +613,7 @@
 .o_contract_tab_wrap .o_field_row label {
   font-size: 0.78rem;
   font-weight: 600;
-  color: var(--o-text-muted, #64748b);
+  color: var(--o-text-muted, #95b8d4);
   line-height: 1.25;
 }
 
@@ -645,13 +646,13 @@
   gap: 0.45rem;
   padding: 0.45rem 0.65rem;
   min-height: 40px;
-  border: 1px solid var(--o-border-color, #cbd5e1);
+  border: 1px solid var(--o-border-color, #0d4370);
   border-radius: 6px;
-  background: var(--o-bg-subtle, #f8fafc);
+  background: var(--o-gray-100, #051a2c);
   cursor: pointer;
   font-size: 0.8rem;
   font-weight: 500;
-  color: var(--o-text-main, #1e293b);
+  color: var(--o-text-main, #F2F2F2);
   transition: all 0.15s ease;
   user-select: none;
   box-sizing: border-box;
@@ -659,25 +660,35 @@
 }
 
 .o_contract_radio_chip:hover {
-  border-color: var(--o-action, #074073);
-  background: #ffffff;
+  border-color: var(--o-action, #14B5D9);
+  background: var(--o-gray-200, #072640);
 }
 
 .o_contract_radio_chip:has(input:checked),
 .o_contract_radio_chip.is-active {
-  border-color: var(--o-action, #074073);
-  background: rgba(7, 64, 115, 0.08);
-  color: var(--o-action, #074073);
+  border-color: var(--o-action, #14B5D9);
+  background: var(--o-action-subtle, rgba(20, 181, 217, 0.16));
+  color: var(--o-highlight, #41F2F2);
   font-weight: 600;
 }
 
 .o_contract_radio_chip input[type="radio"] {
-  accent-color: var(--o-action, #074073);
+  accent-color: var(--o-action, #14B5D9);
   width: 16px;
   height: 16px;
   margin: 0;
   cursor: pointer;
   flex-shrink: 0;
+}
+
+[data-theme="light"] .o_contract_radio_chip:has(input:checked),
+[data-theme="light"] .o_contract_radio_chip.is-active {
+  color: var(--o-brand-primary, #074073);
+}
+
+[data-theme="light"] .o_contract_info_banner {
+  background: var(--o-gray-100, #F2F2F2);
+  border-color: var(--o-border-color, #c9dbe7);
 }
 
 /* ==========================================================================
