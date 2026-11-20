@@ -8,7 +8,7 @@
     {
       id: 'contacts',
       name: 'Contactos',
-      icon: '/assets/icons/contacts.png?v=2.35',
+      icon: '/assets/icons/contacts.png?v=2.38',
       xmlid: 'contacts.menu_contacts',
       defaultSubmenu: 'all',
       defaultView: 'list',
@@ -22,7 +22,7 @@
     {
       id: 'expenses',
       name: 'Gastos',
-      icon: '/assets/icons/expenses.png?v=2.35',
+      icon: '/assets/icons/expenses.png?v=2.38',
       xmlid: 'hr_expense.menu_hr_expense_root',
       defaultSubmenu: 'all',
       defaultView: 'list',
@@ -31,7 +31,7 @@
     {
       id: 'sales',
       name: 'Ventas',
-      icon: '/assets/icons/sales.png?v=2.35',
+      icon: '/assets/icons/sales.png?v=2.38',
       xmlid: 'sale.sale_menu_root',
       defaultSubmenu: 'all',
       defaultView: 'list',
@@ -45,7 +45,7 @@
     {
       id: 'accounting',
       name: 'Contabilidad',
-      icon: '/assets/icons/accounting.png?v=2.35',
+      icon: '/assets/icons/accounting.png?v=2.38',
       xmlid: 'account.menu_finance',
       defaultSubmenu: 'dashboard',
       defaultView: 'list',
@@ -59,7 +59,7 @@
     {
       id: 'inventory',
       name: 'Inventario',
-      icon: '/assets/icons/inventory.png?v=2.35',
+      icon: '/assets/icons/inventory.png?v=2.38',
       xmlid: 'stock.menu_stock_root',
       defaultSubmenu: 'stock',
       defaultView: 'list',
@@ -71,7 +71,7 @@
     {
       id: 'settings',
       name: 'Ajustes',
-      icon: '/assets/icons/settings.png?v=2.35',
+      icon: '/assets/icons/settings.png?v=2.38',
       xmlid: 'base.menu_administration',
       defaultSubmenu: 'general',
       defaultView: 'form',
