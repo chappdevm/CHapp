@@ -160,9 +160,9 @@
           <!-- Brand Logo & Official Corporate Banner -->
           <div class="o_login_brand">
             <div class="o_login_logo_badge">
-              <img src="/assets/icons/logo.png" alt="CH Aluminios Logo" />
+              <img src="/assets/icons/logo.png?v=2.35" alt="CH Aluminios Logo" width="120" height="120" />
             </div>
-            <img src="/assets/icons/nombreyslogan.png?v=2.24" alt="CH Aluminios - Innovación y Calidad" class="o_login_brand_banner" />
+            <img src="/assets/icons/nombreyslogan.png?v=2.35" alt="CH Aluminios - Innovación y Calidad" class="o_login_brand_banner" width="432" height="140" fetchpriority="high" />
           </div>
 
           <div class="o_login_header">

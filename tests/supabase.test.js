@@ -268,7 +268,21 @@ describe('Supabase Persistence Layer & PostgREST Architecture', () => {
     assert.equal(deserializedSettings.theme, 'dark');
   });
 
-  it('performs live PostgREST roundtrip CRUD on Supabase (create -> read -> update -> delete)', async () => {
+  async function checkLivePostgrestReachable() {
+    try {
+      const probe = await callPostgrest('/res_partner?limit=1');
+      return probe.status !== 0;
+    } catch {
+      return false;
+    }
+  }
+
+  it('performs live PostgREST roundtrip CRUD on Supabase (create -> read -> update -> delete)', async (t) => {
+    const isReachable = await checkLivePostgrestReachable();
+    if (!isReachable) {
+      if (t && typeof t.skip === 'function') t.skip('Supabase remoto no alcanzable (proyecto pausado o sin red)');
+      return;
+    }
     const persistence = new SupabasePersistence();
     assert.equal(persistence.isReady(), true);
 
@@ -306,7 +320,12 @@ describe('Supabase Persistence Layer & PostgREST Architecture', () => {
     assert.equal(finalRes.data.length, 0);
   });
 
-  it('performs live relational roundtrip with foreign keys across all active tables (product -> partner -> sale + lines -> move -> expense)', async () => {
+  it('performs live relational roundtrip with foreign keys across all active tables (product -> partner -> sale + lines -> move -> expense)', async (t) => {
+    const isReachable = await checkLivePostgrestReachable();
+    if (!isReachable) {
+      if (t && typeof t.skip === 'function') t.skip('Supabase remoto no alcanzable (proyecto pausado o sin red)');
+      return;
+    }
     const persistence = new SupabasePersistence();
     assert.equal(persistence.isReady(), true);
 
@@ -589,7 +608,12 @@ describe('Supabase Persistence Layer & PostgREST Architecture', () => {
     } catch (_) {}
   });
 
-  it('supports deleteProduct and ensures ensureSynced(0) queries remote database immediately', async () => {
+  it('supports deleteProduct and ensures ensureSynced(0) queries remote database immediately', async (t) => {
+    const isReachable = await checkLivePostgrestReachable();
+    if (!isReachable) {
+      if (t && typeof t.skip === 'function') t.skip('Supabase remoto no alcanzable (proyecto pausado o sin red)');
+      return;
+    }
     const persistence = new SupabasePersistence();
     if (!persistence.isReady()) return;
 

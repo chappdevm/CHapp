@@ -514,8 +514,8 @@
 }
 
 @keyframes loginPulse {
-  0%, 100% { transform: scale(1); opacity: 0.8; }
-  50% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 12px #41F2F2; }
+  0%, 100% { transform: scale(1); opacity: 0.75; }
+  50% { transform: scale(1.4); opacity: 1; }
 }
 
 /* ==================== RESPONSIVE ADAPTATIONS ==================== */
