@@ -608,7 +608,7 @@
 
   function initListMutationObserver() {
     if (typeof window === 'undefined' || typeof MutationObserver === 'undefined' || window.__chappListObserver) return;
-    const viewContainer = document.getElementById('viewContainer');
+    const viewContainer = document.getElementById('moduleContent') || document.getElementById('moduleWorkspace') || document.body;
     if (!viewContainer) return;
     window.__chappListObserver = new MutationObserver(() => {
       if (viewContainer.querySelector('table.o_list_table:not([data-list-enhanced="1"])')) {
@@ -623,7 +623,7 @@
     bindGlobalActionsMenuDismiss();
     initListMutationObserver();
 
-    const container = root || document.getElementById('viewContainer');
+    const container = root || document.getElementById('moduleContent') || document.getElementById('moduleWorkspace') || document.body;
     if (!container) return;
 
     const existingCp = document.getElementById('cpListActionsWrap');

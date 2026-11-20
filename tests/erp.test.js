@@ -3225,6 +3225,7 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     const tableCss = origReadFileSync(path.join(__dirname, '..', 'assets', 'css', 'modules', '06-kanban-tables.css'), 'utf8');
 
     assert.ok(routerJs.includes('function enhanceSelectableListTables'), 'Debe definir enhanceSelectableListTables');
+    assert.ok(routerJs.includes("getElementById('moduleContent')"), 'Debe conectarse al contenedor real #moduleContent');
     assert.ok(routerJs.includes('WORKFLOW_ACTIONS_BY_TYPE'), 'Debe mapear acciones específicas por entidad');
     assert.ok(routerJs.includes('exportSelectedTableRowsCsv'), 'Debe soportar exportación CSV');
     assert.ok(routerJs.includes('printSelectedTableRows'), 'Debe soportar impresión de selección');

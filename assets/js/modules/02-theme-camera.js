@@ -221,6 +221,7 @@
     if (state.currentApp === 'settings') {
       cp.style.display = 'none';
       renderSettingsModule();
+      if (typeof enhanceSelectableListTables === 'function') enhanceSelectableListTables();
       return;
     }
     cp.style.display = 'flex';
