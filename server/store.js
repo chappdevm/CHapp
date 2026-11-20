@@ -1442,6 +1442,23 @@ class ERPStore {
       throw new Error('El nombre del contacto es obligatorio.');
     }
 
+    const vat = String(payload.vat || '').trim();
+    if (vat) {
+      const cleanVat = vat.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      const currentId = payload.id ? Number(payload.id) : null;
+      const dup = (this.data.contacts || []).find((c) => {
+        if (currentId && Number(c.id) === currentId) return false;
+        const cVat = String(c.vat || '').trim();
+        if (!cVat) return false;
+        if (cVat.toLowerCase() === vat.toLowerCase()) return true;
+        const cCleanVat = cVat.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+        return cleanVat.length >= 3 && cleanVat === cCleanVat;
+      });
+      if (dup) {
+        throw new Error(`Ya existe un contacto registrado con este documento (${dup.name} - ${dup.doc_type || 'NIT/CC'}: ${dup.vat}).`);
+      }
+    }
+
     const categories = Array.isArray(payload.category_ids)
       ? payload.category_ids.map((t) => String(t).trim()).filter(Boolean)
       : String(payload.category_ids || '')

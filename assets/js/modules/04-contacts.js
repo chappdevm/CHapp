@@ -535,6 +535,23 @@
             showToast('No hay cambios pendientes por guardar.');
             return;
           }
+          const rawVat = (payload.vat || '').trim();
+          if (rawVat) {
+            const cleanVat = rawVat.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+            const currentId = isNew ? null : Number(existing.id);
+            const dup = (state.data?.contacts || []).find((c) => {
+              if (currentId && Number(c.id) === currentId) return false;
+              const cVat = String(c.vat || '').trim();
+              if (!cVat) return false;
+              if (cVat.toLowerCase() === rawVat.toLowerCase()) return true;
+              const cClean = cVat.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+              return cleanVat.length >= 3 && cleanVat === cClean;
+            });
+            if (dup) {
+              showToast(`Ya existe un contacto registrado con este documento (${dup.name} - ${dup.doc_type || 'NIT/CC'}: ${dup.vat}).`, true);
+              return;
+            }
+          }
           const res = await apiCall('/api/contacts', 'POST', payload);
           if (isNew) {
             state.activeRecordId = null;

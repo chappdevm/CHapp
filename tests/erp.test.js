@@ -138,6 +138,22 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.equal(created.json.contact.doc_type, 'NIT');
     assert.deepEqual(created.json.contact.category_ids, ['VIP', 'Costa']);
 
+    // Edge case: duplicate VAT / NIT rejected
+    const dupVatRes = await req('/api/contacts', 'POST', {
+      name: 'Empresa Duplicada S.A.S.',
+      vat: '901.555.888-0'
+    });
+    assert.equal(dupVatRes.status, 400);
+    assert.match(dupVatRes.json.error, /ya existe un contacto registrado con este documento/i);
+
+    // Edge case: normalized duplicate VAT (ignoring punctuation/dashes) also rejected
+    const dupCleanVatRes = await req('/api/contacts', 'POST', {
+      name: 'Empresa Duplicada Limpia',
+      vat: '9015558880'
+    });
+    assert.equal(dupCleanVatRes.status, 400);
+    assert.match(dupCleanVatRes.json.error, /ya existe un contacto registrado con este documento/i);
+
     // Default city on new contact without city specified is Pereira
     const defaultCityContact = await req('/api/contacts', 'POST', {
       name: 'Comercializadora Risaralda S.A.S.'
