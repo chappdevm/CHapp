@@ -293,6 +293,12 @@ function createHandler(store = new ERPStore(undefined, { useSupabase: isSupabase
           return sendJson(res, 200, { ok: true, order, state: store.getBootstrapState() });
         }
 
+        const saleDelMatch = pathname.match(/^\/api\/sales\/(\d+)$/);
+        if (method === 'DELETE' && saleDelMatch) {
+          const deleted = await store.deleteSaleOrder(Number(saleDelMatch[1]));
+          return sendJson(res, 200, { ok: true, deleted, state: store.getBootstrapState() });
+        }
+
         const saleActionMatch = pathname.match(/^\/api\/sales\/(\d+)\/action$/);
         if (method === 'POST' && saleActionMatch) {
           const body = await readJsonBody(req);
@@ -307,6 +313,12 @@ function createHandler(store = new ERPStore(undefined, { useSupabase: isSupabase
           return sendJson(res, 200, { ok: true, move, state: store.getBootstrapState() });
         }
 
+        const moveDelMatch = pathname.match(/^\/api\/accounting\/moves\/(\d+)$/);
+        if (method === 'DELETE' && moveDelMatch) {
+          const deleted = await store.deleteAccountMove(Number(moveDelMatch[1]));
+          return sendJson(res, 200, { ok: true, deleted, state: store.getBootstrapState() });
+        }
+
         const moveActionMatch = pathname.match(/^\/api\/accounting\/moves\/(\d+)\/action$/);
         if (method === 'POST' && moveActionMatch) {
           const body = await readJsonBody(req);
@@ -314,11 +326,24 @@ function createHandler(store = new ERPStore(undefined, { useSupabase: isSupabase
           return sendJson(res, 200, { ok: true, move, state: store.getBootstrapState() });
         }
 
+        // Accounting Payments DELETE
+        const paymentDelMatch = pathname.match(/^\/api\/accounting\/payments\/(\d+)$/);
+        if (method === 'DELETE' && paymentDelMatch) {
+          const deleted = await store.deletePayment(Number(paymentDelMatch[1]));
+          return sendJson(res, 200, { ok: true, deleted, state: store.getBootstrapState() });
+        }
+
         // Accounting Accounts
         if (method === 'POST' && pathname === '/api/accounting/accounts') {
           const body = await readJsonBody(req);
           const account = await store.saveAccount(body);
           return sendJson(res, 200, { ok: true, account, state: store.getBootstrapState() });
+        }
+
+        const accountDelMatch = pathname.match(/^\/api\/accounting\/accounts\/([^/]+)$/);
+        if (method === 'DELETE' && accountDelMatch) {
+          const deleted = store.deleteAccount(decodeURIComponent(accountDelMatch[1]));
+          return sendJson(res, 200, { ok: true, deleted, state: store.getBootstrapState() });
         }
 
         // Accounting Financial Journals / Accounts

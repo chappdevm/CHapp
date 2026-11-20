@@ -404,4 +404,168 @@
   }
 }
 
+/* ==========================================================================
+   6b. ODOO-STYLE LIST MULTI-SELECTION & ACTIONS MENU
+   ========================================================================== */
+
+.o_list_select_wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  margin-inline-end: 0.55rem;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+}
+
+.o_list_select_all,
+.o_list_record_selector {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--o-action, #14b5d9);
+  cursor: pointer;
+}
+
+.o_list_table tbody tr.is-selected td,
+.o_list_table tbody tr.is-selected th {
+  background-color: rgba(20, 181, 217, 0.14) !important;
+}
+
+.o_list_table tbody tr.is-selected th:first-child,
+.o_list_table tbody tr.is-selected td:first-child {
+  box-shadow: inset 3px 0 0 var(--o-action, #14b5d9);
+}
+
+.o_list_selection_bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.55rem 0.85rem;
+  margin-bottom: 0.65rem;
+  background: var(--o-view-bg);
+  border: 1px solid var(--o-action, #14b5d9);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(20, 181, 217, 0.12);
+}
+
+.o_list_selection_info,
+.o_list_selection_controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.o_list_selected_badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(20, 181, 217, 0.15);
+  color: var(--o-action, #14b5d9);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.o_list_actions_dropdown {
+  position: relative;
+  display: inline-flex;
+}
+
+.o_list_actions_btn,
+.o_list_quick_export_btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.o_list_actions_menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 245px;
+  background: var(--o-view-bg);
+  border: 1px solid var(--o-border-color);
+  border-radius: 8px;
+  padding: 0.35rem;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  z-index: 60;
+}
+
+.o_cp_actions_dropdown .o_list_actions_menu {
+  left: 0;
+  right: auto;
+}
+
+.o_list_action_item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.7rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--o-text-main);
+  font-size: 0.84rem;
+  font-weight: 500;
+  text-align: start;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.o_list_action_item:hover {
+  background: rgba(20, 181, 217, 0.12);
+  color: var(--o-action, #14b5d9);
+}
+
+.o_list_action_item.is-danger {
+  color: #ef4444;
+}
+
+.o_list_action_item.is-danger:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+}
+
+.o_list_actions_divider {
+  height: 1px;
+  margin: 0.3rem 0.25rem;
+  background: var(--o-border-color);
+}
+
+@container (width < 600px) {
+  .o_list_table tbody td:first-child:has(.o_list_select_wrap) {
+    justify-content: flex-start;
+    text-align: start;
+  }
+}
+
+@media (max-width: 600px) {
+  .o_list_table tbody td:first-child:has(.o_list_select_wrap) {
+    justify-content: flex-start;
+  }
+
+  .o_list_selection_bar {
+    padding: 0.65rem;
+  }
+
+  .o_list_actions_btn,
+  .o_list_quick_export_btn,
+  .o_list_clear_btn {
+    min-height: 44px;
+  }
+
+  .o_list_actions_menu {
+    left: 0;
+    right: auto;
+    min-width: min(260px, 84vw);
+  }
+}
+
 

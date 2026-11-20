@@ -749,7 +749,7 @@
               </tr>
             </thead>
             <tbody>
-              ${payments.map((p) => `<tr><th>${esc(p.name)}</th><td>${esc(p.date)}</td><td>${esc(p.journal_name)}</td><td>${esc(p.partner_name)}</td><td>${esc(p.ref)}</td><td class="text-end"><strong>${formatMoney(p.amount)}</strong></td><td><span class="o_badge ${p.payment_type === 'inbound' ? 'o_badge_success' : 'o_badge_warning'}">${p.payment_type === 'inbound' ? 'Recaudo Cliente' : 'Egreso / Pago'}</span></td></tr>`).join('')}
+              ${payments.map((p) => `<tr data-payment-id="${p.id}"><th>${esc(p.name)}</th><td>${esc(p.date)}</td><td>${esc(p.journal_name)}</td><td>${esc(p.partner_name)}</td><td>${esc(p.ref)}</td><td class="text-end"><strong>${formatMoney(p.amount)}</strong></td><td><span class="o_badge ${p.payment_type === 'inbound' ? 'o_badge_success' : 'o_badge_warning'}">${p.payment_type === 'inbound' ? 'Recaudo Cliente' : 'Egreso / Pago'}</span></td></tr>`).join('')}
             </tbody>
           </table>
         </div>
@@ -799,7 +799,7 @@
               </tr>
             </thead>
             <tbody>
-              ${accounts.map((a) => `<tr><th>${esc(a.code)}</th><td>${esc(a.name)}</td><td>${esc(a.type)}</td><td><span class="o_badge ${a.reconcile ? 'o_badge_success' : 'o_badge_muted'}">${a.reconcile ? 'Sí' : 'No'}</span></td></tr>`).join('')}
+              ${accounts.map((a) => `<tr data-account-code="${esc(a.code)}"><th>${esc(a.code)}</th><td>${esc(a.name)}</td><td>${esc(a.type)}</td><td><span class="o_badge ${a.reconcile ? 'o_badge_success' : 'o_badge_muted'}">${a.reconcile ? 'Sí' : 'No'}</span></td></tr>`).join('')}
             </tbody>
           </table>
         </div>

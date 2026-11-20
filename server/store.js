@@ -2643,6 +2643,50 @@ class ERPStore {
     return newOrder;
   }
 
+  async deleteSaleOrder(id) {
+    const idx = this.data.sales.findIndex((s) => Number(s.id) === Number(id));
+    if (idx === -1) throw new Error('Pedido de venta no encontrado.');
+    const order = this.data.sales[idx];
+    const linkedMoves = (this.data.accounting.moves || []).filter(
+      (m) => (order.invoice_ids || []).includes(Number(m.id)) || m.origin === order.name
+    );
+    const hasPostedMoves = linkedMoves.some((m) => m.state === 'posted');
+    if (hasPostedMoves) {
+      throw new Error(`No se puede eliminar el pedido ${order.name} porque tiene facturas publicadas asociadas. Cancele o elimine las facturas primero.`);
+    }
+
+    const removedMoves = [];
+    if (linkedMoves.length > 0) {
+      const linkedIds = new Set(linkedMoves.map((m) => Number(m.id)));
+      this.data.accounting.moves = this.data.accounting.moves.filter((m) => {
+        if (linkedIds.has(Number(m.id))) {
+          removedMoves.push(m);
+          return false;
+        }
+        return true;
+      });
+    }
+
+    const removed = this.data.sales.splice(idx, 1)[0];
+    this.save();
+    if (this.supabase) {
+      try {
+        for (const m of removedMoves) {
+          await this.supabase.deleteAccountMove(m.id);
+        }
+        await this.supabase.deleteSaleOrder(id);
+      } catch (err) {
+        this.data.sales.splice(idx, 0, removed);
+        if (removedMoves.length > 0) {
+          this.data.accounting.moves.unshift(...removedMoves);
+        }
+        this.save();
+        throw err;
+      }
+    }
+    return removed;
+  }
+
   _createSaleInvoiceInternal(order, reqAmount = null, params = {}) {
     this.normalizeSaleContractInstallments(order);
     const existingInvoices = (order.invoice_ids || [])
@@ -3504,6 +3548,122 @@ class ERPStore {
     this.data.accounting.accounts.sort((a, b) => a.code.localeCompare(b.code));
     this.save();
     return acc;
+  }
+
+  deleteAccount(code) {
+    const idx = this.data.accounting.accounts.findIndex((a) => String(a.code) === String(code));
+    if (idx === -1) throw new Error('Cuenta contable no encontrada.');
+    const removed = this.data.accounting.accounts.splice(idx, 1)[0];
+    this.save();
+    return removed;
+  }
+
+  async deleteAccountMove(id) {
+    const idx = this.data.accounting.moves.findIndex((m) => Number(m.id) === Number(id));
+    if (idx === -1) throw new Error('Documento contable no encontrado.');
+    const move = this.data.accounting.moves[idx];
+
+    const oldMoves = [...this.data.accounting.moves];
+    const oldPayments = [...this.data.accounting.payments];
+    const linkedPayments = this.data.accounting.payments.filter((p) => Number(p.move_id) === Number(id));
+    linkedPayments.forEach((p) => {
+      const reversalDelta = p.payment_type === 'inbound' ? -Number(p.amount || 0) : Number(p.amount || 0);
+      this.adjustJournalBalance(p.journal_code, reversalDelta);
+    });
+    this.data.accounting.payments = this.data.accounting.payments.filter((p) => Number(p.move_id) !== Number(id));
+
+    const removed = this.data.accounting.moves.splice(idx, 1)[0];
+    const linkedSale = this.data.sales.find(
+      (s) => (s.invoice_ids || []).includes(Number(move.id)) || s.name === move.origin || s.name === move.ref
+    );
+    const oldSaleSnapshot = linkedSale ? JSON.parse(JSON.stringify(linkedSale)) : null;
+    if (linkedSale) {
+      linkedSale.invoice_ids = (linkedSale.invoice_ids || []).filter((mid) => Number(mid) !== Number(move.id));
+      this.recomputeSaleOrderInvoiceStatus(linkedSale);
+    }
+
+    if (move.move_type === 'in_invoice' && Array.isArray(this.data.inventory_moves)) {
+      this.data.inventory_moves = this.data.inventory_moves.filter(
+        (m) => !(m.origin_type === 'bill' && Number(m.origin_id) === Number(id))
+      );
+      this.recomputeInventoryStock();
+    }
+
+    this.save();
+    if (this.supabase) {
+      try {
+        await this.supabase.deleteAccountMove(id);
+        if (linkedSale) {
+          await this.supabase.saveSaleOrder(linkedSale);
+        }
+      } catch (err) {
+        linkedPayments.forEach((p) => {
+          const restoreDelta = p.payment_type === 'inbound' ? Number(p.amount || 0) : -Number(p.amount || 0);
+          this.adjustJournalBalance(p.journal_code, restoreDelta);
+        });
+        this.data.accounting.moves = oldMoves;
+        this.data.accounting.payments = oldPayments;
+        if (linkedSale && oldSaleSnapshot) Object.assign(linkedSale, oldSaleSnapshot);
+        this.save();
+        throw err;
+      }
+    }
+    return removed;
+  }
+
+  async deletePayment(id) {
+    const idx = this.data.accounting.payments.findIndex((p) => Number(p.id) === Number(id));
+    if (idx === -1) throw new Error('Pago no encontrado.');
+    const payment = this.data.accounting.payments[idx];
+    const reversalDelta = payment.payment_type === 'inbound' ? -Number(payment.amount || 0) : Number(payment.amount || 0);
+    this.adjustJournalBalance(payment.journal_code, reversalDelta);
+
+    const removed = this.data.accounting.payments.splice(idx, 1)[0];
+    const move = payment.move_id
+      ? this.data.accounting.moves.find((m) => Number(m.id) === Number(payment.move_id))
+      : null;
+    const oldMoveSnapshot = move ? JSON.parse(JSON.stringify(move)) : null;
+    let linkedSale = null;
+    let oldSaleSnapshot = null;
+
+    if (move) {
+      const remainingPayments = this.data.accounting.payments.filter((p) => Number(p.move_id) === Number(move.id));
+      const paidTotal = round2(remainingPayments.reduce((s, p) => s + Number(p.amount || 0), 0));
+      move.payments_history = Array.isArray(move.payments_history)
+        ? move.payments_history.filter((ph) => ph.payment_name !== payment.name)
+        : [];
+      move.amount_residual = Math.max(0, round2(Number(move.amount_total || 0) - paidTotal));
+      move.payment_state = move.amount_residual <= 0.001
+        ? 'paid'
+        : (paidTotal > 0 ? 'partial' : 'not_paid');
+      if (move.payment_state === 'paid') move.amount_residual = 0;
+
+      linkedSale = this.data.sales.find(
+        (s) => (s.invoice_ids || []).includes(Number(move.id)) || s.name === move.origin || s.name === move.ref
+      );
+      if (linkedSale) {
+        oldSaleSnapshot = JSON.parse(JSON.stringify(linkedSale));
+        this.recomputeSaleOrderInvoiceStatus(linkedSale);
+      }
+    }
+
+    this.save();
+    if (this.supabase) {
+      try {
+        await this.supabase.deletePayment(id);
+        if (move) await this.supabase.saveAccountMove(move);
+        if (linkedSale) await this.supabase.saveSaleOrder(linkedSale);
+      } catch (err) {
+        const restoreDelta = payment.payment_type === 'inbound' ? Number(payment.amount || 0) : -Number(payment.amount || 0);
+        this.adjustJournalBalance(payment.journal_code, restoreDelta);
+        this.data.accounting.payments.splice(idx, 0, removed);
+        if (move && oldMoveSnapshot) Object.assign(move, oldMoveSnapshot);
+        if (linkedSale && oldSaleSnapshot) Object.assign(linkedSale, oldSaleSnapshot);
+        this.save();
+        throw err;
+      }
+    }
+    return removed;
   }
 
   // ==================== AJUSTES (res.config.settings) ====================

@@ -3146,5 +3146,106 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.equal(invoice.amount_financing, 100000, 'La factura debe conservar el monto de financiación');
     assert.equal(invoice.amount_total, 1100000);
   });
+
+  it('Listas Seleccionables Universales, Menú de Acciones Estilo Odoo y Endpoints de Eliminación', async () => {
+    // 1. Verificar DELETE /api/sales/:id (cotización eliminable vs pedido con factura publicada bloqueado)
+    const partnerRes = await req('/api/contacts', 'POST', { name: 'Cliente Test Selección Odoo', vat: '901222333-1' });
+    assert.equal(partnerRes.status, 200);
+    const partnerId = partnerRes.json.contact.id;
+
+    const prodRes = await req('/api/products', 'POST', { name: 'Puerta Glass Odoo', list_price: 500000, standard_price: 250000, tax_rate: 0 });
+    assert.equal(prodRes.status, 200);
+    const prodId = prodRes.json.product.id;
+
+    const draftSaleRes = await req('/api/sales', 'POST', {
+      partner_id: partnerId,
+      lines: [{ product_id: prodId, description: 'Puerta Glass Odoo', quantity: 1, price_unit: 500000, tax_rate: 0 }]
+    });
+    assert.equal(draftSaleRes.status, 200);
+    const draftSaleId = draftSaleRes.json.order.id;
+
+    const delDraftSaleRes = await req(`/api/sales/${draftSaleId}`, 'DELETE');
+    assert.equal(delDraftSaleRes.status, 200, 'Debe permitir eliminar cotización sin facturas publicadas');
+    assert.ok(!delDraftSaleRes.json.state.sales.some((s) => s.id === draftSaleId));
+
+    // Crear pedido y entregarlo (genera factura publicada)
+    const saleRes = await req('/api/sales', 'POST', {
+      partner_id: partnerId,
+      payment_term: 'Contado',
+      lines: [{ product_id: prodId, description: 'Puerta Glass Odoo', quantity: 2, price_unit: 500000, tax_rate: 0 }]
+    });
+    const orderId = saleRes.json.order.id;
+    await req(`/api/sales/${orderId}/action`, 'POST', { action: 'confirm' });
+    const delivRes = await req(`/api/sales/${orderId}/action`, 'POST', { action: 'deliver' });
+    assert.equal(delivRes.status, 200);
+    const invId = delivRes.json.invoice.id;
+
+    // Intentar eliminar pedido con factura publicada debe bloquearse
+    const blockedSaleDel = await req(`/api/sales/${orderId}`, 'DELETE');
+    assert.equal(blockedSaleDel.status, 400);
+    assert.match(blockedSaleDel.json.error, /facturas publicadas/i);
+
+    // 2. Registrar pago en factura y probar DELETE /api/accounting/payments/:id (reversión)
+    const payRes = await req(`/api/accounting/moves/${invId}/action`, 'POST', {
+      action: 'register_payment',
+      amount: 1000000,
+      journal_code: 'BNK1',
+      date: '2026-11-20'
+    });
+    assert.equal(payRes.status, 200);
+    const createdPayment = payRes.json.state.accounting.payments.find((p) => Number(p.move_id) === Number(invId));
+    assert.ok(createdPayment, 'Debe existir el comprobante de pago vinculado');
+
+    const delPayRes = await req(`/api/accounting/payments/${createdPayment.id}`, 'DELETE');
+    assert.equal(delPayRes.status, 200);
+    const invAfterPayDel = delPayRes.json.state.accounting.moves.find((m) => m.id === invId);
+    assert.equal(invAfterPayDel.payment_state, 'not_paid', 'Eliminar pago debe restablecer estado de pago de factura');
+    assert.equal(invAfterPayDel.amount_residual, 1000000, 'Eliminar pago debe restaurar el saldo pendiente');
+
+    // 3. Eliminar factura y luego permitir eliminar el pedido
+    const delInvRes = await req(`/api/accounting/moves/${invId}`, 'DELETE');
+    assert.equal(delInvRes.status, 200);
+    const saleAfterInvDel = delInvRes.json.state.sales.find((s) => s.id === orderId);
+    assert.equal(saleAfterInvDel.invoice_ids.length, 0, 'Debe desvincular la factura eliminada del pedido');
+
+    const nowAllowedSaleDel = await req(`/api/sales/${orderId}`, 'DELETE');
+    assert.equal(nowAllowedSaleDel.status, 200);
+
+    // 4. Verificación de cuentas contables DELETE /api/accounting/accounts/:code
+    const accAdd = await req('/api/accounting/accounts', 'POST', { code: '519999', name: 'Cuenta Test Del', type: 'Gastos Operacionales' });
+    assert.equal(accAdd.status, 200);
+    const accDel = await req('/api/accounting/accounts/519999', 'DELETE');
+    assert.equal(accDel.status, 200);
+
+    // 5. Contratos Frontend: engine universal de listas seleccionables, CSV export y Acciones
+    const routerJs = origReadFileSync(path.join(__dirname, '..', 'assets', 'js', 'modules', '03-router-control-panel.js'), 'utf8');
+    const themeJs = origReadFileSync(path.join(__dirname, '..', 'assets', 'js', 'modules', '02-theme-camera.js'), 'utf8');
+    const accDashJs = origReadFileSync(path.join(__dirname, '..', 'assets', 'js', 'modules', '12-accounting-dashboard.js'), 'utf8');
+    const invJs = origReadFileSync(path.join(__dirname, '..', 'assets', 'js', 'modules', '15-inventory.js'), 'utf8');
+    const tableCss = origReadFileSync(path.join(__dirname, '..', 'assets', 'css', 'modules', '06-kanban-tables.css'), 'utf8');
+
+    assert.ok(routerJs.includes('function enhanceSelectableListTables'), 'Debe definir enhanceSelectableListTables');
+    assert.ok(routerJs.includes('WORKFLOW_ACTIONS_BY_TYPE'), 'Debe mapear acciones específicas por entidad');
+    assert.ok(routerJs.includes('exportSelectedTableRowsCsv'), 'Debe soportar exportación CSV');
+    assert.ok(routerJs.includes('printSelectedTableRows'), 'Debe soportar impresión de selección');
+    assert.ok(routerJs.includes('MutationObserver'), 'Debe observar re-renderizados de tablas en subpestañas');
+    assert.ok(routerJs.includes('o_list_selection_bar') && routerJs.includes('o_list_actions_menu'), 'Debe construir barra de selección y menú Acciones');
+    assert.ok(themeJs.includes('enhanceSelectableListTables()'), 'renderModuleWorkspace debe activar la selección universal');
+    assert.ok(accDashJs.includes('data-payment-id=') && accDashJs.includes('data-account-code='), 'Pagos y cuentas deben exponer IDs seleccionables');
+    assert.ok(invJs.includes('data-inv-move-id='), 'Kardex de inventario debe exponer data-inv-move-id');
+    assert.ok(tableCss.includes('.o_list_selection_bar') && tableCss.includes('.o_list_actions_menu'), '06-kanban-tables.css debe estilar la barra y menú');
+
+    // Cero emojis en botones y estricto límite < 900 líneas
+    const btnEmojiRegex = /<button[\s\S]*?<\/button>/gi;
+    const emojiCheck = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u;
+    [routerJs, themeJs, accDashJs, invJs].forEach((content) => {
+      const btns = content.match(btnEmojiRegex) || [];
+      for (const b of btns) assert.ok(!emojiCheck.test(b), `Emoji prohibido en botón: ${b}`);
+    });
+    ['assets/js/modules/03-router-control-panel.js', 'assets/js/modules/02-theme-camera.js', 'assets/js/modules/12-accounting-dashboard.js', 'assets/js/modules/15-inventory.js', 'assets/css/modules/06-kanban-tables.css'].forEach((rel) => {
+      const lc = origReadFileSync(path.join(__dirname, '..', rel), 'utf8').split(/\r?\n/).length;
+      assert.ok(lc < 900, `${rel} tiene ${lc} líneas (límite < 900)`);
+    });
+  });
 });
 

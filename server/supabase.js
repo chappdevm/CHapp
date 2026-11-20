@@ -1148,6 +1148,50 @@ class SupabasePersistence {
     return res.data;
   }
 
+  async deleteSaleOrder(id) {
+    if (!this.isReady()) return;
+    const lineRes = await callPostgrest(`/sale_order_line?order_id=eq.${id}`, { method: 'DELETE' });
+    if (!lineRes.ok && lineRes.status !== 404) {
+      const errMsg = formatSupabaseError(`Error eliminando líneas del pedido ${id}`, lineRes);
+      console.error(errMsg);
+      throw new Error(errMsg);
+    }
+    const res = await callPostgrest(`/sale_order?id=eq.${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const errMsg = formatSupabaseError(`Error eliminando pedido de venta ${id}`, res);
+      console.error(errMsg);
+      throw new Error(errMsg);
+    }
+    return res.data;
+  }
+
+  async deleteAccountMove(id) {
+    if (!this.isReady()) return;
+    await this.deletePaymentsByMoveId(id);
+    const res = await callPostgrest(`/account_move?id=eq.${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const errMsg = formatSupabaseError(`Error eliminando documento contable ${id}`, res);
+      console.error(errMsg);
+      throw new Error(errMsg);
+    }
+    return res.data;
+  }
+
+  async deletePayment(id) {
+    if (!this.isReady() || this.tableSupport.account_payment === false) return;
+    const res = await callPostgrest(`/account_payment?id=eq.${id}`, { method: 'DELETE' });
+    if (res.status === 404) {
+      this.tableSupport.account_payment = false;
+      return null;
+    }
+    if (!res.ok) {
+      const errMsg = formatSupabaseError(`Error eliminando pago ${id}`, res);
+      console.error(errMsg);
+      throw new Error(errMsg);
+    }
+    return res.data;
+  }
+
   async saveExpense(expense) {
     if (!this.isReady()) return;
     const payload = serializeExpense(expense);

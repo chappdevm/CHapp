@@ -350,7 +350,7 @@
                    </td>
                  </tr>`
               : moves.map((m) => `
-                  <tr>
+                  <tr data-inv-move-id="${m.id}" data-expense-id="${m.origin_id || ''}">
                     <td>${esc(m.date || '')}</td>
                     <td>
                       <span class="o_stock_movement_tag btn-link-expense" data-exp-id="${m.origin_id}" style="cursor: pointer;" title="Ver gasto asociado ${esc(m.origin_ref || '')}">
@@ -482,7 +482,7 @@
                            </td>
                          </tr>`
                       : moves.map((m) => `
-                          <tr>
+                          <tr data-inv-move-id="${m.id}" data-expense-id="${m.origin_id || ''}">
                             <td>${esc(m.date || '')}</td>
                             <td>
                               <span class="o_stock_movement_tag btn-link-expense" data-exp-id="${m.origin_id}" style="cursor: pointer;">

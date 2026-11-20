@@ -232,6 +232,10 @@
     else if (state.currentApp === 'sales') renderSalesModule();
     else if (state.currentApp === 'accounting') renderAccountingModule();
     else if (state.currentApp === 'inventory') renderInventoryModule();
+
+    if (typeof enhanceSelectableListTables === 'function') {
+      enhanceSelectableListTables();
+    }
   }
 
   
