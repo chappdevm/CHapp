@@ -540,10 +540,13 @@
   }
 
   // ==================== COMMAND PALETTE (Ctrl+K) ====================
+  let activeCmdIndex = 0;
+
   function openCommandPalette() {
     const dialog = document.getElementById('commandPaletteDialog');
     const input = document.getElementById('commandPaletteInput');
     if (!dialog) return;
+    activeCmdIndex = 0;
     input.value = '';
     renderCommandPaletteResults('');
     dialog.showModal();
@@ -553,67 +556,159 @@
   function renderCommandPaletteResults(query) {
     const resultsEl = document.getElementById('commandPaletteResults');
     if (!resultsEl || !state.data) return;
-    const q = query.trim().toLowerCase();
+    const rawQ = (query || '').trim();
+    const qNorm = typeof normalizeSearchText === 'function' ? normalizeSearchText(rawQ) : rawQ.toLowerCase();
 
     const items = [];
+
+    // 1. Navigation items (Apps and Submenus)
     APPS.forEach((a) => {
-      if (!q || a.name.toLowerCase().includes(q)) {
-        items.push({ type: 'Módulo', label: `Abrir módulo: ${a.name}`, action: () => openApp(a.id) });
-      }
-    });
-    (state.data.contacts || []).forEach((c) => {
-      if (q && (c.name.toLowerCase().includes(q) || (c.vat || '').toLowerCase().includes(q))) {
-        items.push({ type: 'Contacto', label: `${c.name} (${c.vat || ''})`, action: () => openApp('contacts', { viewType: 'form', recordId: c.id }) });
-      }
-    });
-    (state.data.expenses || []).forEach((e) => {
-      if (
-        q &&
-        ((e.reference || '').toLowerCase().includes(q) ||
-          (e.name || '').toLowerCase().includes(q) ||
-          (e.employee_name || '').toLowerCase().includes(q))
-      ) {
+      const aNorm = typeof normalizeSearchText === 'function' ? normalizeSearchText(a.name) : a.name.toLowerCase();
+      if (!qNorm || aNorm.includes(qNorm)) {
         items.push({
-          type: 'Gasto',
-          label: `${e.reference} — ${e.name} (${formatMoney(e.total_amount)})`,
-          action: () => openApp('expenses', { viewType: 'form', recordId: e.id })
+          type: 'Módulo',
+          label: `Abrir módulo: ${a.name}`,
+          action: () => openApp(a.id)
         });
       }
-    });
-    (state.data.sales || []).forEach((s) => {
-      if (q && (s.name.toLowerCase().includes(q) || s.partner_name.toLowerCase().includes(q))) {
-        items.push({ type: 'Venta', label: `${s.name} — ${s.partner_name} (${formatMoney(s.amount_total)})`, action: () => openApp('sales', { viewType: 'form', recordId: s.id }) });
-      }
-    });
-    (state.data.products || []).forEach((p) => {
-      if (q && ((p.name || '').toLowerCase().includes(q) || (p.default_code || '').toLowerCase().includes(q))) {
-        items.push({
-          type: 'Producto',
-          label: `[${p.default_code}] ${p.name} (${formatMoney(p.list_price)})`,
-          action: () => openApp('sales', { submenu: 'products', viewType: 'form', recordId: p.id })
-        });
-      }
-    });
-    (state.data.accounting.moves || []).forEach((m) => {
-      if (q && (m.name.toLowerCase().includes(q) || m.partner_name.toLowerCase().includes(q))) {
-        items.push({
-          type: 'Contabilidad',
-          label: `${m.name} — ${m.partner_name} (${formatMoney(m.amount_total)})`,
-          action: () =>
-            openApp('accounting', {
-              submenu: m.move_type === 'in_invoice' ? 'in_invoice' : m.move_type === 'out_invoice' ? 'out_invoice' : 'entries',
-              viewType: 'form',
-              recordId: m.id
-            })
-        });
-      }
+      (a.submenus || []).forEach((sub) => {
+        const subNorm = typeof normalizeSearchText === 'function' ? normalizeSearchText(sub.label) : sub.label.toLowerCase();
+        const matchesSub = qNorm && subNorm.includes(qNorm);
+        const matchesAlias = qNorm && (
+          (qNorm.includes('factur') && (sub.id === 'out_invoice' || sub.id === 'in_invoice')) ||
+          (qNorm.includes('client') && (sub.id === 'customers' || sub.id === 'out_invoice')) ||
+          (qNorm.includes('proveed') && (sub.id === 'suppliers' || sub.id === 'in_invoice')) ||
+          (qNorm.includes('pedid') && sub.id === 'orders') ||
+          (qNorm.includes('cotiz') && sub.id === 'quotations') ||
+          (qNorm.includes('product') && sub.id === 'products') ||
+          ((qNorm.includes('stock') || qNorm.includes('inventar') || qNorm.includes('existenc')) && sub.id === 'stock') ||
+          (qNorm.includes('pago') && sub.id === 'payments')
+        );
+
+        if (matchesSub || matchesAlias) {
+          items.push({
+            type: 'Menú',
+            label: `${a.name} / ${sub.label}`,
+            action: () => openApp(a.id, { submenu: sub.id })
+          });
+        }
+      });
     });
 
-    resultsEl.innerHTML = items
-      .slice(0, 12)
+    if (qNorm) {
+      // 2. Facturas y Asientos Contables
+      const isInvoiceQuery = qNorm.includes('factur') || qNorm.includes('inv') || qNorm.includes('bill');
+      (state.data.accounting?.moves || []).forEach((m) => {
+        const nameNorm = typeof normalizeSearchText === 'function' ? normalizeSearchText(m.name) : (m.name || '').toLowerCase();
+        const partnerNorm = typeof normalizeSearchText === 'function' ? normalizeSearchText(m.partner_name) : (m.partner_name || '').toLowerCase();
+        const originNorm = typeof normalizeSearchText === 'function' ? normalizeSearchText(m.invoice_origin) : (m.invoice_origin || '').toLowerCase();
+        if (
+          isInvoiceQuery ||
+          nameNorm.includes(qNorm) ||
+          partnerNorm.includes(qNorm) ||
+          originNorm.includes(qNorm)
+        ) {
+          const moveTitle = m.move_type === 'in_invoice' ? 'Factura Proveedor' : m.move_type === 'out_invoice' ? 'Factura Cliente' : 'Asiento Contable';
+          items.push({
+            type: 'Contabilidad',
+            label: `${moveTitle}: ${m.name} — ${m.partner_name || 'Sin contacto'} (${formatMoney(m.amount_total)})`,
+            action: () =>
+              openApp('accounting', {
+                submenu: m.move_type === 'in_invoice' ? 'in_invoice' : m.move_type === 'out_invoice' ? 'out_invoice' : 'entries',
+                viewType: 'form',
+                recordId: m.id
+              })
+          });
+        }
+      });
+
+      // 3. Contactos
+      const isClientQuery = qNorm.includes('client');
+      const isSupplierQuery = qNorm.includes('proveed');
+      (state.data.contacts || []).forEach((c) => {
+        const nameNorm = typeof normalizeSearchText === 'function' ? normalizeSearchText(c.name) : (c.name || '').toLowerCase();
+        const vatNorm = typeof normalizeSearchText === 'function' ? normalizeSearchText(c.vat) : (c.vat || '').toLowerCase();
+        const phoneNorm = typeof normalizeSearchText === 'function' ? normalizeSearchText(c.phone || c.mobile) : (c.phone || c.mobile || '').toLowerCase();
+        const emailNorm = typeof normalizeSearchText === 'function' ? normalizeSearchText(c.email) : (c.email || '').toLowerCase();
+        const isClient = c.is_customer !== false && c.supplier_rank === 0;
+        const isSupplier = c.supplier_rank > 0;
+
+        if (
+          (isClientQuery && isClient) ||
+          (isSupplierQuery && isSupplier) ||
+          nameNorm.includes(qNorm) ||
+          vatNorm.includes(qNorm) ||
+          phoneNorm.includes(qNorm) ||
+          emailNorm.includes(qNorm)
+        ) {
+          const roleLabel = isSupplier ? 'Proveedor' : c.is_company ? 'Compañía' : 'Cliente';
+          items.push({
+            type: 'Contacto',
+            label: `${c.name} [${roleLabel}] ${c.vat ? `(NIT/CC: ${c.vat})` : ''}`,
+            action: () => openApp('contacts', { viewType: 'form', recordId: c.id })
+          });
+        }
+      });
+
+      // 4. Ventas (Cotizaciones y Pedidos)
+      const isSaleQuery = qNorm.includes('pedid') || qNorm.includes('cotiz') || qNorm.includes('vent');
+      (state.data.sales || []).forEach((s) => {
+        const nameNorm = typeof normalizeSearchText === 'function' ? normalizeSearchText(s.name) : (s.name || '').toLowerCase();
+        const partnerNorm = typeof normalizeSearchText === 'function' ? normalizeSearchText(s.partner_name) : (s.partner_name || '').toLowerCase();
+        if (isSaleQuery || nameNorm.includes(qNorm) || partnerNorm.includes(qNorm)) {
+          const typeLabel = s.state === 'draft' || s.state === 'sent' ? 'Cotización' : 'Pedido de Venta';
+          items.push({
+            type: 'Ventas',
+            label: `${typeLabel} ${s.name} — ${s.partner_name} (${formatMoney(s.amount_total)})`,
+            action: () => openApp('sales', { viewType: 'form', recordId: s.id })
+          });
+        }
+      });
+
+      // 5. Productos / Insumos
+      const isProductQuery = qNorm.includes('product') || qNorm.includes('insum');
+      (state.data.products || []).forEach((p) => {
+        const nameNorm = typeof normalizeSearchText === 'function' ? normalizeSearchText(p.name) : (p.name || '').toLowerCase();
+        const codeNorm = typeof normalizeSearchText === 'function' ? normalizeSearchText(p.default_code) : (p.default_code || '').toLowerCase();
+        if (isProductQuery || nameNorm.includes(qNorm) || codeNorm.includes(qNorm)) {
+          items.push({
+            type: 'Producto',
+            label: `[${p.default_code || 'PROD'}] ${p.name} (${formatMoney(p.list_price)})`,
+            action: () => openApp('sales', { submenu: 'products', viewType: 'form', recordId: p.id })
+          });
+        }
+      });
+
+      // 6. Gastos
+      const isExpenseQuery = qNorm.includes('gast');
+      (state.data.expenses || []).forEach((e) => {
+        const refNorm = typeof normalizeSearchText === 'function' ? normalizeSearchText(e.reference) : (e.reference || '').toLowerCase();
+        const nameNorm = typeof normalizeSearchText === 'function' ? normalizeSearchText(e.name) : (e.name || '').toLowerCase();
+        const empNorm = typeof normalizeSearchText === 'function' ? normalizeSearchText(e.employee_name) : (e.employee_name || '').toLowerCase();
+        if (isExpenseQuery || refNorm.includes(qNorm) || nameNorm.includes(qNorm) || empNorm.includes(qNorm)) {
+          items.push({
+            type: 'Gasto',
+            label: `${e.reference || 'EXP'} — ${e.name} (${formatMoney(e.total_amount)})`,
+            action: () => openApp('expenses', { viewType: 'form', recordId: e.id })
+          });
+        }
+      });
+    }
+
+    const displayedItems = items.slice(0, 16);
+    window._currentCmdItems = displayedItems;
+
+    if (displayedItems.length === 0) {
+      resultsEl.innerHTML = `<div style="text-align: center; color: var(--o-text-muted); padding: 1.5rem; font-size: 0.9rem;">No se encontraron resultados para "${esc(rawQ)}"</div>`;
+      return;
+    }
+
+    if (activeCmdIndex >= displayedItems.length) activeCmdIndex = 0;
+
+    resultsEl.innerHTML = displayedItems
       .map(
         (it, i) => `
-        <button type="button" class="o_cmd_entry" data-cmd-idx="${i}">
+        <button type="button" class="o_cmd_entry"${i === activeCmdIndex ? ' data-focused="true"' : ''} data-cmd-idx="${i}">
           <span class="o_cmd_label">${esc(it.label)}</span>
           <span class="o_badge o_badge_info">${esc(it.type)}</span>
         </button>
@@ -625,7 +720,7 @@
       btn.addEventListener('click', () => {
         const idx = Number(btn.getAttribute('data-cmd-idx'));
         document.getElementById('commandPaletteDialog').close();
-        items[idx].action();
+        if (displayedItems[idx]) displayedItems[idx].action();
       });
     });
   }

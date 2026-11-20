@@ -78,14 +78,14 @@
     const searchWrapper = document.getElementById('homeSearchBarWrapper');
     if (!grid) return;
 
-    const q = state.homeSearchQuery.trim().toLowerCase();
-    if (q) {
+    const rawQ = (state.homeSearchQuery || '').trim();
+    if (rawQ) {
       searchWrapper.classList.add('is-visible');
     } else {
       searchWrapper.classList.remove('is-visible');
     }
 
-    const filtered = APPS.filter((a) => a.name.toLowerCase().includes(q));
+    const filtered = typeof getFilteredHomeApps === 'function' ? getFilteredHomeApps(rawQ) : APPS.filter((a) => a.name.toLowerCase().includes(rawQ.toLowerCase()));
     if (state.homeFocusedIndex >= filtered.length) {
       state.homeFocusedIndex = 0;
     }
@@ -102,14 +102,15 @@
           href="#${esc(app.id)}"
           role="option"
           aria-selected="${idx === state.homeFocusedIndex ? 'true' : 'false'}"
-          class="o_app o_menuitem ${q && idx === state.homeFocusedIndex ? 'o_focused' : ''}"
+          class="o_app o_menuitem ${rawQ && idx === state.homeFocusedIndex ? 'o_focused' : ''}"
           data-app-id="${esc(app.id)}"
+          data-submenu-id="${esc(app.matchedSubmenu || '')}"
           data-menu-xmlid="${esc(app.xmlid)}"
         >
           <div class="o_app_icon">
             <img src="${esc(app.icon)}" alt="${esc(app.name)}" />
           </div>
-          <div class="o_caption">${esc(app.name)}</div>
+          <div class="o_caption">${esc(app.name)}${app.matchedSubmenuLabel ? `<span style="display:block;font-size:0.75rem;opacity:0.85;font-weight:normal;margin-top:2px;">${esc(app.matchedSubmenuLabel)}</span>` : ''}</div>
         </a>
       `
       )
@@ -119,7 +120,8 @@
       el.addEventListener('click', (e) => {
         e.preventDefault();
         const appId = el.getAttribute('data-app-id');
-        openApp(appId);
+        const subId = el.getAttribute('data-submenu-id');
+        openApp(appId, subId ? { submenu: subId } : {});
       });
     });
   }

@@ -8,7 +8,7 @@
     {
       id: 'contacts',
       name: 'Contactos',
-      icon: '/assets/icons/contacts.png?v=2.38',
+      icon: '/assets/icons/contacts.png?v=2.39',
       xmlid: 'contacts.menu_contacts',
       defaultSubmenu: 'all',
       defaultView: 'list',
@@ -22,7 +22,7 @@
     {
       id: 'expenses',
       name: 'Gastos',
-      icon: '/assets/icons/expenses.png?v=2.38',
+      icon: '/assets/icons/expenses.png?v=2.39',
       xmlid: 'hr_expense.menu_hr_expense_root',
       defaultSubmenu: 'all',
       defaultView: 'list',
@@ -31,7 +31,7 @@
     {
       id: 'sales',
       name: 'Ventas',
-      icon: '/assets/icons/sales.png?v=2.38',
+      icon: '/assets/icons/sales.png?v=2.39',
       xmlid: 'sale.sale_menu_root',
       defaultSubmenu: 'all',
       defaultView: 'list',
@@ -45,7 +45,7 @@
     {
       id: 'accounting',
       name: 'Contabilidad',
-      icon: '/assets/icons/accounting.png?v=2.38',
+      icon: '/assets/icons/accounting.png?v=2.39',
       xmlid: 'account.menu_finance',
       defaultSubmenu: 'dashboard',
       defaultView: 'list',
@@ -59,7 +59,7 @@
     {
       id: 'inventory',
       name: 'Inventario',
-      icon: '/assets/icons/inventory.png?v=2.38',
+      icon: '/assets/icons/inventory.png?v=2.39',
       xmlid: 'stock.menu_stock_root',
       defaultSubmenu: 'stock',
       defaultView: 'list',
@@ -71,7 +71,7 @@
     {
       id: 'settings',
       name: 'Ajustes',
-      icon: '/assets/icons/settings.png?v=2.38',
+      icon: '/assets/icons/settings.png?v=2.39',
       xmlid: 'base.menu_administration',
       defaultSubmenu: 'general',
       defaultView: 'form',
@@ -358,5 +358,59 @@
         });
       }
     });
+  }
+
+  // ==================== SEARCH & PALETTE UTILITIES ====================
+  function normalizeSearchText(str) {
+    return (str || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
+  }
+
+  function getFilteredHomeApps(query) {
+    const q = normalizeSearchText(query);
+    if (!q) return APPS.map((a) => ({ ...a, matchedSubmenu: null, matchedSubmenuLabel: null }));
+
+    const matches = [];
+    APPS.forEach((app) => {
+      const appNameNorm = normalizeSearchText(app.name);
+      let appMatches = appNameNorm.includes(q);
+
+      // Check submenus
+      let matchedSub = (app.submenus || []).find((s) => {
+        const subLabelNorm = normalizeSearchText(s.label);
+        return subLabelNorm.includes(q);
+      });
+
+      // Semantic aliases for Colombian ERP workflows
+      if (!matchedSub) {
+        if ((q.includes('factur') || q === 'fac') && app.id === 'accounting') {
+          matchedSub = (app.submenus || []).find((s) => s.id === 'out_invoice') || (app.submenus || [])[1];
+        } else if ((q.includes('client') || q === 'cli') && (app.id === 'contacts' || app.id === 'accounting')) {
+          matchedSub = (app.submenus || []).find((s) => s.id === 'customers' || s.id === 'out_invoice');
+        } else if ((q.includes('proveed') || q === 'prov') && (app.id === 'contacts' || app.id === 'accounting' || app.id === 'expenses')) {
+          matchedSub = (app.submenus || []).find((s) => s.id === 'suppliers' || s.id === 'in_invoice');
+        } else if ((q.includes('pedid') || q === 'ped' || q.includes('cotiz') || q === 'cot') && app.id === 'sales') {
+          matchedSub = (app.submenus || []).find((s) => q.includes('cotiz') ? s.id === 'quotations' : s.id === 'orders');
+        } else if ((q.includes('product') || q === 'prod' || q.includes('insum')) && app.id === 'sales') {
+          matchedSub = (app.submenus || []).find((s) => s.id === 'products');
+        } else if ((q.includes('stock') || q.includes('existenc') || q.includes('inventari')) && app.id === 'inventory') {
+          matchedSub = (app.submenus || []).find((s) => s.id === 'stock');
+        } else if ((q.includes('pago') || q === 'pag') && app.id === 'accounting') {
+          matchedSub = (app.submenus || []).find((s) => s.id === 'payments');
+        }
+      }
+
+      if (appMatches || matchedSub) {
+        matches.push({
+          ...app,
+          matchedSubmenu: matchedSub ? matchedSub.id : null,
+          matchedSubmenuLabel: matchedSub ? matchedSub.label : null
+        });
+      }
+    });
+    return matches;
   }
 

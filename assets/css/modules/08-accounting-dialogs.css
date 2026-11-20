@@ -250,7 +250,9 @@ dialog.o_dialog::backdrop {
 }
 
 .o_cmd_entry:hover,
-.o_cmd_entry:focus {
+.o_cmd_entry:focus,
+.o_cmd_entry[data-focused="true"],
+.o_cmd_entry.o_focused {
   background: var(--o-gray-200);
   border-color: var(--o-action);
 }
