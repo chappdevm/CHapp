@@ -430,11 +430,11 @@
               </div>
               <div class="o_field_row">
                 <label for="fContactPhone">Teléfono Fijo</label>
-                <input type="text" id="fContactPhone" class="o_input" value="${esc(existing.phone)}" />
+                <input type="tel" id="fContactPhone" class="o_input" value="${esc(existing.phone)}" placeholder="Ej. (606) 334-5566 o 3345566" maxlength="15" autocomplete="tel" />
               </div>
               <div class="o_field_row">
                 <label for="fContactMobile">Móvil / WhatsApp</label>
-                <input type="text" id="fContactMobile" class="o_input" value="${esc(existing.mobile)}" />
+                <input type="tel" id="fContactMobile" class="o_input" value="${esc(existing.mobile)}" placeholder="Ej. 310 456 7890 o +57 310 456 7890" maxlength="16" autocomplete="tel" />
               </div>
               <div class="o_field_row">
                 <label for="fContactStreet">Dirección Fiscal</label>
@@ -507,6 +507,19 @@
       });
     });
 
+    const phoneInput = document.getElementById('fContactPhone');
+    if (phoneInput) {
+      phoneInput.addEventListener('input', () => {
+        phoneInput.value = phoneInput.value.replace(/[^0-9+\s()-]/g, '');
+      });
+    }
+    const mobileInput = document.getElementById('fContactMobile');
+    if (mobileInput) {
+      mobileInput.addEventListener('input', () => {
+        mobileInput.value = mobileInput.value.replace(/[^0-9+\s()-]/g, '');
+      });
+    }
+
     const btnSaveContactEl = document.getElementById('btnSaveContact');
     if (btnSaveContactEl) {
       btnSaveContactEl.addEventListener('click', () => {
@@ -552,6 +565,35 @@
               return;
             }
           }
+
+          // Validación de Teléfono Fijo
+          const rawPhone = (payload.phone || '').trim();
+          if (rawPhone) {
+            if (/[a-zA-Z]/.test(rawPhone)) {
+              showToast('El teléfono fijo no puede contener letras.', true);
+              return;
+            }
+            const digitsPhone = rawPhone.replace(/\D/g, '');
+            if (digitsPhone.length < 7 || digitsPhone.length > 12) {
+              showToast('El teléfono fijo debe tener entre 7 y 10 dígitos (o hasta 12 con código de país).', true);
+              return;
+            }
+          }
+
+          // Validación de Móvil / WhatsApp
+          const rawMobile = (payload.mobile || '').trim();
+          if (rawMobile) {
+            if (/[a-zA-Z]/.test(rawMobile)) {
+              showToast('El número móvil/WhatsApp no puede contener letras.', true);
+              return;
+            }
+            const digitsMobile = rawMobile.replace(/\D/g, '');
+            if (digitsMobile.length < 10 || digitsMobile.length > 13) {
+              showToast('El número móvil/WhatsApp no es válido. Debe tener entre 10 y 12 dígitos (ej. 310 123 4567).', true);
+              return;
+            }
+          }
+
           const res = await apiCall('/api/contacts', 'POST', payload);
           if (isNew) {
             state.activeRecordId = null;

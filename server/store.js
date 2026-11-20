@@ -1459,6 +1459,30 @@ class ERPStore {
       }
     }
 
+    // Validación de Teléfono Fijo
+    const rawPhone = payload.phone !== undefined ? String(payload.phone).trim() : '';
+    if (rawPhone) {
+      if (/[a-zA-Z]/.test(rawPhone)) {
+        throw new Error('El teléfono fijo no puede contener letras.');
+      }
+      const digitsPhone = rawPhone.replace(/\D/g, '');
+      if (digitsPhone.length < 7 || digitsPhone.length > 12) {
+        throw new Error('El teléfono fijo debe tener entre 7 y 10 dígitos (o hasta 12 con prefijo nacional/internacional).');
+      }
+    }
+
+    // Validación de Móvil / WhatsApp
+    const rawMobile = payload.mobile !== undefined ? String(payload.mobile).trim() : '';
+    if (rawMobile) {
+      if (/[a-zA-Z]/.test(rawMobile)) {
+        throw new Error('El número móvil/WhatsApp no puede contener letras.');
+      }
+      const digitsMobile = rawMobile.replace(/\D/g, '');
+      if (digitsMobile.length < 10 || digitsMobile.length > 13) {
+        throw new Error('El número móvil/WhatsApp debe tener entre 10 y 12 dígitos (ej. 310 123 4567 o +57 310 123 4567).');
+      }
+    }
+
     const categories = Array.isArray(payload.category_ids)
       ? payload.category_ids.map((t) => String(t).trim()).filter(Boolean)
       : String(payload.category_ids || '')

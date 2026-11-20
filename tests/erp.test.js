@@ -154,6 +154,22 @@ describe('CHapp ERP — End-to-End API & Workflow Suite', () => {
     assert.equal(dupCleanVatRes.status, 400);
     assert.match(dupCleanVatRes.json.error, /ya existe un contacto registrado con este documento/i);
 
+    // Edge case: letters in phone rejected
+    const badPhoneRes = await req('/api/contacts', 'POST', {
+      name: 'Contacto Tel Inválido',
+      phone: '320abc1122'
+    });
+    assert.equal(badPhoneRes.status, 400);
+    assert.match(badPhoneRes.json.error, /teléfono fijo/i);
+
+    // Edge case: excessively long mobile rejected
+    const badMobileRes = await req('/api/contacts', 'POST', {
+      name: 'Contacto Móvil Inválido',
+      mobile: '3101234567890123456789'
+    });
+    assert.equal(badMobileRes.status, 400);
+    assert.match(badMobileRes.json.error, /móvil\/whatsapp/i);
+
     // Default city on new contact without city specified is Pereira
     const defaultCityContact = await req('/api/contacts', 'POST', {
       name: 'Comercializadora Risaralda S.A.S.'
