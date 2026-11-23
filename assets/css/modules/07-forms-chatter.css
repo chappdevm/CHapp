@@ -36,6 +36,68 @@
   border: 1px solid var(--o-border-color);
   border-radius: 8px;
   padding: 0.6rem 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 18;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+}
+
+.o_mobile_save_bar {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .o_form_statusbar {
+    position: static;
+    box-shadow: none;
+  }
+
+  .o_mobile_save_bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 25;
+    padding: 0.65rem 1rem calc(0.65rem + env(safe-area-inset-bottom, 0px));
+    background: var(--o-navbar-bg);
+    border-top: 1px solid var(--o-border-color);
+    box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.28);
+  }
+
+  .o_mobile_save_total {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .o_mobile_save_label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--o-text-muted);
+    font-weight: 600;
+  }
+
+  .o_mobile_save_total strong {
+    font-size: 1rem;
+    color: var(--o-text-main);
+    white-space: nowrap;
+  }
+
+  .o_mobile_save_bar .btn {
+    min-height: 44px;
+    padding: 0.5rem 1.35rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .o_content:has(.o_mobile_save_bar) {
+    padding-bottom: 5.5rem;
+  }
 }
 
 .o_statusbar_buttons {

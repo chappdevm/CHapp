@@ -412,6 +412,7 @@
           </div>
         </aside>
       </div>
+      ${isEditable || (!isNew && existing.state === 'sale') ? `<div class="o_mobile_save_bar" id="saleMobileSaveBar"><div class="o_mobile_save_total"><span class="o_mobile_save_label">Total</span><strong id="saleMobileTotalVal">${formatMoney(calcTotal)}</strong></div><button type="button" class="btn btn-primary" id="btnMobileSaveSale">${isEditable ? 'Guardar' : 'Guardar Contrato'}</button></div>` : ''}
     `;
 
     wireChatterEvents('sales', existing.id);
@@ -718,6 +719,7 @@
       });
     }
 
+    document.getElementById('btnMobileSaveSale')?.addEventListener('click', () => document.getElementById(isEditable ? 'btnSaveSaleOrder' : 'btnSaveContractData')?.click());
     const btnSendSaleWa = document.getElementById('btnSendSaleWhatsApp');
     if (btnSendSaleWa) {
       btnSendSaleWa.addEventListener('click', () => {
