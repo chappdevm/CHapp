@@ -572,7 +572,17 @@
       }
     });
 
-    // Line events
+    // Line events (preserve scroll on edit; scroll + highlight on new line)
+    const rerenderKeepScroll = (focusIdx = -1, highlightNew = false) => {
+      const sy = typeof window !== 'undefined' ? window.scrollY : 0;
+      const ct = container.scrollTop;
+      renderSaleOrderForm(container);
+      if (highlightNew && focusIdx >= 0) {
+        const row = container.querySelector(`#saleLinesTbody tr[data-line-idx="${focusIdx}"]`);
+        if (row) { row.classList.add('is-newly-added'); row.scrollIntoView({ behavior: 'smooth', block: 'center' }); row.querySelector('.line-product')?.focus({ preventScroll: true }); }
+      } else { if (typeof window !== 'undefined') window.scrollTo(0, sy); container.scrollTop = ct; }
+    };
+
     container.querySelectorAll('.line-product').forEach((sel) => {
       sel.addEventListener('change', () => {
         syncSaleDraft();
@@ -588,7 +598,7 @@
           line.measure = m;
           line.price_unit = m * Number(prod.list_price || 0);
           line.tax_rate = prod.tax_rate !== undefined && prod.tax_rate !== null && prod.tax_rate !== '' ? prod.tax_rate : '';
-          renderSaleOrderForm(container);
+          rerenderKeepScroll(idx, false);
         }
       });
     });
@@ -602,30 +612,23 @@
           const prod = (state.data.products || []).find((p) => Number(p.id) === Number(line.product_id));
           const m = Number(inp.value || 1);
           line.measure = m;
-          if (prod) {
-            line.price_unit = m * Number(prod.list_price || 0);
-          }
-          renderSaleOrderForm(container);
+          if (prod) line.price_unit = m * Number(prod.list_price || 0);
+          rerenderKeepScroll(idx, false);
         }
       });
     });
 
     container.querySelectorAll('.line-qty, .line-price, .line-disc, .line-tax').forEach((inp) => {
-      inp.addEventListener('change', () => {
-        syncSaleDraft();
-        renderSaleOrderForm(container);
-      });
+      inp.addEventListener('change', () => { syncSaleDraft(); rerenderKeepScroll(-1, false); });
     });
 
     container.querySelectorAll('.btn-remove-line').forEach((btn) => {
       btn.addEventListener('click', () => {
         syncSaleDraft();
         const idx = Number(btn.getAttribute('data-idx'));
-        if (state.formDraft.lines.length <= 1) {
-          return showToast('El pedido debe conservar al menos una línea.', true);
-        }
+        if (state.formDraft.lines.length <= 1) return showToast('El pedido debe conservar al menos una línea.', true);
         state.formDraft.lines.splice(idx, 1);
-        renderSaleOrderForm(container);
+        rerenderKeepScroll(-1, false);
       });
     });
 
@@ -633,19 +636,9 @@
     if (btnAddLineEl) {
       btnAddLineEl.addEventListener('click', () => {
         syncSaleDraft();
-        state.formDraft.lines.push({
-          id: Date.now(),
-          product_id: '',
-          product_name: '',
-          description: '',
-          measure: 1,
-          uom: '',
-          quantity: 1,
-          price_unit: 0,
-          discount: 0,
-          tax_rate: ''
-        });
-        renderSaleOrderForm(container);
+        const newIdx = state.formDraft.lines.length;
+        state.formDraft.lines.push({ id: Date.now(), product_id: '', product_name: '', description: '', measure: 1, uom: '', quantity: 1, price_unit: 0, discount: 0, tax_rate: '' });
+        rerenderKeepScroll(newIdx, true);
       });
     }
 

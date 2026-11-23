@@ -387,6 +387,11 @@
     max-block-size: min(560px, 72vh);
   }
 
+  .o_form_sheet .table-wrapper {
+    max-block-size: none;
+    overflow: visible;
+  }
+
   .o_kanban_record {
     padding: 0.75rem 0.85rem;
     gap: 0.65rem;
@@ -438,6 +443,16 @@
   margin: 0;
   accent-color: var(--o-action, #14b5d9);
   cursor: pointer;
+}
+
+.o_list_table tbody tr.is-newly-added {
+  animation: chappLinePulse 1.4s ease;
+  box-shadow: 0 0 0 2px var(--o-action, #14b5d9);
+}
+
+@keyframes chappLinePulse {
+  0% { background-color: rgba(20, 181, 217, 0.28); }
+  100% { background-color: transparent; }
 }
 
 .o_list_table tbody tr.is-selected td,
