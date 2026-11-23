@@ -305,7 +305,7 @@
                               </select>
                             </th>
                             <td><input type="number" class="o_input line-measure" data-idx="${idx}" min="0" step="any" value="${measureVal}" ${!isEditable ? 'readonly' : ''} /></td>
-                            <td style="text-align: center;"><input type="text" class="o_input line-uom" data-idx="${idx}" value="${esc(formatUomShort(uomName))}" readonly style="background: var(--o-bg-subtle, #f8fafc); color: #074073; font-weight: 700; text-align: center;" /></td>
+                            <td style="text-align: center;"><input type="text" class="o_input line-uom" data-idx="${idx}" value="${esc(formatUomShort(uomName))}" readonly style="background: var(--o-bg-subtle); color: var(--o-action); border-color: var(--o-border-color); font-weight: 700; text-align: center; cursor: default;" /></td>
                             <td><input type="number" class="o_input line-price" data-idx="${idx}" min="0" step="any" value="${Number(l.price_unit || 0)}" ${!isEditable ? 'readonly' : ''} /></td>
                             <td><input type="number" class="o_input line-qty" data-idx="${idx}" min="1" step="any" value="${Number(l.quantity || 1)}" ${!isEditable ? 'readonly' : ''} /></td>
                             <td><input type="number" class="o_input line-disc" data-idx="${idx}" min="0" max="100" step="any" value="${Number(l.discount || 0)}" ${!isEditable ? 'readonly' : ''} /></td>

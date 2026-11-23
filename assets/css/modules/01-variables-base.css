@@ -52,6 +52,11 @@
   --o-border-color: #0d4370;
   --o-text-main: #F2F2F2;
   --o-text-muted: #95b8d4;
+  --o-bg-subtle: #051a2c;
+  --o-bg-surface: #072c4d;
+  --o-border: #0d4370;
+  --o-text: #F2F2F2;
+  --o-heading: #14B5D9;
 
   /* Home Menu Dark Variables */
   --AppSwitcherBg-base: #031626;
@@ -107,6 +112,11 @@
   --o-border-color: #c9dbe7;
   --o-text-main: #031626;
   --o-text-muted: #426f95;
+  --o-bg-subtle: #f1f5f9;
+  --o-bg-surface: #ffffff;
+  --o-border: #c9dbe7;
+  --o-text: #031626;
+  --o-heading: #074073;
 
   --AppSwitcherBg-base: #F2F2F2;
   --AppSwitcherBg-contrastRadial: rgba(226, 234, 240, 0.92);
