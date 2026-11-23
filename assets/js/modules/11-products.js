@@ -128,6 +128,8 @@
       label = 'Precio por Metro Lineal';
     } else if (uom === 'Metro Cuadrado') {
       label = 'Precio por Metro Cuadrado';
+    } else if (uom === 'Unidad') {
+      label = 'Precio por Unidad';
     }
     return withCurrency ? `${label} (COP)` : label;
   }
@@ -205,6 +207,7 @@
                       <option value="" ${!existing.uom ? 'selected disabled' : ''}>— Seleccione Unidad de Medida —</option>
                       <option value="Metro Cuadrado" ${existing.uom === 'Metro Cuadrado' ? 'selected' : ''}>Metro Cuadrado (m²)</option>
                       <option value="Metro Lineal" ${existing.uom === 'Metro Lineal' || existing.uom === 'Metro Liso' ? 'selected' : ''}>Metro Lineal</option>
+                      <option value="Unidad" ${existing.uom === 'Unidad' ? 'selected' : ''}>Unidad (und)</option>
                       <option value="Metro Liso" style="display: none;">Metro Liso</option>
                     </select>
                   </div>

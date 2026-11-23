@@ -270,17 +270,17 @@
 
                 <div id="saleTabLinesPanel" style="${activeSaleTab === 'lines' ? '' : 'display: none;'}">
                 <div tabindex="0" role="region" aria-label="Líneas del pedido de venta" class="table-wrapper" style="margin-bottom: 0.75rem;">
-                  <table class="o_list_table" style="--label-2: 'Medida'; --label-3: 'U. Medida'; --label-4: 'Precio Unit.'; --label-5: 'Cant.'; --label-6: 'Desc %'; --label-7: 'IVA %'; --label-8: 'Subtotal'; --label-9: 'Acción';">
+                  <table class="o_list_table" style="--label-2: 'Medida'; --label-3: 'Precio Unit.'; --label-4: 'Cant.'; --label-5: 'Unidades'; --label-6: 'Desc %'; --label-7: 'IVA %'; --label-8: 'Subtotal'; --label-9: 'Acción';">
                     <thead>
                       <tr>
                         <th>Producto / Servicio</th>
-                        <th style="width: 95px;">Medida</th>
-                        <th style="width: 85px; text-align: center;">Und. Medida</th>
-                        <th style="width: 135px;">Precio Unit.</th>
-                        <th style="width: 85px;">Cant.</th>
-                        <th style="width: 80px;">Desc.%</th>
-                        <th style="width: 90px;">IVA %</th>
-                        <th class="text-end" style="width: 120px;">Subtotal</th>
+                        <th style="width: 90px;">Medida</th>
+                        <th style="width: 130px;">Precio Unit.</th>
+                        <th style="width: 80px;">Cant.</th>
+                        <th style="width: 115px;">Unidades</th>
+                        <th style="width: 75px;">Desc.%</th>
+                        <th style="width: 85px;">IVA %</th>
+                        <th class="text-end" style="width: 115px;">Subtotal</th>
                         ${isEditable ? `<th style="width: 50px;"></th>` : ''}
                       </tr>
                     </thead>
@@ -289,8 +289,10 @@
                         .map((l, idx) => {
                           const prod = (state.data.products || []).find((p) => Number(p.id) === Number(l.product_id));
                           const uomName = l.uom || (prod ? prod.uom : '') || 'Metro Cuadrado';
-                          const measureVal = l.measure !== undefined && l.measure !== null ? Number(l.measure) : 1;
-                          const lineGrossSub = Number(l.quantity || 0) * Number(l.price_unit || 0);
+                          const isUnitUom = /^und|unidad/i.test(uomName);
+                          const measureVal = isUnitUom ? 1 : (l.measure !== undefined && l.measure !== null ? Number(l.measure) : 1);
+                          const qtyInt = Math.max(1, Math.floor(Number(l.quantity) || 1));
+                          const lineGrossSub = qtyInt * Number(l.price_unit || 0);
                           return `
                           <tr data-line-idx="${idx}">
                             <th>
@@ -304,10 +306,10 @@
                                   .join('')}
                               </select>
                             </th>
-                            <td><input type="number" class="o_input line-measure" data-idx="${idx}" min="0" step="any" value="${measureVal}" ${!isEditable ? 'readonly' : ''} /></td>
-                            <td style="text-align: center;"><input type="text" class="o_input line-uom" data-idx="${idx}" value="${esc(formatUomShort(uomName))}" readonly style="background: var(--o-bg-subtle); color: var(--o-action); border-color: var(--o-border-color); font-weight: 700; text-align: center; cursor: default;" /></td>
+                            <td><input type="number" class="o_input line-measure" data-idx="${idx}" min="0" step="any" value="${measureVal}" ${!isEditable || isUnitUom ? 'readonly' : ''} style="${isUnitUom ? 'opacity: 0.55; cursor: default;' : ''}" /></td>
                             <td><input type="number" class="o_input line-price" data-idx="${idx}" min="0" step="any" value="${Number(l.price_unit || 0)}" ${!isEditable ? 'readonly' : ''} /></td>
-                            <td><input type="number" class="o_input line-qty" data-idx="${idx}" min="1" step="any" value="${Number(l.quantity || 1)}" ${!isEditable ? 'readonly' : ''} /></td>
+                            <td><input type="number" class="o_input line-qty" data-idx="${idx}" min="1" step="1" inputmode="numeric" value="${qtyInt}" ${!isEditable ? 'readonly' : ''} /></td>
+                            <td><select class="o_select line-uom" data-idx="${idx}" ${!isEditable ? 'disabled' : ''} style="color: var(--o-action); font-weight: 700;"><option value="Unidad" ${isUnitUom ? 'selected' : ''}>Unidad (und)</option><option value="Metro Cuadrado" ${uomName === 'Metro Cuadrado' ? 'selected' : ''}>Metro² (m²)</option><option value="Metro Lineal" ${uomName === 'Metro Lineal' || uomName === 'Metro Liso' ? 'selected' : ''}>Metro (m)</option>${!isUnitUom && uomName !== 'Metro Cuadrado' && uomName !== 'Metro Lineal' && uomName !== 'Metro Liso' ? `<option value="${esc(uomName)}" selected>${esc(formatUomShort(uomName))}</option>` : ''}</select></td>
                             <td><input type="number" class="o_input line-disc" data-idx="${idx}" min="0" max="100" step="any" value="${Number(l.discount || 0)}" ${!isEditable ? 'readonly' : ''} /></td>
                             <td>
                               <select class="o_select line-tax" data-idx="${idx}" ${!isEditable ? 'disabled' : ''}>
@@ -452,7 +454,9 @@
         const measureInp = tr.querySelector('.line-measure');
         if (measureInp) line.measure = Number(measureInp.value || 1);
         const qtyInp = tr.querySelector('.line-qty');
-        if (qtyInp) line.quantity = Number(qtyInp.value || 1);
+        if (qtyInp) line.quantity = Math.max(1, Math.floor(Number(qtyInp.value) || 1));
+        const uomSel = tr.querySelector('.line-uom');
+        if (uomSel && uomSel.value) line.uom = uomSel.value;
         const priceInp = tr.querySelector('.line-price');
         if (priceInp) line.price_unit = Number(priceInp.value || 0);
         const discInp = tr.querySelector('.line-disc');
@@ -594,9 +598,10 @@
           line.product_name = prod.name;
           line.description = prod.name;
           line.uom = prod.uom || 'Metro Cuadrado';
-          const m = Number(line.measure !== undefined && line.measure !== null ? line.measure : 1);
+          const isUnit = /^und|unidad/i.test(line.uom);
+          const m = isUnit ? 1 : Number(line.measure !== undefined && line.measure !== null ? line.measure : 1);
           line.measure = m;
-          line.price_unit = m * Number(prod.list_price || 0);
+          line.price_unit = isUnit ? Number(prod.list_price || 0) : m * Number(prod.list_price || 0);
           line.tax_rate = prod.tax_rate !== undefined && prod.tax_rate !== null && prod.tax_rate !== '' ? prod.tax_rate : '';
           rerenderKeepScroll(idx, false);
         }
@@ -618,7 +623,33 @@
       });
     });
 
-    container.querySelectorAll('.line-qty, .line-price, .line-disc, .line-tax').forEach((inp) => {
+    container.querySelectorAll('.line-qty').forEach((inp) => {
+      inp.addEventListener('keydown', (e) => { if (['.', ',', 'e', 'E', '-', '+'].includes(e.key)) e.preventDefault(); });
+      inp.addEventListener('input', () => { inp.value = inp.value.replace(/[^\d]/g, ''); });
+      inp.addEventListener('change', () => {
+        const raw = Number(inp.value);
+        if (!Number.isInteger(raw) || raw < 1) { inp.value = '1'; showToast('La cantidad debe ser un número entero mayor o igual a 1.', true); }
+        syncSaleDraft();
+        rerenderKeepScroll(-1, false);
+      });
+    });
+
+    container.querySelectorAll('.line-uom').forEach((sel) => {
+      sel.addEventListener('change', () => {
+        syncSaleDraft();
+        const idx = Number(sel.getAttribute('data-idx'));
+        const line = state.formDraft.lines[idx];
+        if (line) {
+          line.uom = sel.value;
+          const prod = (state.data.products || []).find((p) => Number(p.id) === Number(line.product_id));
+          if (/^und|unidad/i.test(line.uom)) { line.measure = 1; if (prod) line.price_unit = Number(prod.list_price || 0); }
+          else if (prod) { line.price_unit = Number(line.measure || 1) * Number(prod.list_price || 0); }
+          rerenderKeepScroll(idx, false);
+        }
+      });
+    });
+
+    container.querySelectorAll('.line-price, .line-disc, .line-tax').forEach((inp) => {
       inp.addEventListener('change', () => { syncSaleDraft(); rerenderKeepScroll(-1, false); });
     });
 
@@ -796,55 +827,31 @@
       });
     });
 
-    const openInvBtn = document.getElementById('btnOpenSaleInvoice');
-    if (openInvBtn) {
-      openInvBtn.addEventListener('click', () => {
-        if (existing.invoice_ids.length === 1) {
-          const invId = existing.invoice_ids[0];
-          openApp('accounting', { submenu: 'out_invoice', viewType: 'form', recordId: invId, returnTo: { app: 'sales', submenu: state.submenu, viewType: 'form', recordId: state.activeRecordId } });
-        } else {
-          const panel = container.querySelector('.o_linked_invoices_panel');
-          if (panel) {
-            panel.scrollIntoView({ behavior: 'smooth' });
-          } else {
-            const invId = existing.invoice_ids[existing.invoice_ids.length - 1];
-            openApp('accounting', { submenu: 'out_invoice', viewType: 'form', recordId: invId, returnTo: { app: 'sales', submenu: state.submenu, viewType: 'form', recordId: state.activeRecordId } });
-          }
-        }
-      });
-    }
+    const openInvoiceById = (invId) => {
+      if (invId) openApp('accounting', { submenu: 'out_invoice', viewType: 'form', recordId: invId, returnTo: { app: 'sales', submenu: state.submenu, viewType: 'form', recordId: state.activeRecordId } });
+    };
+
+    document.getElementById('btnOpenSaleInvoice')?.addEventListener('click', () => {
+      if (existing.invoice_ids.length === 1) return openInvoiceById(existing.invoice_ids[0]);
+      const panel = container.querySelector('.o_linked_invoices_panel');
+      if (panel) panel.scrollIntoView({ behavior: 'smooth' });
+      else openInvoiceById(existing.invoice_ids[existing.invoice_ids.length - 1]);
+    });
 
     container.querySelectorAll('.o_linked_invoices_panel tbody tr[data-invoice-id]').forEach((row) => {
-      row.addEventListener('click', () => {
-        const moveId = Number(row.getAttribute('data-invoice-id'));
-        if (moveId) {
-          openApp('accounting', { submenu: 'out_invoice', viewType: 'form', recordId: moveId, returnTo: { app: 'sales', submenu: state.submenu, viewType: 'form', recordId: state.activeRecordId } });
-        }
-      });
+      row.addEventListener('click', () => openInvoiceById(Number(row.getAttribute('data-invoice-id'))));
     });
 
     container.querySelectorAll('.btn-goto-invoice').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const moveId = Number(btn.getAttribute('data-invoice-id'));
-        if (moveId) {
-          openApp('accounting', { submenu: 'out_invoice', viewType: 'form', recordId: moveId, returnTo: { app: 'sales', submenu: state.submenu, viewType: 'form', recordId: state.activeRecordId } });
-        }
-      });
+      btn.addEventListener('click', (e) => { e.stopPropagation(); openInvoiceById(Number(btn.getAttribute('data-invoice-id'))); });
     });
 
     container.querySelectorAll('.btn-pay-sale-invoice, .btn-pay-plan-invoice').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const moveId = Number(btn.getAttribute('data-invoice-id'));
-        const moves = (state.data.accounting && state.data.accounting.moves) || [];
-        const targetMove = moves.find((m) => Number(m.id) === moveId);
-        if (!targetMove) {
-          return showToast('Factura no encontrada.', true);
-        }
-        if (typeof window.openPaymentModal === 'function') {
-          window.openPaymentModal(targetMove);
-        }
+        const targetMove = ((state.data.accounting && state.data.accounting.moves) || []).find((m) => Number(m.id) === Number(btn.getAttribute('data-invoice-id')));
+        if (!targetMove) return showToast('Factura no encontrada.', true);
+        if (typeof window.openPaymentModal === 'function') window.openPaymentModal(targetMove);
       });
     });
 
@@ -852,8 +859,7 @@
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         withActionLock(btn, async () => {
-          const moveId = Number(btn.getAttribute('data-invoice-id'));
-          await apiCall(`/api/accounting/moves/${moveId}/action`, 'POST', { action: 'post' });
+          await apiCall(`/api/accounting/moves/${Number(btn.getAttribute('data-invoice-id'))}/action`, 'POST', { action: 'post' });
           state.formDraft = null;
           showToast('Factura publicada.');
           renderModuleWorkspace();
@@ -863,23 +869,12 @@
 
     const handlePdfDownload = (autoPrint) => {
       syncSaleDraft();
-      if (currentDocType === 'contract' && typeof downloadContractPdf === 'function') {
-        downloadContractPdf(previewData, autoPrint);
-      } else if (currentDocType === 'invoice' && linkedOrderMoves.length > 0 && typeof downloadInvoicePdf === 'function') {
-        downloadInvoicePdf(linkedOrderMoves[0], autoPrint);
-      } else {
-        downloadSalePdf(previewData, autoPrint);
-      }
+      if (currentDocType === 'contract' && typeof downloadContractPdf === 'function') downloadContractPdf(previewData, autoPrint);
+      else if (currentDocType === 'invoice' && linkedOrderMoves.length > 0 && typeof downloadInvoicePdf === 'function') downloadInvoicePdf(linkedOrderMoves[0], autoPrint);
+      else downloadSalePdf(previewData, autoPrint);
     };
 
-    const btnPrintSale = document.getElementById('btnPrintSalePdf');
-    if (btnPrintSale) {
-      btnPrintSale.addEventListener('click', () => handlePdfDownload(true));
-    }
-
-    const btnDownloadSale = document.getElementById('btnDownloadSalePdf');
-    if (btnDownloadSale) {
-      btnDownloadSale.addEventListener('click', () => handlePdfDownload(false));
-    }
+    document.getElementById('btnPrintSalePdf')?.addEventListener('click', () => handlePdfDownload(true));
+    document.getElementById('btnDownloadSalePdf')?.addEventListener('click', () => handlePdfDownload(false));
   }
 

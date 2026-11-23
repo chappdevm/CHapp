@@ -2473,8 +2473,8 @@ class ERPStore {
       const discount = Math.min(100, Math.max(0, Number(line.discount ?? 0)));
       const taxRate = Number(line.tax_rate ?? (product ? product.tax_rate : 19));
 
-      if (!Number.isFinite(qty) || qty <= 0) {
-        throw new Error(`La cantidad en la línea ${idx + 1} debe ser mayor a 0.`);
+      if (!Number.isFinite(qty) || qty < 1 || !Number.isInteger(qty)) {
+        throw new Error(`La cantidad en la línea ${idx + 1} debe ser un número entero mayor o igual a 1.`);
       }
       if (!Number.isFinite(price) || price < 0) {
         throw new Error(`El precio unitario en la línea ${idx + 1} no puede ser negativo.`);
