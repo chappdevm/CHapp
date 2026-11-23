@@ -2492,6 +2492,7 @@ class ERPStore {
         description: String(line.description || (product ? product.name : 'Servicio')).trim(),
         measure: Number.isFinite(measure) && measure > 0 ? measure : 1,
         quantity: qty,
+        qty_uom: String(line.qty_uom || 'Unidad').trim(),
         uom: String(line.uom || (product ? product.uom : 'Metro Cuadrado')),
         price_unit: price,
         discount,

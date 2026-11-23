@@ -19,7 +19,7 @@
           state: 'draft',
           invoice_status: 'no',
           lines: state.formDraft && state.formDraft.lines ? state.formDraft.lines : [
-            { id: 1, product_id: '', product_name: '', description: '', measure: 1, uom: '', quantity: 1, price_unit: 0, discount: 0, tax_rate: '', subtotal: 0, tax_amount: 0, total: 0 }
+            { id: 1, product_id: '', product_name: '', description: '', measure: 1, uom: '', quantity: 1, qty_uom: 'Unidad', price_unit: 0, discount: 0, tax_rate: '', subtotal: 0, tax_amount: 0, total: 0 }
           ],
           notes: state.data.settings.sale_terms || '',
           invoice_ids: [],
@@ -270,17 +270,18 @@
 
                 <div id="saleTabLinesPanel" style="${activeSaleTab === 'lines' ? '' : 'display: none;'}">
                 <div tabindex="0" role="region" aria-label="Líneas del pedido de venta" class="table-wrapper" style="margin-bottom: 0.75rem;">
-                  <table class="o_list_table" style="--label-2: 'Medida'; --label-3: 'Precio Unit.'; --label-4: 'Cant.'; --label-5: 'Unidades'; --label-6: 'Desc %'; --label-7: 'IVA %'; --label-8: 'Subtotal'; --label-9: 'Acción';">
+                  <table class="o_list_table" style="--label-2: 'Medida'; --label-3: 'Und. Medida'; --label-4: 'Precio Unit.'; --label-5: 'Cant.'; --label-6: 'Unidades'; --label-7: 'Desc %'; --label-8: 'IVA %'; --label-9: 'Subtotal'; --label-10: 'Acción';">
                     <thead>
                       <tr>
                         <th>Producto / Servicio</th>
-                        <th style="width: 90px;">Medida</th>
-                        <th style="width: 130px;">Precio Unit.</th>
-                        <th style="width: 80px;">Cant.</th>
-                        <th style="width: 115px;">Unidades</th>
+                        <th style="width: 85px;">Medida</th>
+                        <th style="width: 85px; text-align: center;">Und. Medida</th>
+                        <th style="width: 125px;">Precio Unit.</th>
+                        <th style="width: 75px;">Cant.</th>
+                        <th style="width: 110px;">Unidades</th>
                         <th style="width: 75px;">Desc.%</th>
                         <th style="width: 85px;">IVA %</th>
-                        <th class="text-end" style="width: 115px;">Subtotal</th>
+                        <th class="text-end" style="width: 110px;">Subtotal</th>
                         ${isEditable ? `<th style="width: 50px;"></th>` : ''}
                       </tr>
                     </thead>
@@ -292,6 +293,7 @@
                           const isUnitUom = /^und|unidad/i.test(uomName);
                           const measureVal = isUnitUom ? 1 : (l.measure !== undefined && l.measure !== null ? Number(l.measure) : 1);
                           const qtyInt = Math.max(1, Math.floor(Number(l.quantity) || 1));
+                          const qtyUom = l.qty_uom || 'Unidad';
                           const lineGrossSub = qtyInt * Number(l.price_unit || 0);
                           return `
                           <tr data-line-idx="${idx}">
@@ -307,9 +309,10 @@
                               </select>
                             </th>
                             <td><input type="number" class="o_input line-measure" data-idx="${idx}" min="0" step="any" value="${measureVal}" ${!isEditable || isUnitUom ? 'readonly' : ''} style="${isUnitUom ? 'opacity: 0.55; cursor: default;' : ''}" /></td>
+                            <td style="text-align: center;"><input type="text" class="o_input line-uom" data-idx="${idx}" value="${esc(formatUomShort(uomName))}" readonly style="background: var(--o-bg-subtle); color: var(--o-action); border-color: var(--o-border-color); font-weight: 700; text-align: center; cursor: default;" /></td>
                             <td><input type="number" class="o_input line-price" data-idx="${idx}" min="0" step="any" value="${Number(l.price_unit || 0)}" ${!isEditable ? 'readonly' : ''} /></td>
                             <td><input type="number" class="o_input line-qty" data-idx="${idx}" min="1" step="1" inputmode="numeric" value="${qtyInt}" ${!isEditable ? 'readonly' : ''} /></td>
-                            <td><select class="o_select line-uom" data-idx="${idx}" ${!isEditable ? 'disabled' : ''} style="color: var(--o-action); font-weight: 700;"><option value="Unidad" ${isUnitUom ? 'selected' : ''}>Unidad (und)</option><option value="Metro Cuadrado" ${uomName === 'Metro Cuadrado' ? 'selected' : ''}>Metro² (m²)</option><option value="Metro Lineal" ${uomName === 'Metro Lineal' || uomName === 'Metro Liso' ? 'selected' : ''}>Metro (m)</option>${!isUnitUom && uomName !== 'Metro Cuadrado' && uomName !== 'Metro Lineal' && uomName !== 'Metro Liso' ? `<option value="${esc(uomName)}" selected>${esc(formatUomShort(uomName))}</option>` : ''}</select></td>
+                            <td><select class="o_select line-qty-uom" data-idx="${idx}" ${!isEditable ? 'disabled' : ''} style="color: var(--o-action); font-weight: 700;"><option value="Unidad" ${qtyUom === 'Unidad' ? 'selected' : ''}>Unidad (und)</option><option value="Caja" ${qtyUom === 'Caja' ? 'selected' : ''}>Caja</option><option value="Rollo" ${qtyUom === 'Rollo' ? 'selected' : ''}>Rollo</option><option value="Juego" ${qtyUom === 'Juego' ? 'selected' : ''}>Juego</option><option value="Par" ${qtyUom === 'Par' ? 'selected' : ''}>Par</option><option value="Paquete" ${qtyUom === 'Paquete' ? 'selected' : ''}>Paquete</option><option value="Metro" ${qtyUom === 'Metro' ? 'selected' : ''}>Metro (m)</option></select></td>
                             <td><input type="number" class="o_input line-disc" data-idx="${idx}" min="0" max="100" step="any" value="${Number(l.discount || 0)}" ${!isEditable ? 'readonly' : ''} /></td>
                             <td>
                               <select class="o_select line-tax" data-idx="${idx}" ${!isEditable ? 'disabled' : ''}>
@@ -455,8 +458,8 @@
         if (measureInp) line.measure = Number(measureInp.value || 1);
         const qtyInp = tr.querySelector('.line-qty');
         if (qtyInp) line.quantity = Math.max(1, Math.floor(Number(qtyInp.value) || 1));
-        const uomSel = tr.querySelector('.line-uom');
-        if (uomSel && uomSel.value) line.uom = uomSel.value;
+        const qtyUomSel = tr.querySelector('.line-qty-uom');
+        if (qtyUomSel && qtyUomSel.value) line.qty_uom = qtyUomSel.value;
         const priceInp = tr.querySelector('.line-price');
         if (priceInp) line.price_unit = Number(priceInp.value || 0);
         const discInp = tr.querySelector('.line-disc');
@@ -634,18 +637,12 @@
       });
     });
 
-    container.querySelectorAll('.line-uom').forEach((sel) => {
+    container.querySelectorAll('.line-qty-uom').forEach((sel) => {
       sel.addEventListener('change', () => {
         syncSaleDraft();
         const idx = Number(sel.getAttribute('data-idx'));
         const line = state.formDraft.lines[idx];
-        if (line) {
-          line.uom = sel.value;
-          const prod = (state.data.products || []).find((p) => Number(p.id) === Number(line.product_id));
-          if (/^und|unidad/i.test(line.uom)) { line.measure = 1; if (prod) line.price_unit = Number(prod.list_price || 0); }
-          else if (prod) { line.price_unit = Number(line.measure || 1) * Number(prod.list_price || 0); }
-          rerenderKeepScroll(idx, false);
-        }
+        if (line) { line.qty_uom = sel.value; rerenderKeepScroll(idx, false); }
       });
     });
 
@@ -668,7 +665,7 @@
       btnAddLineEl.addEventListener('click', () => {
         syncSaleDraft();
         const newIdx = state.formDraft.lines.length;
-        state.formDraft.lines.push({ id: Date.now(), product_id: '', product_name: '', description: '', measure: 1, uom: '', quantity: 1, price_unit: 0, discount: 0, tax_rate: '' });
+        state.formDraft.lines.push({ id: Date.now(), product_id: '', product_name: '', description: '', measure: 1, uom: '', quantity: 1, qty_uom: 'Unidad', price_unit: 0, discount: 0, tax_rate: '' });
         rerenderKeepScroll(newIdx, true);
       });
     }
