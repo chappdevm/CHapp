@@ -157,3 +157,34 @@ button, input, select, textarea {
   color: inherit;
 }
 
+/* Mobile & Tablet Natural Full-Page Scrolling:
+   Prevents navbar + control panel from staying stuck at the top and eating half the screen */
+@media (max-width: 768px) {
+  html,
+  body {
+    height: auto;
+    min-height: 100dvh;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .o_web_client {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+    overflow-x: clip;
+  }
+
+  #moduleWorkspace {
+    overflow: visible !important;
+    height: auto;
+    min-height: 0;
+  }
+
+  .o_home_menu,
+  .o_content {
+    overflow-y: visible;
+    flex: 1 0 auto;
+  }
+}
+

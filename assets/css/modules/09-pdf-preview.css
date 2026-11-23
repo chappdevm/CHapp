@@ -166,6 +166,13 @@
   min-width: 0;
 }
 
+@media (max-width: 1100px) {
+  .o_invoice_pdf_panel {
+    position: static;
+    max-height: none;
+  }
+}
+
 .o_pdf_panel_header {
   display: flex;
   justify-content: space-between;

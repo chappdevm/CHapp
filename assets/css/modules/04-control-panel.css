@@ -223,6 +223,8 @@
   .o_cp_breadcrumbs {
     font-size: 0.95rem;
     line-height: 1.25;
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 
   .o_cp_center {

@@ -202,28 +202,32 @@
   .o_menu_brand {
     order: 2;
     min-height: 44px;
-    padding: 0.25rem 0.45rem;
-    font-size: 0.95rem;
-    max-width: calc(100vw - 230px);
+    padding: 0.25rem 0.35rem;
+    font-size: 0.92rem;
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: none;
+    overflow: hidden;
   }
 
   .o_menu_brand span {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    min-width: 0;
   }
 
   .o_menu_systray {
     order: 3;
     margin-left: auto;
-    gap: 0.2rem;
+    gap: 0.1rem;
     flex-shrink: 0;
   }
 
   .o_systray_item {
     min-width: 44px;
     min-height: 44px;
-    padding: 0.3rem 0.4rem;
+    padding: 0.25rem 0.35rem;
     justify-content: center;
   }
 
