@@ -34,7 +34,8 @@
     font-size: 0.84rem;
   }
   .o_stat_card .o_stat_value {
-    font-size: 1.25rem;
+    font-size: clamp(0.95rem, 4.2vw, 1.25rem);
+    white-space: nowrap;
   }
 }
 
